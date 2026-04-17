@@ -920,6 +920,10 @@ Además de los endpoints del lenguaje Moset, el IDE incluye un **agente autónom
 
 ---
 
-**Dueño del ecosistema:** Tomás Segura
-**Base de Operaciones:** `S:\Naraka Studio\Moset\`
 **Licencia:** BUSL-1.1
+
+---
+
+<div align="center">
+  <i>Moset 2026 - Desarrollado por <b>narakastudio.com</b></i>
+</div>

@@ -62,5 +62,5 @@ npm run tauri dev
 
 ---
 <div align="center">
-  <i>Construido en Argentina por <b>Naraka Studio</b>.</i>
+  <i>Moset 2026 - Desarrollado por <b>narakastudio.com</b></i>
 </div>
