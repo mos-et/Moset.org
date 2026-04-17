@@ -8,6 +8,13 @@
   [![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](https://polyformproject.org/licenses/noncommercial/1.0.0)
   [![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)](https://www.rust-lang.org/)
   [![Tauri](https://img.shields.io/badge/Tauri-2.0-yellow.svg)](https://tauri.app/)
+
+  <br>
+  <a href="https://www.paypal.com/donate/?hosted_button_id=SJEV4XPZGFNP6">
+    <img src="https://img.shields.io/badge/Donar-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="Donar vía PayPal" />
+  </a>
+  <br>
+  <i>Creado y mantenido por <b><a href="https://narakastudio.com">narakastudio.com</a></b></i>
 </div>
 
 <br/>
