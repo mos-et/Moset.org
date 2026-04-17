@@ -1,0 +1,52 @@
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Bits Cuánticos Avanzados
+:@ Superposición y colapso probabilístico
+:@ ═══════════════════════════════════════════════
+
+:@ Bit cuántico puro (50/50)
+moneda = Bit:~
+mostrar "Moneda cuántica: "
+mostrar moneda
+
+:@ Colapso (observación)
+observado = !moneda
+mostrar "Después de observar: "
+mostrar observado
+
+:@ Bits sesgados
+alta_confianza = Bit:[0.95]
+baja_confianza = Bit:[0.10]
+medio = Bit:[0.50]
+
+mostrar "Alta confianza (95%): "
+mostrar !alta_confianza
+mostrar "Baja confianza (10%): "
+mostrar !baja_confianza
+mostrar "Medio (50%): "
+mostrar !medio
+
+:@ Uso en decisiones
+sensor_activo = Bit:[0.99]
+si !sensor_activo:
+    mostrar "Sensor detectó movimiento"
+sino:
+    mostrar "Sin actividad"
+
+:@ Múltiples colapsos del mismo bit
+dado = Bit:~
+mostrar "Tirada 1: "
+mostrar !dado
+mostrar "Tirada 2: "
+mostrar !dado
+mostrar "Tirada 3: "
+mostrar !dado
+
+:@ Bit como parámetro
+:,] decidir(confianza)
+    si !confianza:
+        mostrar "Acción ejecutada"
+    sino:
+        mostrar "Acción descartada"
+
+decidir(Bit:[0.80])
+decidir(Bit:[0.20])

@@ -1,0 +1,58 @@
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Pensar (Scoped Blocks)
+:@ Bloques aislados de ejecución
+:@ ═══════════════════════════════════════════════
+
+:@ Bloque pensar básico
+x = 10
+pensar:
+    y = 20
+    z = x + y
+    mostrar "Dentro del bloque: "
+    mostrar z
+
+:@ Variable x sigue accesible fuera
+mostrar "Fuera del bloque, x = "
+mostrar x
+
+:@ Pensar con cálculos complejos
+total = 0
+pensar:
+    precio = 100
+    cantidad = 5
+    subtotal = precio * cantidad
+    descuento = subtotal * 10 / 100
+    total = subtotal - descuento
+    mostrar "Subtotal: "
+    mostrar subtotal
+    mostrar "Descuento: "
+    mostrar descuento
+
+mostrar "Total calculado: "
+mostrar total
+
+:@ Pensar anidado
+pensar:
+    nivel1 = "exterior"
+    mostrar nivel1
+    pensar:
+        nivel2 = "interior"
+        mostrar nivel2
+
+:@ Pensar con condicional
+valor = 42
+pensar:
+    si valor > 40:
+        mostrar "Valor alto"
+    sino:
+        mostrar "Valor bajo"
+
+:@ Pensar con bucle
+pensar:
+    i = 0
+    acumulador = 0
+    mientras i < 5:
+        acumulador = acumulador + i
+        i = i + 1
+    mostrar "Suma 0..4: "
+    mostrar acumulador

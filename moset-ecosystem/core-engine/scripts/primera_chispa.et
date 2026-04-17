@@ -1,0 +1,45 @@
+:@ ============================================================
+:@ PRIMERA CHISPA — El primer latido del Soberano
+:@ ============================================================
+:@ Este script carga el motor Mythos con un modelo real
+:@ y ejecuta la primera inferencia nativa de Moset.
+:@ ============================================================
+
+:@ === Fase 1: Diagnostico del Motor ===
+mostrar "=== PRIMERA CHISPA DEL SOBERANO ==="
+mostrar ""
+
+estado = mythos_estado()
+mostrar "Estado Motor: " + estado
+
+diagnostico = mythos_diagnostico()
+mostrar "Diagnostico:"
+mostrar diagnostico
+mostrar ""
+
+:@ === Fase 2: Cargar el Modelo ===
+mostrar "=== CARGANDO MODELO GGUF ==="
+ruta_modelo = "S:\\Data Strix\\Modelos LM Studio\\lmstudio-community\\DeepSeek-R1-0528-Qwen3-8B-GGUF\\DeepSeek-R1-0528-Qwen3-8B-Q4_K_M.gguf"
+ruta_tokenizer = "S:\\Data Strix\\Modelos LM Studio\\lmstudio-community\\DeepSeek-R1-0528-Qwen3-8B-GGUF\\tokenizer.json"
+
+resultado_carga = mythos_cargar(ruta_modelo, ruta_tokenizer)
+mostrar resultado_carga
+mostrar ""
+
+:@ === Fase 3: Primera Inferencia ===
+mostrar "=== PRIMERA INFERENCIA ==="
+prompt = "Describe en una oracion que es la soberania digital."
+mostrar "Prompt: " + prompt
+mostrar ""
+
+respuesta = mythos(prompt, 64)
+mostrar "Mythos dice:"
+mostrar respuesta
+mostrar ""
+
+:@ === Verificacion Final ===
+mostrar "=== ESTADO POST-INFERENCIA ==="
+estado_final = mythos_estado()
+mostrar estado_final
+mostrar ""
+mostrar ">>> Primera chispa completada. El Soberano ha despertado. <<<"

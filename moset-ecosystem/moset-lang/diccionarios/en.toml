@@ -1,0 +1,40 @@
+# ============================================================================
+# MOSET — English Dictionary
+# ============================================================================
+# Maps human-readable words → Universal U-AST Tokens.
+# The LSP uses this file to render code in English.
+# ============================================================================
+
+[meta]
+nombre = "English"
+codigo = "en"
+autor = "Naraka Studio"
+
+[palabras_clave]
+if = "TOKEN_SI"
+else = "TOKEN_SINO"
+while = "TOKEN_MIENTRAS"
+for = "TOKEN_POR"
+each = "TOKEN_CADA"
+in = "TOKEN_EN"
+mold = "TOKEN_MOLDE"
+show = "TOKEN_MOSTRAR"
+import = "TOKEN_IMPORTAR"
+true = "TOKEN_VERDADERO"
+false = "TOKEN_FALSO"
+null = "TOKEN_NULO"
+and = "TOKEN_Y"
+or = "TOKEN_O"
+not = "TOKEN_NO"
+return = "TOKEN_DEVOLVER"
+
+[semantico]
+first = "INDEX_1"
+last = "INDEX_LAST"
+
+[tipos]
+integer = "TIPO_ENTERO"
+decimal = "TIPO_DECIMAL"
+text = "TIPO_TEXTO"
+boolean = "TIPO_BOOLEANO"
+list = "TIPO_LISTA"

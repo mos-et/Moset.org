@@ -1,0 +1,39 @@
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Condicionales
+:@ Flujos de control con si/sino
+:@ ═══════════════════════════════════════════════
+
+:@ Condicional simple
+edad = 25
+si edad >= 18:
+    mostrar "Mayor de edad"
+sino:
+    mostrar "Menor de edad"
+
+:@ Condicional con comparación de texto
+rol = "admin"
+si rol == "admin":
+    mostrar "Acceso total concedido"
+sino:
+    mostrar "Acceso denegado"
+
+:@ Condicional anidado
+temperatura = 35
+si temperatura > 30:
+    mostrar "Hace mucho calor"
+sino:
+    si temperatura > 20:
+        mostrar "Temperatura agradable"
+    sino:
+        mostrar "Hace frio"
+
+:@ Condicional con operaciones
+a = 10
+b = 20
+si a + b > 25:
+    mostrar "La suma supera 25"
+
+:@ Condicional con variable booleana
+activo = verdadero
+si activo:
+    mostrar "El sistema esta activo"

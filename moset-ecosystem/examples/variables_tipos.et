@@ -1,0 +1,23 @@
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Variables y Tipos
+:@ Demostración de inferencia de tipos nativos
+:@ ═══════════════════════════════════════════════
+
+:@ Variables numéricas
+x = 42
+y = 3.14
+z = x + y
+mostrar "Suma de entero y decimal: "
+mostrar z
+
+:@ Variables de texto
+nombre = "Naraka"
+saludo = "Hola, " + nombre + "!"
+mostrar saludo
+
+:@ Reasignación
+contador = 0
+contador = contador + 1
+contador = contador + 1
+mostrar "Contador: "
+mostrar contador

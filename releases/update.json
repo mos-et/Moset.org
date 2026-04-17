@@ -1,0 +1,11 @@
+{
+  "version": "0.1.0",
+  "notes": "Primera versión del Motor Soberano",
+  "pub_date": "2026-04-15T18:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "",
+      "url": "file:///S:/Naraka Studio/Moset/releases/Moset_IDE_0.1.0_x64-setup.nsis.zip"
+    }
+  }
+}

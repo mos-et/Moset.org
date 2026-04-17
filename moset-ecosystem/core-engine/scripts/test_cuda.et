@@ -1,0 +1,3 @@
+:@ Test CUDA: verificar que el motor detecta la GPU
+x = 42
+imprimir(x)

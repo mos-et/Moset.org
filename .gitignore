@@ -1,0 +1,39 @@
+# ═══════════════════════════════════════════════
+# Moset Global Ecosystem — .gitignore
+# ═══════════════════════════════════════════════
+
+# Archivos Locales / SO
+*.lnk
+*.swo
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs y Temporales
+*.log
+tmp/
+temp/
+
+# IDE
+.vscode/
+.idea/
+
+# Rust build artifacts
+**/target/
+
+# Node.js
+**/node_modules/
+**/dist/
+
+# Moset AI Models & Checkpoints
+*.safetensors
+*.gguf
+*.pt
+**/results/
+**/checkpoint-*/
+
+# CUDA intermediates
+*.ptx
+*.cubin

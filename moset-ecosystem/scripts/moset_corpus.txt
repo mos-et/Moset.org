@@ -1,0 +1,717 @@
+moneda = Bit:~
+mostrar "Estado cuantico:"
+mostrar moneda
+
+resultado = !moneda
+mostrar "Despues de observar:"
+mostrar resultado
+
+destino = Bit:~
+si destino:
+    mostrar "El universo eligio: CARA"
+sino:
+    mostrar "El universo eligio: CRUZ"
+
+<|endoftext|>
+
+mostrar "=== BITS CUANTICOS SESGADOS ==="
+mostrar ""
+
+moneda = Bit:~
+mostrar "Moneda justa (50/50):"
+mostrar moneda
+
+confianza = Bit:[0.85]
+mostrar "Mythos dice 85% seguro:"
+mostrar confianza
+
+certeza = Bit:[0.99]
+mostrar "Certeza absoluta (99%):"
+mostrar certeza
+
+trampa = Bit:[0.0]
+mostrar "Imposible (0%):"
+mostrar trampa
+
+mostrar ""
+mostrar "=== COLAPSANDO ==="
+mostrar !confianza
+mostrar !certeza
+mostrar !trampa
+
+<|endoftext|>
+
+mostrar "=== MOSET: BRAZOS DEL SISTEMA ==="
+mostrar ""
+
+:@ -- Shell: ejecutar comandos del SO --
+usuario = shell("whoami")
+mostrar "Usuario: " + usuario
+
+hostname = shell("hostname")
+mostrar "Hostname: " + hostname
+
+:@ -- Entorno: leer variables del SO --
+path = entorno("USERPROFILE")
+mostrar "Home: " + path
+
+:@ -- Escribir + Leer: tocar el disco --
+escribir("T:\\moset_firma.txt", "Naraka Studio - Motor Soberano v0.1.0")
+contenido = leer("T:\\moset_firma.txt")
+mostrar "Archivo leido: " + contenido
+
+:@ -- Existe: verificar paths --
+mostrar "Existe T:\\moset_firma.txt: "
+mostrar existe("T:\\moset_firma.txt")
+
+mostrar "Existe /ruta/imposible: "
+mostrar existe("/ruta/imposible")
+
+:@ -- Quantum + Shell: el Soberano con agencia --
+confianza = Bit:[0.95]
+mostrar ""
+mostrar "Confianza del agente:"
+mostrar confianza
+mostrar "Decision: " + shell("echo EJECUTAR_MISION")
+
+<|endoftext|>
+
+:@ === MOSET: MOLDES ELÁSTICOS (La Corteza y el Núcleo) ===
+mostrar "=== MOLDES ELASTICOS ==="
+mostrar ""
+
+:@ -- 1. Molde elástico con espacio latente --
+molde Escaneo: ip, puerto, ...
+
+scan = Escaneo { ip: "192.168.1.1", puerto: 80 }
+mostrar "Instancia base:"
+mostrar scan
+
+:@ -- 2. Mythos inyecta en espacio latente --
+scan.version = "Apache 2.4"
+scan.confianza = Bit:[0.87]
+mostrar ""
+mostrar "Después de inyección al núcleo:"
+mostrar scan
+
+:@ -- 3. Leer desde la corteza y el núcleo --
+mostrar ""
+mostrar "Corteza (ip): " + scan.ip
+mostrar "Corteza (puerto): "
+mostrar scan.puerto
+mostrar "Núcleo (version): " + scan.version
+mostrar "Núcleo (confianza):"
+mostrar scan.confianza
+
+:@ -- 4. Reasignar campo fijo (corteza) --
+scan.ip = "10.0.0.42"
+mostrar ""
+mostrar "IP reasignada: " + scan.ip
+
+:@ -- 5. Molde puro elástico (solo núcleo) --
+molde Libre: ...
+pensamiento = Libre {}
+pensamiento.idea = "El Soberano es libre"
+pensamiento.certeza = Bit:[0.99]
+mostrar ""
+mostrar "Pensamiento libre:"
+mostrar pensamiento
+
+<|endoftext|>
+
+:@ ============================================================
+:@ PRIMERA CHISPA — El primer latido del Soberano
+:@ ============================================================
+:@ Este script carga el motor Mythos con un modelo real
+:@ y ejecuta la primera inferencia nativa de Moset.
+:@ ============================================================
+
+:@ === Fase 1: Diagnostico del Motor ===
+mostrar "=== PRIMERA CHISPA DEL SOBERANO ==="
+mostrar ""
+
+estado = mythos_estado()
+mostrar "Estado Motor: " + estado
+
+diagnostico = mythos_diagnostico()
+mostrar "Diagnostico:"
+mostrar diagnostico
+mostrar ""
+
+:@ === Fase 2: Cargar el Modelo ===
+mostrar "=== CARGANDO MODELO GGUF ==="
+ruta_modelo = "S:\\Data Strix\\Modelos LM Studio\\lmstudio-community\\DeepSeek-R1-0528-Qwen3-8B-GGUF\\DeepSeek-R1-0528-Qwen3-8B-Q4_K_M.gguf"
+ruta_tokenizer = "S:\\Data Strix\\Modelos LM Studio\\lmstudio-community\\DeepSeek-R1-0528-Qwen3-8B-GGUF\\tokenizer.json"
+
+resultado_carga = mythos_cargar(ruta_modelo, ruta_tokenizer)
+mostrar resultado_carga
+mostrar ""
+
+:@ === Fase 3: Primera Inferencia ===
+mostrar "=== PRIMERA INFERENCIA ==="
+prompt = "Describe en una oracion que es la soberania digital."
+mostrar "Prompt: " + prompt
+mostrar ""
+
+respuesta = mythos(prompt, 64)
+mostrar "Mythos dice:"
+mostrar respuesta
+mostrar ""
+
+:@ === Verificacion Final ===
+mostrar "=== ESTADO POST-INFERENCIA ==="
+estado_final = mythos_estado()
+mostrar estado_final
+mostrar ""
+mostrar ">>> Primera chispa completada. El Soberano ha despertado. <<<"
+
+<|endoftext|>
+
+:@ Test CUDA: verificar que el motor detecta la GPU
+x = 42
+imprimir(x)
+
+<|endoftext|>
+
+// ==========================================
+// TEST DE ARMADURA LINTER MOSET
+// ==========================================
+// Script diseñado expresamente para fallar
+// y desatar la furia de los Markers de Monaco.
+
+// 1. Mutación Asimétrica (Tipo Primitivo Fuerte)
+edad = 29
+edad = "veintinueve" :@ <-- TypeError Linter (Entero -> Texto)
+
+// 2. Nulabilidad Exigida (Safe Flow)
+identidad_secreta = nulo :@ <-- Warning Linter (Puntero no seguro)
+si identidad_secreta != nulo:
+    mostrar identidad_secreta
+sino:
+    identidad_secreta = "Batman" :@ <-- Shadowing dinámico con reasignación
+
+// 3. Superposición y colapso asimétrico
+gato_vivo = Bit:~
+gato_vivo = 3.14 :@ <-- TypeError (Superposición Cuántica a Decimal)
+
+// 4. Intentando usar enteros donde debe ir decimal
+peso = 75.5
+peso = 76 :@ <-- TypeError (Decimal a Entero no permitido sin cast explícito, Fricción Cero pero Seguridad Máxima)
+
+mostrar "Si el IDE subraya en rojo asíncronamente las líneas de arriba, ¡la Fase 3 fue un éxito absoluto!"
+
+<|endoftext|>
+
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Hola Mundo
+:@ El primer programa en el lenguaje soberano.
+:@ ═══════════════════════════════════════════════
+
+:@ Variables con inferencia de tipo
+nombre = "Naraka"
+edad = 25
+version = 0.1
+
+:@ Mostrar: el print nativo de Moset
+mostrar "¡Hola, Mundo!"
+mostrar "Bienvenido al Motor Soberano, " + nombre + "."
+mostrar "Edad: " + edad
+mostrar "Versión Moset: " + version
+
+:@ Condicional como expresión (inline)
+estado = si edad > 18: "Mayor de edad" sino: "Menor de edad"
+mostrar estado
+
+:@ Lista con indexación Base 1
+colores = ["rojo", "azul", "verde"]
+mostrar "Primer color: " + colores[1]
+mostrar "Último: " + colores.ultimo
+
+:@ Función con retorno implícito
+:,] sumar(a, b)
+    a + b
+
+resultado = sumar(10, 32)
+mostrar "10 + 32 = " + resultado
+
+:@ Bucle por cada
+mostrar "Colores disponibles:"
+por cada color en colores:
+    mostrar "  → " + color
+
+:@ Catch en línea (Plan B)
+seguro = sumar(5, 5) :,[ "Error en suma"
+mostrar "Resultado seguro: " + seguro
+
+<|endoftext|>
+
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Variables y Tipos
+:@ Demostración de inferencia de tipos nativos
+:@ ═══════════════════════════════════════════════
+
+:@ Variables numéricas
+x = 42
+y = 3.14
+z = x + y
+mostrar "Suma de entero y decimal: "
+mostrar z
+
+:@ Variables de texto
+nombre = "Naraka"
+saludo = "Hola, " + nombre + "!"
+mostrar saludo
+
+:@ Reasignación
+contador = 0
+contador = contador + 1
+contador = contador + 1
+mostrar "Contador: "
+mostrar contador
+
+<|endoftext|>
+
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Condicionales
+:@ Flujos de control con si/sino
+:@ ═══════════════════════════════════════════════
+
+:@ Condicional simple
+edad = 25
+si edad >= 18:
+    mostrar "Mayor de edad"
+sino:
+    mostrar "Menor de edad"
+
+:@ Condicional con comparación de texto
+rol = "admin"
+si rol == "admin":
+    mostrar "Acceso total concedido"
+sino:
+    mostrar "Acceso denegado"
+
+:@ Condicional anidado
+temperatura = 35
+si temperatura > 30:
+    mostrar "Hace mucho calor"
+sino:
+    si temperatura > 20:
+        mostrar "Temperatura agradable"
+    sino:
+        mostrar "Hace frio"
+
+:@ Condicional con operaciones
+a = 10
+b = 20
+si a + b > 25:
+    mostrar "La suma supera 25"
+
+:@ Condicional con variable booleana
+activo = verdadero
+si activo:
+    mostrar "El sistema esta activo"
+
+<|endoftext|>
+
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Bucles
+:@ Iteraciones con mientras y por cada
+:@ ═══════════════════════════════════════════════
+
+:@ Bucle mientras
+i = 0
+mientras i < 5:
+    mostrar "Iteracion: "
+    mostrar i
+    i = i + 1
+
+:@ Bucle con acumulador
+suma = 0
+n = 1
+mientras n <= 10:
+    suma = suma + n
+    n = n + 1
+mostrar "Suma de 1 a 10: "
+mostrar suma
+
+:@ Bucle con condición compuesta
+x = 100
+mientras x > 1:
+    x = x / 2
+    mostrar x
+
+:@ Bucle con texto
+mensaje = ""
+contador = 0
+mientras contador < 3:
+    mensaje = mensaje + "hola "
+    contador = contador + 1
+mostrar mensaje
+
+:@ Countdown
+cohete = 10
+mientras cohete > 0:
+    mostrar cohete
+    cohete = cohete - 1
+mostrar "Despegue!"
+
+<|endoftext|>
+
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Funciones
+:@ Definición y llamada de funciones soberanas
+:@ ═══════════════════════════════════════════════
+
+:@ Función simple
+:,] saludar(nombre)
+    mostrar "Hola, " + nombre + "!"
+
+saludar("Mundo")
+saludar("Naraka")
+
+:@ Función con retorno implícito
+:,] sumar(a, b)
+    a + b
+
+resultado = sumar(10, 32)
+mostrar "10 + 32 = "
+mostrar resultado
+
+:@ Función con operación
+:,] cuadrado(n)
+    n * n
+
+mostrar "5 al cuadrado: "
+mostrar cuadrado(5)
+
+:@ Función con condicional
+:,] maximo(a, b)
+    si a > b:
+        a
+    sino:
+        b
+
+mostrar "Mayor entre 15 y 42: "
+mostrar maximo(15, 42)
+
+:@ Función usando otra función
+:,] hipotenusa(a, b)
+    sumar(cuadrado(a), cuadrado(b))
+
+mostrar "Hipotenusa (3,4): "
+mostrar hipotenusa(3, 4)
+
+:@ Función con múltiples parámetros
+:,] presentar(nombre, edad, ciudad)
+    mostrar nombre + " tiene "
+    mostrar edad
+    mostrar " y vive en " + ciudad
+    
+presentar("Ana", 28, "Buenos Aires")
+
+<|endoftext|>
+
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Bits Cuánticos Avanzados
+:@ Superposición y colapso probabilístico
+:@ ═══════════════════════════════════════════════
+
+:@ Bit cuántico puro (50/50)
+moneda = Bit:~
+mostrar "Moneda cuántica: "
+mostrar moneda
+
+:@ Colapso (observación)
+observado = !moneda
+mostrar "Después de observar: "
+mostrar observado
+
+:@ Bits sesgados
+alta_confianza = Bit:[0.95]
+baja_confianza = Bit:[0.10]
+medio = Bit:[0.50]
+
+mostrar "Alta confianza (95%): "
+mostrar !alta_confianza
+mostrar "Baja confianza (10%): "
+mostrar !baja_confianza
+mostrar "Medio (50%): "
+mostrar !medio
+
+:@ Uso en decisiones
+sensor_activo = Bit:[0.99]
+si !sensor_activo:
+    mostrar "Sensor detectó movimiento"
+sino:
+    mostrar "Sin actividad"
+
+:@ Múltiples colapsos del mismo bit
+dado = Bit:~
+mostrar "Tirada 1: "
+mostrar !dado
+mostrar "Tirada 2: "
+mostrar !dado
+mostrar "Tirada 3: "
+mostrar !dado
+
+:@ Bit como parámetro
+:,] decidir(confianza)
+    si !confianza:
+        mostrar "Acción ejecutada"
+    sino:
+        mostrar "Acción descartada"
+
+decidir(Bit:[0.80])
+decidir(Bit:[0.20])
+
+<|endoftext|>
+
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Moldes (Structs)
+:@ Estructuras de datos con corteza y núcleo
+:@ ═══════════════════════════════════════════════
+
+:@ Molde rígido (solo corteza)
+molde Usuario: nombre, edad, email
+
+u1 = Usuario { nombre: "Ana", edad: 30, email: "ana@naraka.io" }
+mostrar "Usuario creado:"
+mostrar u1
+
+:@ Acceso a campos
+mostrar "Nombre: " + u1.nombre
+mostrar "Edad: "
+mostrar u1.edad
+
+:@ Reasignación de campos
+u1.edad = 31
+mostrar "Edad actualizada: "
+mostrar u1.edad
+
+:@ Molde elástico (corteza + núcleo)
+molde Nodo: ip, puerto, ...
+
+n1 = Nodo { ip: "192.168.1.1", puerto: 8080 }
+n1.estado = "activo"
+n1.latencia = 42
+mostrar "Nodo con campos dinámicos:"
+mostrar n1
+
+:@ Molde puro elástico (solo núcleo)
+molde Metadata: ...
+
+meta = Metadata {}
+meta.version = "1.0.0"
+meta.autor = "Naraka Studio"
+meta.licencia = "Soberana"
+mostrar meta
+
+:@ Múltiples instancias
+molde Punto: x, y
+
+p1 = Punto { x: 10, y: 20 }
+p2 = Punto { x: 30, y: 40 }
+mostrar "P1:"
+mostrar p1
+mostrar "P2:"
+mostrar p2
+
+<|endoftext|>
+
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Operaciones con Shell y Sistema
+:@ Acceso al SO a través del Vigilante
+:@ ═══════════════════════════════════════════════
+
+:@ Obtener información del sistema
+usuario = shell("whoami")
+mostrar "Ejecutando como: " + usuario
+
+hostname = shell("hostname")
+mostrar "Máquina: " + hostname
+
+:@ Variables de entorno
+home = entorno("USERPROFILE")
+mostrar "Directorio home: " + home
+
+:@ Verificar existencia de archivos
+si existe("C:\\Windows\\System32\\cmd.exe"):
+    mostrar "cmd.exe existe"
+sino:
+    mostrar "cmd.exe no encontrado"
+
+:@ Escribir y leer archivos
+escribir("test_moset.txt", "Escrito desde Moset")
+contenido = leer("test_moset.txt")
+mostrar "Contenido leído: " + contenido
+
+:@ Operaciones aritméticas con resultados del sistema
+memoria_mb = 16384
+uso_porcentaje = 45
+memoria_usada = memoria_mb * uso_porcentaje / 100
+mostrar "Memoria usada (MB): "
+mostrar memoria_usada
+
+<|endoftext|>
+
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Aritmética y Expresiones
+:@ Operaciones matemáticas completas
+:@ ═══════════════════════════════════════════════
+
+:@ Aritmética básica
+mostrar "Suma: "
+mostrar 10 + 20
+mostrar "Resta: "
+mostrar 50 - 15
+mostrar "Multiplicación: "
+mostrar 6 * 7
+mostrar "División: "
+mostrar 100 / 4
+mostrar "Módulo: "
+mostrar 17 % 5
+
+:@ Precedencia de operadores
+resultado = 2 + 3 * 4
+mostrar "2 + 3 * 4 = "
+mostrar resultado
+
+resultado2 = (2 + 3) * 4
+mostrar "(2 + 3) * 4 = "
+mostrar resultado2
+
+:@ Operaciones con decimales
+pi = 3.14159
+radio = 5.0
+area = pi * radio * radio
+mostrar "Área del círculo: "
+mostrar area
+
+:@ Comparaciones
+mostrar "10 > 5: "
+mostrar 10 > 5
+mostrar "3 == 3: "
+mostrar 3 == 3
+mostrar "7 != 8: "
+mostrar 7 != 8
+mostrar "15 >= 15: "
+mostrar 15 >= 15
+mostrar "4 <= 3: "
+mostrar 4 <= 3
+
+:@ Operaciones compuestas
+base = 100
+impuesto = base * 21 / 100
+total = base + impuesto
+mostrar "Base: "
+mostrar base
+mostrar "Impuesto (21%): "
+mostrar impuesto
+mostrar "Total: "
+mostrar total
+
+<|endoftext|>
+
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Mythos IA Integration
+:@ Uso del motor de IA nativo
+:@ ═══════════════════════════════════════════════
+
+:@ Verificar estado del motor
+estado = mythos_estado()
+mostrar "Estado Mythos: " + estado
+
+:@ Diagnóstico completo
+diagnostico = mythos_diagnostico()
+mostrar "Diagnóstico:"
+mostrar diagnostico
+
+:@ Cargar modelo GGUF
+ruta_modelo = "ruta/al/modelo.gguf"
+ruta_tokenizer = "ruta/al/tokenizer.json"
+mythos_cargar(ruta_modelo, ruta_tokenizer)
+
+:@ Inferencia básica
+respuesta = mythos("Explica qué es Moset en una línea", 50)
+mostrar "IA dice: " + respuesta
+
+:@ Inferencia con más tokens
+explicacion = mythos("Describe la arquitectura de un compilador", 200)
+mostrar explicacion
+
+:@ Usar IA para generar código
+codigo = mythos("Escribe una función en Moset que calcule el factorial", 100)
+mostrar "Código generado:"
+mostrar codigo
+
+:@ Inferencia con decisión cuántica
+confianza = Bit:[0.90]
+si !confianza:
+    respuesta_ia = mythos("Genera un plan de acción", 150)
+    mostrar respuesta_ia
+sino:
+    mostrar "Confianza insuficiente, abortando consulta"
+
+<|endoftext|>
+
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Pensar (Scoped Blocks)
+:@ Bloques aislados de ejecución
+:@ ═══════════════════════════════════════════════
+
+:@ Bloque pensar básico
+x = 10
+pensar:
+    y = 20
+    z = x + y
+    mostrar "Dentro del bloque: "
+    mostrar z
+
+:@ Variable x sigue accesible fuera
+mostrar "Fuera del bloque, x = "
+mostrar x
+
+:@ Pensar con cálculos complejos
+total = 0
+pensar:
+    precio = 100
+    cantidad = 5
+    subtotal = precio * cantidad
+    descuento = subtotal * 10 / 100
+    total = subtotal - descuento
+    mostrar "Subtotal: "
+    mostrar subtotal
+    mostrar "Descuento: "
+    mostrar descuento
+
+mostrar "Total calculado: "
+mostrar total
+
+:@ Pensar anidado
+pensar:
+    nivel1 = "exterior"
+    mostrar nivel1
+    pensar:
+        nivel2 = "interior"
+        mostrar nivel2
+
+:@ Pensar con condicional
+valor = 42
+pensar:
+    si valor > 40:
+        mostrar "Valor alto"
+    sino:
+        mostrar "Valor bajo"
+
+:@ Pensar con bucle
+pensar:
+    i = 0
+    acumulador = 0
+    mientras i < 5:
+        acumulador = acumulador + i
+        i = i + 1
+    mostrar "Suma 0..4: "
+    mostrar acumulador
+
+<|endoftext|>
+

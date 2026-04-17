@@ -1,0 +1,40 @@
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Hola Mundo
+:@ El primer programa en el lenguaje soberano.
+:@ ═══════════════════════════════════════════════
+
+:@ Variables con inferencia de tipo
+nombre = "Naraka"
+edad = 25
+version = 0.1
+
+:@ Mostrar: el print nativo de Moset
+mostrar "¡Hola, Mundo!"
+mostrar "Bienvenido al Motor Soberano, " + nombre + "."
+mostrar "Edad: " + edad
+mostrar "Versión Moset: " + version
+
+:@ Condicional como expresión (inline)
+estado = si edad > 18: "Mayor de edad" sino: "Menor de edad"
+mostrar estado
+
+:@ Lista con indexación Base 1
+colores = ["rojo", "azul", "verde"]
+mostrar "Primer color: " + colores[1]
+mostrar "Último: " + colores.ultimo
+
+:@ Función con retorno implícito
+:,] sumar(a, b)
+    a + b
+
+resultado = sumar(10, 32)
+mostrar "10 + 32 = " + resultado
+
+:@ Bucle por cada
+mostrar "Colores disponibles:"
+por cada color en colores:
+    mostrar "  → " + color
+
+:@ Catch en línea (Plan B)
+seguro = sumar(5, 5) :,[ "Error en suma"
+mostrar "Resultado seguro: " + seguro

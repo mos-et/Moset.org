@@ -1,0 +1,29 @@
+# ═══════════════════════════════════════════════
+# Moset Ecosystem — .gitignore
+# ═══════════════════════════════════════════════
+
+# Rust build artifacts
+**/target/
+
+# Node.js
+**/node_modules/
+**/dist/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# CUDA intermediates
+*.ptx
+*.cubin
+
+# Logs
+*.log
+
+# OS
+desktop.ini

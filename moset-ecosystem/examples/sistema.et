@@ -1,0 +1,33 @@
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Operaciones con Shell y Sistema
+:@ Acceso al SO a través del Vigilante
+:@ ═══════════════════════════════════════════════
+
+:@ Obtener información del sistema
+usuario = shell("whoami")
+mostrar "Ejecutando como: " + usuario
+
+hostname = shell("hostname")
+mostrar "Máquina: " + hostname
+
+:@ Variables de entorno
+home = entorno("USERPROFILE")
+mostrar "Directorio home: " + home
+
+:@ Verificar existencia de archivos
+si existe("C:\\Windows\\System32\\cmd.exe"):
+    mostrar "cmd.exe existe"
+sino:
+    mostrar "cmd.exe no encontrado"
+
+:@ Escribir y leer archivos
+escribir("test_moset.txt", "Escrito desde Moset")
+contenido = leer("test_moset.txt")
+mostrar "Contenido leído: " + contenido
+
+:@ Operaciones aritméticas con resultados del sistema
+memoria_mb = 16384
+uso_porcentaje = 45
+memoria_usada = memoria_mb * uso_porcentaje / 100
+mostrar "Memoria usada (MB): "
+mostrar memoria_usada

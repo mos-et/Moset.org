@@ -1,0 +1,26 @@
+// ==========================================
+// TEST DE ARMADURA LINTER MOSET
+// ==========================================
+// Script diseñado expresamente para fallar
+// y desatar la furia de los Markers de Monaco.
+
+// 1. Mutación Asimétrica (Tipo Primitivo Fuerte)
+edad = 29
+edad = "veintinueve" :@ <-- TypeError Linter (Entero -> Texto)
+
+// 2. Nulabilidad Exigida (Safe Flow)
+identidad_secreta = nulo :@ <-- Warning Linter (Puntero no seguro)
+si identidad_secreta != nulo:
+    mostrar identidad_secreta
+sino:
+    identidad_secreta = "Batman" :@ <-- Shadowing dinámico con reasignación
+
+// 3. Superposición y colapso asimétrico
+gato_vivo = Bit:~
+gato_vivo = 3.14 :@ <-- TypeError (Superposición Cuántica a Decimal)
+
+// 4. Intentando usar enteros donde debe ir decimal
+peso = 75.5
+peso = 76 :@ <-- TypeError (Decimal a Entero no permitido sin cast explícito, Fricción Cero pero Seguridad Máxima)
+
+mostrar "Si el IDE subraya en rojo asíncronamente las líneas de arriba, ¡la Fase 3 fue un éxito absoluto!"

@@ -1,0 +1,41 @@
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Bucles
+:@ Iteraciones con mientras y por cada
+:@ ═══════════════════════════════════════════════
+
+:@ Bucle mientras
+i = 0
+mientras i < 5:
+    mostrar "Iteracion: "
+    mostrar i
+    i = i + 1
+
+:@ Bucle con acumulador
+suma = 0
+n = 1
+mientras n <= 10:
+    suma = suma + n
+    n = n + 1
+mostrar "Suma de 1 a 10: "
+mostrar suma
+
+:@ Bucle con condición compuesta
+x = 100
+mientras x > 1:
+    x = x / 2
+    mostrar x
+
+:@ Bucle con texto
+mensaje = ""
+contador = 0
+mientras contador < 3:
+    mensaje = mensaje + "hola "
+    contador = contador + 1
+mostrar mensaje
+
+:@ Countdown
+cohete = 10
+mientras cohete > 0:
+    mostrar cohete
+    cohete = cohete - 1
+mostrar "Despegue!"

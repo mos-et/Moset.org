@@ -1,0 +1,39 @@
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Mythos IA Integration
+:@ Uso del motor de IA nativo
+:@ ═══════════════════════════════════════════════
+
+:@ Verificar estado del motor
+estado = mythos_estado()
+mostrar "Estado Mythos: " + estado
+
+:@ Diagnóstico completo
+diagnostico = mythos_diagnostico()
+mostrar "Diagnóstico:"
+mostrar diagnostico
+
+:@ Cargar modelo GGUF
+ruta_modelo = "ruta/al/modelo.gguf"
+ruta_tokenizer = "ruta/al/tokenizer.json"
+mythos_cargar(ruta_modelo, ruta_tokenizer)
+
+:@ Inferencia básica
+respuesta = mythos("Explica qué es Moset en una línea", 50)
+mostrar "IA dice: " + respuesta
+
+:@ Inferencia con más tokens
+explicacion = mythos("Describe la arquitectura de un compilador", 200)
+mostrar explicacion
+
+:@ Usar IA para generar código
+codigo = mythos("Escribe una función en Moset que calcule el factorial", 100)
+mostrar "Código generado:"
+mostrar codigo
+
+:@ Inferencia con decisión cuántica
+confianza = Bit:[0.90]
+si !confianza:
+    respuesta_ia = mythos("Genera un plan de acción", 150)
+    mostrar respuesta_ia
+sino:
+    mostrar "Confianza insuficiente, abortando consulta"

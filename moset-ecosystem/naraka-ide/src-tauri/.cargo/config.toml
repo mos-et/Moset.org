@@ -1,0 +1,10 @@
+# Configuración de Cargo para Naraka IDE
+# Desactiva compilación incremental para evitar que target/ crezca a 18+ GB
+# Los kernels CUDA (candle-kernels) generan artefactos incrementales masivos
+
+[build]
+incremental = false
+
+[env]
+# Necesario para CUDA 13.2 + CCCL — evita error del preprocesador tradicional de MSVC
+NVCC_PREPEND_FLAGS = "-Xcompiler /Zc:preprocessor"

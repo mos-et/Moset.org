@@ -1,0 +1,41 @@
+# ============================================================================
+# MOSET — Diccionario Español (Idioma por defecto)
+# ============================================================================
+# Mapea palabras humanas → Tokens Universales del U-AST.
+# El LSP usa este archivo para renderizar el código en español.
+# ============================================================================
+
+[meta]
+nombre = "Español"
+codigo = "es"
+autor = "Naraka Studio"
+
+[palabras_clave]
+si = "TOKEN_SI"
+sino = "TOKEN_SINO"
+mientras = "TOKEN_MIENTRAS"
+por = "TOKEN_POR"
+cada = "TOKEN_CADA"
+en = "TOKEN_EN"
+molde = "TOKEN_MOLDE"
+mostrar = "TOKEN_MOSTRAR"
+importar = "TOKEN_IMPORTAR"
+verdadero = "TOKEN_VERDADERO"
+falso = "TOKEN_FALSO"
+nulo = "TOKEN_NULO"
+y = "TOKEN_Y"
+o = "TOKEN_O"
+no = "TOKEN_NO"
+devolver = "TOKEN_DEVOLVER"
+
+[semantico]
+# Acceso semántico a colecciones (Base 1)
+primero = "INDEX_1"
+ultimo = "INDEX_LAST"
+
+[tipos]
+entero = "TIPO_ENTERO"
+decimal = "TIPO_DECIMAL"
+texto = "TIPO_TEXTO"
+booleano = "TIPO_BOOLEANO"
+lista = "TIPO_LISTA"

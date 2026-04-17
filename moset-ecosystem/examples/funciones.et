@@ -1,0 +1,51 @@
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Funciones
+:@ Definición y llamada de funciones soberanas
+:@ ═══════════════════════════════════════════════
+
+:@ Función simple
+:,] saludar(nombre)
+    mostrar "Hola, " + nombre + "!"
+
+saludar("Mundo")
+saludar("Naraka")
+
+:@ Función con retorno implícito
+:,] sumar(a, b)
+    a + b
+
+resultado = sumar(10, 32)
+mostrar "10 + 32 = "
+mostrar resultado
+
+:@ Función con operación
+:,] cuadrado(n)
+    n * n
+
+mostrar "5 al cuadrado: "
+mostrar cuadrado(5)
+
+:@ Función con condicional
+:,] maximo(a, b)
+    si a > b:
+        a
+    sino:
+        b
+
+mostrar "Mayor entre 15 y 42: "
+mostrar maximo(15, 42)
+
+:@ Función usando otra función
+:,] hipotenusa(a, b)
+    sumar(cuadrado(a), cuadrado(b))
+
+mostrar "Hipotenusa (3,4): "
+mostrar hipotenusa(3, 4)
+
+:@ Función con múltiples parámetros
+:,] presentar(nombre, edad, ciudad)
+    mostrar nombre + " tiene "
+    mostrar edad
+    mostrar " y vive en " + ciudad
+    
+presentar("Ana", 28, "Buenos Aires")

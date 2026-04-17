@@ -1,0 +1,55 @@
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Aritmética y Expresiones
+:@ Operaciones matemáticas completas
+:@ ═══════════════════════════════════════════════
+
+:@ Aritmética básica
+mostrar "Suma: "
+mostrar 10 + 20
+mostrar "Resta: "
+mostrar 50 - 15
+mostrar "Multiplicación: "
+mostrar 6 * 7
+mostrar "División: "
+mostrar 100 / 4
+mostrar "Módulo: "
+mostrar 17 % 5
+
+:@ Precedencia de operadores
+resultado = 2 + 3 * 4
+mostrar "2 + 3 * 4 = "
+mostrar resultado
+
+resultado2 = (2 + 3) * 4
+mostrar "(2 + 3) * 4 = "
+mostrar resultado2
+
+:@ Operaciones con decimales
+pi = 3.14159
+radio = 5.0
+area = pi * radio * radio
+mostrar "Área del círculo: "
+mostrar area
+
+:@ Comparaciones
+mostrar "10 > 5: "
+mostrar 10 > 5
+mostrar "3 == 3: "
+mostrar 3 == 3
+mostrar "7 != 8: "
+mostrar 7 != 8
+mostrar "15 >= 15: "
+mostrar 15 >= 15
+mostrar "4 <= 3: "
+mostrar 4 <= 3
+
+:@ Operaciones compuestas
+base = 100
+impuesto = base * 21 / 100
+total = base + impuesto
+mostrar "Base: "
+mostrar base
+mostrar "Impuesto (21%): "
+mostrar impuesto
+mostrar "Total: "
+mostrar total
