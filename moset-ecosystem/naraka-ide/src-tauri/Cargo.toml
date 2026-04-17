@@ -26,6 +26,6 @@ moset_core = { path = "../../core-engine", package = "moset" }
 portable-pty = "0.9.0"
 
 [features]
-default = ["ai", "cuda"]
+default = ["ai"]
 ai = ["moset_core/ai"]
 cuda = ["moset_core/cuda"]
