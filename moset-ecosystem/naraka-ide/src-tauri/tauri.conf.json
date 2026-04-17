@@ -27,7 +27,7 @@
   "bundle": {
     "active": true,
     "targets": ["msi", "nsis"],
-    "createUpdaterArtifacts": false,
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -52,8 +52,8 @@
   },
   "plugins": {
     "updater": {
-      "endpoints": ["https://127.0.0.1/update.json"],
-      "pubkey": ""
+      "endpoints": ["https://moset.org/api/update.json"],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMyREM4QTk0NUM1NUQ3MjcKUldRbjExVmNsSXJjTW5IOTNSK2VtRGwrVEpoU09Rbnh5RGpZT1hIa0hhN1pkajVzUys3cDZiUU4K"
     }
   }
 }
