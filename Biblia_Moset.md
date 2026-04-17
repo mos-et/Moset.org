@@ -893,6 +893,7 @@ Además de los endpoints del lenguaje Moset, el IDE incluye un **agente autónom
 - [x] Installer MSI/NSIS con `cargo tauri build` ✅
 - [x] Auto-updater con `tauri-plugin-updater` y endpoint `file://` local ✅
 - [x] `moset` CLI en PATH del sistema mediante `install_cli.ps1` ✅
+- [x] Cross-OS CI/CD Pipeline en GitHub Actions (Win/Mac/Linux) + Desacople de CUDA por default ✅
 
 **UX/UI:**
 - [x] PTY resize dinámico (UX-001)
@@ -920,8 +921,7 @@ Además de los endpoints del lenguaje Moset, el IDE incluye un **agente autónom
 
 ---
 
-**Licencia:** BUSL-1.1
-
+**Licencia:** PolyForm Noncommercial 1.0.0
 ---
 
 <div align="center">
