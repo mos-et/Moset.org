@@ -5,31 +5,31 @@
 
 :root {
   --bg-0:       #0A0A0F;
-  --bg-1:       rgba(15, 17, 26, 0.85); /* Sidebar y Activity */
-  --bg-2:       rgba(20, 22, 32, 0.9);
-  --bg-3:       rgba(26, 28, 40, 0.8);
-  --bg-4:       rgba(32, 35, 50, 0.7);
-  --border:     rgba(255, 255, 255, 0.05);
-  --border-hover: rgba(255, 255, 255, 0.1);
-  --accent:     #00C3FF;
+  --bg-1:       rgba(15, 17, 26, 0.65); /* Más translúcido para que el glassmorphism brille */
+  --bg-2:       rgba(20, 22, 32, 0.70);
+  --bg-3:       rgba(26, 28, 40, 0.60);
+  --bg-4:       rgba(32, 35, 50, 0.50);
+  --border:     rgba(255, 255, 255, 0.08); /* Borde sutil y premium */
+  --border-hover: rgba(255, 255, 255, 0.15);
+  --accent:     #00E5FF; /* Cian más vibrante */
   --accent-2:   #007BFF;
-  --accent-dim: rgba(0, 195, 255, 0.06);
-  --accent-glow:rgba(0, 195, 255, 0.2);
-  --accent-neon: 0 0 10px var(--accent-glow), 0 0 20px rgba(0, 195, 255, 0.1);
-  --text-1:     #E5E7EB;
+  --accent-dim: rgba(0, 229, 255, 0.08);
+  --accent-glow:rgba(0, 229, 255, 0.3);
+  --accent-neon: 0 0 10px var(--accent-glow), 0 0 25px rgba(0, 229, 255, 0.15);
+  --text-1:     #F3F4F6;
   --text-2:     #A1A1AA;
   --text-3:     #71717A;
-  --green:      #4ade80;
-  --blue:       #60a5fa;
-  --cyan:       #22d3ee;
-  --red:        #f87171;
-  --orange:     #fb923c;
-  --purple:     #c084fc;
+  --green:      #10B981;
+  --blue:       #3B82F6;
+  --cyan:       #06B6D4;
+  --red:        #EF4444;
+  --orange:     #F97316;
+  --purple:     #A855F7;
   --tab-h:      38px;
   --activity-w: 52px;
   --sidebar-w:  260px;
   --statusbar-h:24px;
-  --glass:      blur(20px) saturate(180%);
+  --glass:      blur(24px) saturate(190%);
 }
 
 html, body, #root { height: 100%; width: 100%; overflow: hidden; }
@@ -153,9 +153,11 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
 }
 
 .sidebar-project-title {
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--accent);
+  font-size: 13px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #FFFFFF, var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   padding: 0;
   cursor: pointer;
   letter-spacing: 1.5px;
@@ -163,7 +165,12 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
   display: flex;
   align-items: center;
   gap: 8px;
-  text-shadow: 0 0 10px rgba(0, 168, 255, 0.4);
+  text-shadow: 0 0 20px rgba(0, 229, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.sidebar-project-title:hover {
+  text-shadow: var(--accent-neon);
 }
 
 .sidebar-project-title .tree-arrow {
@@ -731,13 +738,14 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
   align-items: center;
   justify-content: space-between;
   padding: 0 14px;
-  height: 46px;
-  background: linear-gradient(135deg, rgba(16, 18, 30, 0.95), rgba(11, 12, 22, 0.98));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(37, 40, 64, 0.6);
+  height: 48px;
+  background: linear-gradient(135deg, rgba(20, 22, 35, 0.75), rgba(15, 17, 26, 0.85));
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   position: relative;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .chat-header::after {

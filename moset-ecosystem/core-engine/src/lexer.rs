@@ -112,26 +112,26 @@ impl Lexer {
 
         // === Cargar Diccionario Bilingüe (Español + Inglés) simultáneamente ===
         
-        // === Cargar Diccionario Omníglota (8+ idiomas simultáneos) ===
-        // Español, Inglés, Portugués, Italiano, Francés, Alemán, Chino, Japonés
+        // === Cargar Diccionario Omníglota (12 idiomas simultáneos) ===
+        // Español, Inglés, Portugués, Italiano, Francés, Alemán, Chino, Japonés, Coreano, Ruso, Hindi, Árabe
         let mappings = vec![
-            (Token::Si, vec!["si", "if", "se", "wenn", "如果", "もし"]),
-            (Token::Sino, vec!["sino", "else", "senao", "senão", "altrimenti", "sinon", "sonst", "否则", "それとも"]),
-            (Token::Mientras, vec!["mientras", "while", "enquanto", "mentre", "tant_que", "solange", "当", "間"]),
-            (Token::Por, vec!["por", "for", "per", "pour", "fuer", "für", "为", "ため"]),
-            (Token::Cada, vec!["cada", "each", "ogni", "chaque", "jeder", "每", "各"]),
-            (Token::En, vec!["en", "in", "em", "dans", "在", "に"]),
-            (Token::Molde, vec!["molde", "mold", "modello", "modele", "modèle", "struktur", "结构", "構造"]),
-            (Token::Mostrar, vec!["mostrar", "show", "mostra", "afficher", "zeigen", "显示", "表示"]),
-            (Token::Importar, vec!["importar", "import", "importa", "importer", "importieren", "导入", "インポート"]),
-            (Token::Verdadero, vec!["verdadero", "true", "verdadeiro", "vero", "vrai", "wahr", "真"]),
-            (Token::Falso, vec!["falso", "false", "faux", "falsch", "假", "偽"]),
-            (Token::Nulo, vec!["nulo", "null", "nullo", "nul", "空", "ヌル"]),
-            (Token::Y, vec!["y", "and", "e", "et", "und", "和", "と"]),
-            (Token::O, vec!["o", "or", "ou", "oder", "或", "または"]),
-            (Token::No, vec!["no", "not", "nao", "não", "non", "nicht", "不", "ない"]),
-            (Token::Devolver, vec!["devolver", "return", "retornar", "ritorna", "retourner", "zurueckgeben", "zurückgeben", "返回", "戻る"]),
-            (Token::Pensar, vec!["pensar", "think", "pensa", "penser", "denken", "思考", "考える"]),
+            (Token::Si, vec!["si", "if", "se", "wenn", "如果", "もし", "만약", "если", "यदि", "إذا"]),
+            (Token::Sino, vec!["sino", "else", "senao", "senão", "altrimenti", "sinon", "sonst", "否则", "それとも", "그렇지_않으면", "иначе", "अन्यथा", "وإلا"]),
+            (Token::Mientras, vec!["mientras", "while", "enquanto", "mentre", "tant_que", "solange", "当", "間", "동안", "пока", "जब", "بينما"]),
+            (Token::Por, vec!["por", "for", "per", "pour", "fuer", "für", "为", "ため", "위해", "для", "के_लिए", "ل"]),
+            (Token::Cada, vec!["cada", "each", "ogni", "chaque", "jeder", "每", "各", "각", "каждый", "प्रत्येक", "كل"]),
+            (Token::En, vec!["en", "in", "em", "dans", "在", "に", "에", "в", "में", "في"]),
+            (Token::Molde, vec!["molde", "mold", "modello", "modele", "modèle", "struktur", "结构", "構造", "틀", "шаблон", "सांचा", "قالب"]),
+            (Token::Mostrar, vec!["mostrar", "show", "mostra", "afficher", "zeigen", "显示", "表示", "표시하다", "показать", "दिखाएं", "يعرض"]),
+            (Token::Importar, vec!["importar", "import", "importa", "importer", "importieren", "导入", "インポート", "가져오기", "импорт", "आयात", "استيراد"]),
+            (Token::Verdadero, vec!["verdadero", "true", "verdadeiro", "vero", "vrai", "wahr", "真", "참", "истина", "सत्य", "صحيح"]),
+            (Token::Falso, vec!["falso", "false", "faux", "falsch", "假", "偽", "거짓", "ложь", "असत्य", "خطأ"]),
+            (Token::Nulo, vec!["nulo", "null", "nullo", "nul", "空", "ヌル", "빈", "нуль", "शून्य", "لا_شيء"]),
+            (Token::Y, vec!["y", "and", "e", "et", "und", "和", "と", "와", "и", "और", "و"]),
+            (Token::O, vec!["o", "or", "ou", "oder", "或", "または", "또는", "или", "या", "أو"]),
+            (Token::No, vec!["no", "not", "nao", "não", "non", "nicht", "不", "ない", "아니", "нет", "नहीं", "لا"]),
+            (Token::Devolver, vec!["devolver", "return", "retornar", "ritorna", "retourner", "zurueckgeben", "zurückgeben", "返回", "戻る", "반환", "вернуть", "वापसी", "عودة"]),
+            (Token::Pensar, vec!["pensar", "think", "pensa", "penser", "denken", "思考", "考える", "생각하다", "думать", "सोच", "يفكر"]),
         ];
 
         for (token_type, words) in mappings {

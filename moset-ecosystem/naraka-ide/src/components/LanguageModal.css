@@ -1,0 +1,150 @@
+.lang-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(20px);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  animation: fadeInModal 0.5s forwards ease-out;
+}
+
+@keyframes fadeInModal {
+  to { opacity: 1; }
+}
+
+.lang-modal-glass {
+  background: rgba(15, 20, 30, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 3rem;
+  width: 500px;
+  max-width: 90%;
+  color: white;
+  text-align: center;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5), inset 0 0 2px rgba(255, 255, 255, 0.2);
+  transform: translateY(20px) scale(0.95);
+  animation: slideUpGlass 0.6s forwards cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.lang-modal-glass::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at top right, rgba(79, 172, 254, 0.15), transparent 50%);
+  pointer-events: none;
+}
+
+@keyframes slideUpGlass {
+  to { transform: translateY(0) scale(1); }
+}
+
+.lang-modal-header {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 1.5rem;
+}
+
+.lang-modal-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  position: relative;
+  z-index: 2;
+  filter: drop-shadow(0 0 10px rgba(79, 172, 254, 0.5));
+}
+
+.lang-modal-logo-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle, rgba(79, 172, 254, 0.4) 0%, transparent 70%);
+  z-index: 1;
+}
+
+.lang-modal-glass h2 {
+  margin: 0 0 1rem;
+  font-size: 2rem;
+  font-weight: 300;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #fff, #a0c4ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.lang-modal-glass p {
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 0.5rem;
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+.lang-modal-sub {
+  font-size: 0.9rem !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  margin-bottom: 2rem !important;
+}
+
+.lang-selector-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.lang-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  padding: 1rem;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.lang-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.lang-btn.active {
+  background: rgba(79, 172, 254, 0.2);
+  border-color: #4facfe;
+  box-shadow: 0 0 15px rgba(79, 172, 254, 0.3);
+  font-weight: 500;
+}
+
+.lang-save-btn {
+  background: linear-gradient(135deg, #4facfe, #00f2fe);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 25px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 100%;
+  box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+}
+
+.lang-save-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(79, 172, 254, 0.6);
+}

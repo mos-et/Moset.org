@@ -17,4 +17,7 @@ pub mod stdlib;
 pub mod vigilante;
 pub mod ai;
 pub mod linter;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod cloud_ai;
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;

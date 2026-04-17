@@ -41,35 +41,29 @@ impl MotorCloud {
     where
         F: FnMut(String) -> bool,
     {
-        let mut buffer = String::new();
+        use std::io::BufRead;
         let mut final_text = String::new();
+        let reader = std::io::BufReader::new(response);
 
-        // Leer bytes continuos de forma bloqueante
-        for byte_res in std::io::Read::bytes(response) {
-            let b = byte_res.map_err(|e| format!("Error leyendo bytes SSE: {}", e))?;
-            let c = b as char;
-            buffer.push(c);
-            
-            if buffer.ends_with('\n') {
-                let line = buffer.trim().to_string();
-                buffer.clear();
+        for line_res in reader.lines() {
+            let line = line_res.map_err(|e| format!("Error leyendo línea SSE: {}", e))?;
+            let trimmed = line.trim();
 
-                if line.starts_with("data: ") && line != "data: [DONE]" {
-                    let json_str = &line[6..]; // despues de "data: "
-                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
-                        let text_chunk = if is_google {
-                            val.pointer("/candidates/0/content/parts/0/text").and_then(|v| v.as_str())
-                        } else if is_anthropic {
-                            val.pointer("/delta/text").and_then(|v| v.as_str())
-                        } else { // OpenAI by default
-                            val.pointer("/choices/0/delta/content").and_then(|v| v.as_str())
-                        };
+            if trimmed.starts_with("data: ") && trimmed != "data: [DONE]" {
+                let json_str = &trimmed[6..]; // despues de "data: "
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
+                    let text_chunk = if is_google {
+                        val.pointer("/candidates/0/content/parts/0/text").and_then(|v| v.as_str())
+                    } else if is_anthropic {
+                        val.pointer("/delta/text").and_then(|v| v.as_str())
+                    } else { // OpenAI by default
+                        val.pointer("/choices/0/delta/content").and_then(|v| v.as_str())
+                    };
 
-                        if let Some(c) = text_chunk {
-                            final_text.push_str(c);
-                            if !on_partial(c.to_string()) {
-                                break;
-                            }
+                    if let Some(c) = text_chunk {
+                        final_text.push_str(c);
+                        if !on_partial(c.to_string()) {
+                            break;
                         }
                     }
                 }

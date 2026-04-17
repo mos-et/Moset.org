@@ -1,0 +1,16 @@
+"$schema" = "../gen/schemas/desktop-schema.json"
+identifier = "default"
+description = "Default capabilities"
+windows = ["main"]
+
+[[permissions]]
+identifier = "core:default"
+
+[[permissions]]
+identifier = "dialog:default"
+
+[[permissions]]
+identifier = "opener:default"
+
+[[permissions]]
+identifier = "fs:default"

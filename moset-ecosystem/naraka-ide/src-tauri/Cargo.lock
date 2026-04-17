@@ -3150,11 +3150,13 @@ dependencies = [
  "candle-nn",
  "candle-transformers",
  "clap",
+ "getrandom 0.3.4",
  "rand 0.9.4",
  "reqwest",
  "serde",
  "serde_json",
  "tokenizers 0.21.4",
+ "wasm-bindgen",
 ]
 
 [[package]]

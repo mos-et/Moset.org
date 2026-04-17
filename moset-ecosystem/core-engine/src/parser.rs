@@ -108,6 +108,13 @@ impl Parser {
         }
         self.consumir(Token::ParenDer)?;
         self.saltar_nuevas_lineas();
+        
+        // Consumir DosPuntos `:` opcional si el usuario lo escribe, como en otros lenguajes
+        if self.verificar(&Token::DosPuntos) {
+            self.avanzar();
+        }
+        
+        self.saltar_nuevas_lineas();
         let cuerpo = self.parsear_bloque()?;
 
         Ok(Nodo::Funcion {

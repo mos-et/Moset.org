@@ -1,7 +1,7 @@
 # 📘 BIBLIA MOSET — Documento Definitivo del Ecosistema (Motor Soberano)
 
 > **Este archivo define la arquitectura, visión, estado real y auditoría completa de Moset IDE y su ecosistema.**
-> Última consolidación: 2026-04-16 — **v0.2.2 (Seguridad VM, Resolución Importar y Auditoría de IA/Modelos)**
+> Última consolidación: 2026-04-17 — **v0.2.3 (RAG Heurístico, Sandbox Expandido, Renderizado Robusto)**
 > Dueño: Equipo Central de Moset
 
 ---
@@ -454,15 +454,23 @@ Define todos los nodos del árbol sintáctico:
 - (BUG-043) `execute_agent_tool` y `save_file_content` no validan sandbox vía Vigilante — el agente podría escribir/ejecutar fuera del Sandbox
 - (BUG-024) `invoke` importado dinámicamente cuando ya está importado estáticamente
 
-### 6.2 `App.tsx` — Layout Principal del IDE (2035 líneas)
-**Componentes internos:**
+### 6.2 `App.tsx` — Coordinador Principal del IDE (~150 líneas)
+**Nota de Arquitectura:** `App.tsx` fue modularizado desde +2000 líneas a un orquestador principal delegando responsabilidades a React Hooks en `src/hooks/*` y subcomponentes en `src/components/*`.
+
+**Componentes inyectados:**
 - `ActivityBar` — Barra lateral izquierda (Explorador, Buscar, Ejecutar, Extensiones, Naraka AI)
 - `TabBar` — Pestañas de archivos abiertos con estado de modificación
-- `TreeView` — Explorador de archivos recursivo con interfaz *Glassmorphism* para estados vacíos
+- `Explorador` (`src/components/Layout/Explorador.tsx`) — Explorador de archivos recursivo y gestión de archivos en el contexto del agente.
 - `StatusBar` — Barra inferior (archivo, lenguaje, proyecto, estado guardado)
-- `TerminalComponent` — Terminal integrada (xterm.js + PTY real)
+- `SoberanaTerminal` (`src/components/Terminal/SoberanaTerminal.tsx`) — Terminal integrada asíncrona segura (PTY/xterm.js).
+- `CodeEditor` (`src/components/Editor/CodeEditor.tsx`) — Integración del motor de Monaco y configuraciones de editor global.
 - `SettingsPanel` — Panel flotante Global con guardado persistente (Config. Modelo, Vigilante, Cuántica, Orquestador N5)
 - `ChatPanel` — Panel de chat IA (importado como componente separado)
+
+**Hooks del Core (Nuevo Enfoque):**
+- `useFileSystem` — Lógica y estado de rutas activas, lecturas y escrituras recursivas.
+- `useMosetBrain` — Nexo comunicador asíncrono con `lib.rs` y el evaluador Rust.
+- `useTauriTerminal` — Instancias y callbacks asíncronos para el manejo del PTY OS.
 
 **Funcionalidades:**
 - Monaco Editor con tema `moset-dark` personalizado + **InlineCompletionsProvider** (AI ghost text, debounced 800ms)
@@ -514,6 +522,7 @@ Define todos los nodos del árbol sintáctico:
 - ✅ Cancelación de inferencia vía `cancel_inference` command
 - ✅ Renderizado inline de markdown: bold, italic, code, headers, listas
 - ✅ Bloques de código con syntax highlighting y botón copiar
+- ✅ Contexto Vigilante IDE: Extrae transparentemente el Estado del Entorno (Nódulos Prohibidos, Peligrosos, en Cuarentena) al System Prompt de Modelos Locales y Nube (BUG FIX Auditado).
 
 **⚠️ Bugs menores activos:**
 - (BUG-025) `uid()` usa `Math.random()` — posible colisión en alta frecuencia
@@ -666,7 +675,7 @@ Además de los endpoints del lenguaje Moset, el IDE incluye un **agente autónom
 | BUG-025 | `ChatPanel.tsx` | 🟢 | `uid()` usa `Math.random()` — posible colisión en alta frecuencia | ✅ RESUELTO |
 | BUG-026 | `compiler.rs` | 🟡 | `importar` resuelve rutas relativas al CWD, no compilaba módulos anidados | ✅ RESUELTO — Implementada compilación anidada en frontend |
 | BUG-027 | `ai.rs` | 🟢 | Múltiples `eprintln!` de debug en producción — contamina stderr | ✅ RESUELTO — Limpiado |
-| BUG-043 | `lib.rs` (Tauri) | 🔴 | `execute_agent_tool` y `save_file_content` no validan sandbox vía Vigilante — el agente podría escribir/ejecutar fuera del directorio permitido | ⬜ PENDIENTE |
+| BUG-043 | `lib.rs` (Tauri) | 🔴 | `execute_agent_tool` y `save_file_content` no validan sandbox vía Vigilante — el agente podría escribir/ejecutar fuera del directorio permitido | ✅ RESUELTO — Sandbox Middleware Inyectado |
 | BUG-044 | `ai.rs` | 🟢 | Streaming de tokens panicábamos al slicear UTF-8 multibyte (emojis). Fix: `is_char_boundary()` guards en 3 puntos de corte | ✅ RESUELTO |
 
 ### 🟡 Issues de UX/UI (Auditoría v4.0)
@@ -918,6 +927,17 @@ Además de los endpoints del lenguaje Moset, el IDE incluye un **agente autónom
 - [x] BUG-043 (Crítico) — Vigilante inyectado en `execute_agent_tool`: `autorizar_ruta()` antes de `write_to_file`/`replace_file_content` y `autorizar()` antes de `run_command`. El agente autónomo ahora opera con confianza implícita `None`, bloqueando comandos peligrosos/cautelosos salvo Bit explícito ✅
 - [x] BUG-027 — `println!("MOSET_EJECUTAR: {}"...)` eliminado de `ejecutar` en producción (ya no vuelca código fuente completo a stdout) ✅
 - [x] BUG-026 — `Compilador` ahora expone campo `pub ruta_base: Option<PathBuf>`. El CLI (`main.rs`) lo instancia con el directorio canónico del archivo fuente, para que futuros `importar` relativos se resuelvan desde el archivo y no del CWD del proceso ✅
+
+**Fase 11 — Estabilización UI, Omniglotismo y Modularización Extrema:**
+- [x] **Modularización Exitosa de App.tsx** — Descomposición del monolito inicial gigante (+2000 líneas) en partes orquestadas (hooks en `src/hooks/*`) y componentes renderizables (`src/components/*`), erradicando TS bugs conflictivos.
+- [x] **Omniglotismo Absoluto Confirmado** — El motor léxico fue expandido abarcando el 80% de lenguajes base del mundo (sino, if, se, wenn, もし, etc).
+- [x] **UI Premium Glassmorphism** — Implementación de modal de Bienvenida (`<LanguageModal/>`), desenfoques nativos `.glass` y animaciones de portal unificadas con la marca de Identidad Cuántica.
+- [x] **Auditoría e Inyección de Consciencia Remota en ChatPanel** — Mapeo del `localStorage` interceptando la configuración Vigilante de Nódulos de la UI y transpilándolas al Sistema Operativo de agentes en la nube (OpenAI, Mistral, Anthropic) para comportamiento soberano sin importar la API subyacente.
+- [x] **Sandbox Extendido en Vigilante** — Expansión de directorios confiables en `vigilante.rs` mitigando bloqueos falsos positivos en workspaces secundarios (ej. S:\Data Strix).
+- [x] **RAG Heurístico** — Eliminado el truncado ciego. Implementada puntuación de relevancia léxica en `fetch_full_context` extrayendo el subset crítico por query de usuario sin romper los limitantes de token de LMM.
+- [x] **Mojibake Fix (SSE UTF-8)** — Migrado parseo en `cloud_ai.rs` a un `BufReader::lines()` protegiendo los bytes multi-byte frente al troceado en stream de acentos/eñes, lo que previene rupturas de JSON.
+- [x] **Sanitización Segura de Tags Parciales** — Removidos filtros Regex destructivos (`/<\|?$/g`) responsables de la amputación del `</think>` nativo del modelo, logrando un DOM resiliente.
+- [x] **Tauri Capabilities ACL v2 (Build Fix)** — Resolución del pánico de validación en Tauri 2.0 (`failed to run custom build command`) eliminando identificadores huérfanos (`moset-ide:default`, `app:default`) del archivo `capabilities/default.toml`, logrando un pipeline de empaquetado 100% estable.
 
 ---
 

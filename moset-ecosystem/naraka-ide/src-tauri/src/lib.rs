@@ -8,14 +8,14 @@ fn version() -> String {
 }
 
 #[tauri::command]
-async fn ejecutar(_app: tauri::AppHandle, codigo: String) -> Result<String, String> {
+async fn ejecutar(_app: tauri::AppHandle, codigo: String, idioma: Option<String>) -> Result<String, String> {
     use moset_core::{lexer::Lexer, parser::Parser, compiler::Compilador, vm::VM};
     use std::sync::{Arc, Mutex};
 
     let output = Arc::new(Mutex::new(String::new()));
     let output_clone = Arc::clone(&output);
 
-    let mut lex = Lexer::nuevo(&codigo, Some("es"));
+    let mut lex = Lexer::nuevo(&codigo, idioma.as_deref());
     let tokens = match lex.tokenizar() {
         Ok(t) => t,
         Err(e) => return Err(format!("Error léxico: {}", e)),
@@ -206,6 +206,8 @@ fn read_file_content(path: String) -> Result<String, String> {
 
 #[tauri::command]
 fn create_file(path: String) -> Result<(), String> {
+    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+    vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado: {}", e))?;
     std::fs::File::create(&path)
         .map(|_| ())
         .map_err(|e| format!("Error creando archivo {}: {}", path, e))
@@ -213,12 +215,16 @@ fn create_file(path: String) -> Result<(), String> {
 
 #[tauri::command]
 fn create_folder(path: String) -> Result<(), String> {
+    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+    vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado: {}", e))?;
     std::fs::create_dir_all(&path)
         .map_err(|e| format!("Error creando carpeta {}: {}", path, e))
 }
 
 #[tauri::command]
 fn delete_item(path: String) -> Result<(), String> {
+    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+    vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado: {}", e))?;
     let p = std::path::Path::new(&path);
     if p.is_dir() {
         std::fs::remove_dir_all(p)
@@ -231,38 +237,55 @@ fn delete_item(path: String) -> Result<(), String> {
 
 #[tauri::command]
 fn rename_item(old_path: String, new_path: String) -> Result<(), String> {
+    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+    vigilante.autorizar_ruta(&old_path).map_err(|e| format!("Vigilante: Acceso denegado (origen): {}", e))?;
+    vigilante.autorizar_ruta(&new_path).map_err(|e| format!("Vigilante: Acceso denegado (destino): {}", e))?;
     std::fs::rename(&old_path, &new_path)
         .map_err(|e| format!("Error renombrando de {} a {}: {}", old_path, new_path, e))
 }
 
 #[tauri::command]
 fn save_file_content(path: String, content: String) -> Result<(), String> {
+    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+    vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado: {}", e))?;
     std::fs::write(&path, &content)
         .map_err(|e| format!("Error guardando {}: {}", path, e))
 }
 
+#[derive(Clone)]
+struct ContextChunk {
+    file_path: String,
+    content: String,
+    score: f32,
+}
+
 #[tauri::command]
-fn fetch_full_context(paths: Vec<String>) -> Result<String, String> {
-    // Límite calibrado para exprimir GPU y que NUNCA revienten los modelos pequeños.
-    // Ej: TinyLlama tiene un contexto de 4096 tokens. Si enviamos 24000 chars, son ~8000 tokens, y dará error de "narrow invalid args".
-    // 10K chars ≈ 2.5K tokens. Queda espacio de sobra para el system prompt y la respuesta.
+fn fetch_full_context(paths: Vec<String>, query: Option<String>) -> Result<String, String> {
     const MAX_CHARS: usize = 10000;
-    let mut total_chars = 0;
-    let mut output = String::new();
     
     let valid_extensions = ["et", "rs", "ts", "tsx", "js", "jsx", "md", "json", "toml", "css", "py", "html", "sh"];
     let ignore_dirs = ["node_modules", ".git", "target", "dist", "build"];
+    
+    let mut all_chunks: Vec<ContextChunk> = Vec::new();
+    
+    // Función auxiliar para extraer palabras de un texto
+    fn extract_words(text: &str) -> Vec<String> {
+        text.split(|c: char| !c.is_alphanumeric())
+            .filter(|s| s.len() > 2)
+            .map(|s| s.to_lowercase())
+            .collect()
+    }
+    
+    let query_words = query.as_ref().map(|q| extract_words(q)).unwrap_or_default();
 
     fn process_path(
         path: &std::path::Path, 
         base_path: &std::path::Path,
-        output: &mut String, 
-        total_chars: &mut usize,
+        chunks: &mut Vec<ContextChunk>, 
+        query_words: &[String],
         valid_extensions: &[&str],
         ignore_dirs: &[&str]
     ) {
-        if *total_chars >= MAX_CHARS { return; }
-        
         let path_str = path.to_string_lossy().replace("\\", "/");
         if ignore_dirs.iter().any(|d| path_str.contains(&format!("/{}", d)) || path_str.ends_with(d)) {
             return;
@@ -272,32 +295,37 @@ fn fetch_full_context(paths: Vec<String>) -> Result<String, String> {
             if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
                 if valid_extensions.contains(&ext.to_lowercase().as_str()) {
                     if let Ok(content) = std::fs::read_to_string(path) {
-                        let rel_path = path.strip_prefix(base_path).unwrap_or(path).to_string_lossy();
-                        output.push_str(&format!("\n--- Archivo: {} ---\n", rel_path));
+                        let rel_path = path.strip_prefix(base_path).unwrap_or(path).to_string_lossy().to_string();
                         
-                        let remaining = MAX_CHARS.saturating_sub(*total_chars);
-                        let content_len = content.chars().count();
-                        
-                        if content_len > remaining {
-                            let truncated: String = content.chars().take(remaining).collect();
-                            output.push_str(&truncated);
-                            output.push_str("\n...[Contenido Truncado]...\n");
-                            *total_chars += remaining;
+                        // Dividir el archivo en trozos (por ejemplo, bloques separados por dobles saltos de línea o simplemente bloques fijos)
+                        // Para simplificar: tomaremos todo el archivo como un chunk, pero si es muy grande, le damos su propio score
+                        let score = if query_words.is_empty() {
+                            // Sin query explícita, los archivos más pequeños (o en orden) tienen más o igual prioridad
+                            1.0
                         } else {
-                            output.push_str(&content);
-                            output.push_str("\n");
-                            *total_chars += content_len;
-                        }
+                            let content_words = extract_words(&content);
+                            let mut match_count = 0;
+                            for qw in query_words {
+                                if content_words.contains(qw) {
+                                    match_count += 1;
+                                }
+                            }
+                            // Score básico: cantidad de matches, normalizado o potenciado por densidad
+                            match_count as f32
+                        };
+
+                        chunks.push(ContextChunk {
+                            file_path: rel_path,
+                            content,
+                            score,
+                        });
                     }
                 }
             }
         } else if path.is_dir() {
             if let Ok(entries) = std::fs::read_dir(path) {
                 for entry in entries.filter_map(Result::ok) {
-                    process_path(&entry.path(), base_path, output, total_chars, valid_extensions, ignore_dirs);
-                    if *total_chars >= MAX_CHARS {
-                        break;
-                    }
+                    process_path(&entry.path(), base_path, chunks, query_words, valid_extensions, ignore_dirs);
                 }
             }
         }
@@ -306,11 +334,37 @@ fn fetch_full_context(paths: Vec<String>) -> Result<String, String> {
     for p in paths {
         let path = std::path::Path::new(&p);
         let base_path = if path.is_file() { path.parent().unwrap_or(path) } else { path };
-        process_path(path, base_path, &mut output, &mut total_chars, &valid_extensions, &ignore_dirs);
+        process_path(path, base_path, &mut all_chunks, &query_words, &valid_extensions, &ignore_dirs);
+    }
+    
+    // Sort chunks by score (descending)
+    all_chunks.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    
+    let mut total_chars = 0;
+    let mut output = String::new();
+    
+    for chunk in all_chunks {
+        if total_chars >= MAX_CHARS { break; }
+        
+        output.push_str(&format!("\n--- Archivo: {} (Relevancia: {}) ---\n", chunk.file_path, chunk.score));
+        
+        let remaining = MAX_CHARS.saturating_sub(total_chars);
+        let content_len = chunk.content.chars().count();
+        
+        if content_len > remaining {
+            let truncated: String = chunk.content.chars().take(remaining).collect();
+            output.push_str(&truncated);
+            output.push_str("\n...[Contenido Truncado por RAG]...\n");
+            total_chars += remaining;
+        } else {
+            output.push_str(&chunk.content);
+            output.push_str("\n");
+            total_chars += content_len;
+        }
     }
     
     if total_chars >= MAX_CHARS {
-        output.push_str("\n... [Contexto truncado por límite de tamaño]");
+        output.push_str("\n... [Contexto RAG truncado por límite de seguridad global]");
     }
     
     Ok(output)
@@ -499,6 +553,7 @@ async fn chat_orquestado(
     provider: String,
     model: String,
     api_key: String,
+    base_url: Option<String>,
     agent_mode: String,
     include_context: bool,
     context_content: String,
@@ -562,7 +617,7 @@ async fn chat_orquestado(
         }).await.map_err(|e| format!("Error en el hilo asíncrono: {}", e))?
     } else {
         tauri::async_runtime::spawn_blocking(move || {
-            let motor_cloud = moset_core::cloud_ai::MotorCloud::nuevo(&provider, &model, &api_key, None);
+            let motor_cloud = moset_core::cloud_ai::MotorCloud::nuevo(&provider, &model, &api_key, base_url.as_deref());
             let res = motor_cloud.inferir(&sys_prompt, &messages, |partial| {
                 window.emit("soberano-stream", partial).ok();
                 !cancel_flag.load(std::sync::atomic::Ordering::Relaxed)

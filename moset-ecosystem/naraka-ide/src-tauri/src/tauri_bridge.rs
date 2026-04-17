@@ -74,16 +74,20 @@ pub fn spawn_pty(app: AppHandle) {
     };
 
     let mut cmd = CommandBuilder::new("powershell.exe");
-    // -NoLogo: sin banner de PS
-    // -NonInteractive: sin prompts de usuario
-    // -WindowStyle Hidden: CRÍTICO en Windows — suprime el flash de ventana CMD al arrancar
-    cmd.args(["-NoLogo", "-NonInteractive", "-WindowStyle", "Hidden"]);
+    cmd.args(["-NoLogo", "-WindowStyle", "Hidden"]);
     
     let child = match pair.slave.spawn_command(cmd) {
         Ok(child) => child,
-        Err(e) => {
-            let _ = app.emit("pty-error", format!("Fallo al iniciar PowerShell: {}", e));
-            return;
+        Err(_) => {
+            // BUGFIX: Si powershell.exe no existe, intentamos con cmd.exe como fallback
+            let cmd2 = CommandBuilder::new("cmd.exe");
+            match pair.slave.spawn_command(cmd2) {
+                Ok(child_fallback) => child_fallback,
+                Err(e2) => {
+                    let _ = app.emit("pty-error", format!("Fallo al iniciar PowerShell y CMD: {}", e2));
+                    return;
+                }
+            }
         }
     };
     

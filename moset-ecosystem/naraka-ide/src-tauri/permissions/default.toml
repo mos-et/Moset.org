@@ -1,0 +1,34 @@
+"$schema" = "https://schemas.tauri.app/schema/v2/permission.json"
+identifier = "default"
+description = "Default custom commands"
+
+[[allow]]
+command = "read_directory"
+[[allow]]
+command = "read_file_content"
+[[allow]]
+command = "create_file"
+[[allow]]
+command = "create_folder"
+[[allow]]
+command = "delete_item"
+[[allow]]
+command = "rename_item"
+[[allow]]
+command = "save_file_content"
+[[allow]]
+command = "fetch_full_context"
+[[allow]]
+command = "execute_agent_tool"
+[[allow]]
+command = "set_clean_cuda_on_exit"
+[[allow]]
+command = "cargar_modelo"
+[[allow]]
+command = "cancel_inference"
+[[allow]]
+command = "descargar_modelo"
+[[allow]]
+command = "chat_soberano"
+[[allow]]
+command = "chat_orquestado"

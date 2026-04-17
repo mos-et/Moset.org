@@ -111,6 +111,33 @@ pub fn entorno(nombre: &str) -> Result<String, String> {
         .map_err(|_| format!("Variable de entorno '{}' no definida", nombre))
 }
 
+/// Realizar una petición HTTP GET.
+/// Requiere conexión a internet.
+///
+/// # Ejemplo Moset
+/// ```moset
+/// respuesta = peticion_get("https://api.github.com")
+/// mostrar respuesta
+/// ```
+#[cfg(not(target_arch = "wasm32"))]
+pub fn peticion_get(url: &str) -> Result<String, String> {
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("Moset/1.0 (Naraka Studio)")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    client.get(url)
+        .send()
+        .map_err(|e| format!("Falló petición a '{}': {}", url, e))?
+        .text()
+        .map_err(|e| format!("Falló extraer cuerpo: {}", e))
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn peticion_get(_url: &str) -> Result<String, String> {
+    Err("Peticiones HTTP síncronas no están disponibles en la web (WASM)".into())
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

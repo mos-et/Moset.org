@@ -193,8 +193,9 @@ impl Vigilante {
 
         let ruta_lower = ruta_normal.to_lowercase();
         
-        // 🟢 Permitimos solo S:\Naraka Studio, temporales, o relativas puras
+        // 🟢 Permitimos S:\Naraka Studio, S:\Data Strix, temporales, o relativas puras
         if ruta_lower.starts_with("s:/naraka studio") 
+           || ruta_lower.starts_with("s:/data strix")
            || ruta_lower.contains("/temp/") 
            || ruta_lower.contains("/tmp/") 
            || (!ruta_lower.starts_with("/") && !ruta_lower.contains(":/")) 
@@ -202,7 +203,7 @@ impl Vigilante {
             Ok(())
         } else {
             Err(format!(
-                "🛑 Vigilante: RUTA FUERA DEL SANDBOX ({}).\nNaraka solo tiene jurisdicción para modificar archivos dentro de S:\\Naraka Studio o directiorios temporales.", 
+                "🛑 Vigilante: RUTA FUERA DEL SANDBOX ({}).\nNaraka solo tiene jurisdicción para modificar archivos dentro de S:\\Naraka Studio, S:\\Data Strix o directorios temporales.", 
                 ruta
             ))
         }
