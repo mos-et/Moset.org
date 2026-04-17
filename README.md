@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="logos%20moset/Logo%20Moset%20v2.png" alt="Moset Logo" width="200" />
+  <img src="moset-ecosystem/naraka-ide/src/assets/moset-logo.png" alt="Moset Logo" width="200" />
   
   # Moset Ecosystem
   **Inteligencia Soberana. Desarrollo Nativo.**
