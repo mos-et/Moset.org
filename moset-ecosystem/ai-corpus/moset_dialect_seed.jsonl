@@ -1,0 +1,10 @@
+{"prompt": "Escribe una funcion en Moset que reciba un parametro de texto e imprima un saludo.", "completion": ":,] saludar(nombre):\n    mostrar(\"Hola \" + nombre)"}
+{"prompt": "¿Cómo defino un bloque condicional si/sino en dialecto Moset?", "completion": "En Moset utilizamos 'si' y 'sino'. Ejemplo:\nsi verdadero:\n    mostrar(\"Es correcto\")\nsino:\n    mostrar(\"Error\")"}
+{"prompt": "Necesito encapsular un error en Moset, ¿cómo hago un catch?", "completion": "Usa la carita modula :,[ (try-catch inline) así:\n:,[ mi_error:\n    mostrar(mi_error)"}
+{"prompt": "Crea un molde para un objeto Usuario con Nombre y Edad.", "completion": "molde Usuario:\n    Nombre: Texto\n    Edad: Entero"}
+{"prompt": "Implementa un bit cuántico que este simulado con 50% de probabilidad de ser verdadero.", "completion": "Para generar un estado de superposición 50/50 usa el tilde de polarización pura:\nmi_probabilidad = Bit:~"}
+{"prompt": "Implementa un bit cuántico sesgado al 85% de probabilidad hacia verdadero.", "completion": "Para generar un estado sesgado usa los corchetes cuánticos:\nmi_probabilidad = Bit:[0.85]"}
+{"prompt": "Escribe un shadow environment (pensar) donde calculo un temporal sin afectar el scope global.", "completion": "pensar {\n    temporal = 100 * 20\n    mostrar(temporal)\n}"}
+{"prompt": "Como espero una promesa (async/await) en Moset?", "completion": "Utiliza la barra invertida para aguardar la promesa:\n:,\\ esperar_red()"}
+{"prompt": "Agrega un comentario de una sola linea en dialecto", "completion": ":@ Esto protege al interpretador de leer esta seccion"}
+{"prompt": "Haz un ciclo 'por cada' sobre una lista", "completion": "por cada item en [1, 2, 3]:\n    mostrar(item)"}

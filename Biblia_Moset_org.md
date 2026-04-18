@@ -37,3 +37,5 @@ Para conectar el front-end web con el Motor (el IDE desarrollado en Tauri/Rust),
 
 ## ðŸ’¿ 4. Auditoría de Seguridad & Legal
 - 2026-04-17: Se integra el flujo de validación de Licencia PolyForm Noncommercial y exención de riesgos de Hardware en ES y EN obligando al paso EULA previo a exponer los links de Windows (.exe), macOS (.dmg) o Linux (.AppImage). Se habilita además link directo al repositorio oficial de GitHub para audit code.
+
+- 2026-04-18: Refactorizacion del formulario de validacion EULA (Espaol/Ingles) con aprobacion implicita a traves del boton Hero, suprimiendo la logica defectuosa de checkboxes y mejorando la inyeccion dinamica en el Shadow DOM (Tailwind v4).
