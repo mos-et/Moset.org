@@ -947,3 +947,6 @@ AdemÃ¡s de los endpoints del lenguaje Moset, el IDE incluye un **agente autÃ³nom
 <div align="center">
   <i>Moset 2026 - Desarrollado por <b>narakastudio.com</b></i>
 </div>
+
+## Última Actualización
+- 2026-04-17: Moset IDE branding estabilizado a moset.org. Chatbot fix (capturas regex en Node) y arquitectura de web migrada a Astro con protección EULA y redirección GitHub para source compile.

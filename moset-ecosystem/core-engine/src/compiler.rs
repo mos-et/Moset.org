@@ -144,37 +144,48 @@ impl Compilador {
 
             // ─── OPERADORES BINARIOS ────────────────────────────────────────
             Nodo::Binario { izq, op, der } => {
-                self.compilar_nodo(izq, linea)?;
-                self.compilar_nodo(der, linea)?;
-
                 match op {
-                    OpBinario::Sumar => self.emitir_byte(OpCode::Suma as u8, linea),
-                    OpBinario::Restar => self.emitir_byte(OpCode::Resta as u8, linea),
-                    OpBinario::Multiplicar => self.emitir_byte(OpCode::Multiplicacion as u8, linea),
-                    OpBinario::Dividir => self.emitir_byte(OpCode::Division as u8, linea),
-                    OpBinario::Modulo => self.emitir_byte(OpCode::Modulo as u8, linea),
-                    OpBinario::Igual => self.emitir_byte(OpCode::Igual as u8, linea),
-                    OpBinario::NoIgual => self.emitir_byte(OpCode::NoIgual as u8, linea),
-                    OpBinario::Mayor => self.emitir_byte(OpCode::Mayor as u8, linea),
-                    OpBinario::Menor => self.emitir_byte(OpCode::Menor as u8, linea),
-                    OpBinario::MayorIgual => self.emitir_byte(OpCode::MayorIgual as u8, linea),
-                    OpBinario::MenorIgual => self.emitir_byte(OpCode::MenorIgual as u8, linea),
                     OpBinario::Y => {
-                        // Short-circuit AND: si izq es falso, salta al final
+                        self.compilar_nodo(izq, linea)?;
+                        // Si izq es falso, saltamos al final (el valor de izq queda en pila como resultado)
                         let salto_fin = self.chunk.emitir_salto(OpCode::SaltoSiFalso, linea);
-                        self.emitir_byte(OpCode::Pop as u8, linea); // pop el resultado de izq
-                        // der ya está compilado arriba — NOTA: para short-circuit real,
-                        // necesitaríamos compilar der AQUÍ, no arriba. Por ahora, evaluamos ambos.
+                        // Si izq era verdadero, lo quitamos de la pila y evaluamos der
+                        self.emitir_byte(OpCode::Pop as u8, linea);
+                        self.compilar_nodo(der, linea)?;
                         self.chunk.parchear_salto(salto_fin);
                     },
                     OpBinario::O => {
-                        // Short-circuit OR: si izq es verdadero, salta al final
-                        let salto_else = self.chunk.emitir_salto(OpCode::SaltoSiFalso, linea);
+                        self.compilar_nodo(izq, linea)?;
+                        // Si izq es verdadero, saltamos al final (el valor queda en pila)
+                        // Para esto necesitamos un SaltoSiVerdadero o similar,
+                        // o usar SaltoSiFalso para ir al bloque que evalúa der.
+                        let salto_eval_der = self.chunk.emitir_salto(OpCode::SaltoSiFalso, linea);
                         let salto_fin = self.chunk.emitir_salto(OpCode::Salto, linea);
-                        self.chunk.parchear_salto(salto_else);
+
+                        self.chunk.parchear_salto(salto_eval_der);
                         self.emitir_byte(OpCode::Pop as u8, linea);
+                        self.compilar_nodo(der, linea)?;
                         self.chunk.parchear_salto(salto_fin);
                     },
+                    _ => {
+                        self.compilar_nodo(izq, linea)?;
+                        self.compilar_nodo(der, linea)?;
+
+                        match op {
+                            OpBinario::Sumar => self.emitir_byte(OpCode::Suma as u8, linea),
+                            OpBinario::Restar => self.emitir_byte(OpCode::Resta as u8, linea),
+                            OpBinario::Multiplicar => self.emitir_byte(OpCode::Multiplicacion as u8, linea),
+                            OpBinario::Dividir => self.emitir_byte(OpCode::Division as u8, linea),
+                            OpBinario::Modulo => self.emitir_byte(OpCode::Modulo as u8, linea),
+                            OpBinario::Igual => self.emitir_byte(OpCode::Igual as u8, linea),
+                            OpBinario::NoIgual => self.emitir_byte(OpCode::NoIgual as u8, linea),
+                            OpBinario::Mayor => self.emitir_byte(OpCode::Mayor as u8, linea),
+                            OpBinario::Menor => self.emitir_byte(OpCode::Menor as u8, linea),
+                            OpBinario::MayorIgual => self.emitir_byte(OpCode::MayorIgual as u8, linea),
+                            OpBinario::MenorIgual => self.emitir_byte(OpCode::MenorIgual as u8, linea),
+                            _ => unreachable!(),
+                        }
+                    }
                 }
             },
 

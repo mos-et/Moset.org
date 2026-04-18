@@ -116,6 +116,8 @@ export function Explorador({ tree, projectRoot, projectName, onOpen, setTree, on
         <div key={node.id}>
           <div
             className="tree-item tree-folder"
+            draggable
+            onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.setData("application/moset-path", fullPath); }}
             style={{ paddingLeft: `${indent + 8}px`, backgroundColor: inContext ? "rgba(0,168,255,0.05)" : undefined }}
             onClick={() => setTree(prev => toggleFolder(node.id, prev))}
             onContextMenu={(e) => {
@@ -158,6 +160,8 @@ export function Explorador({ tree, projectRoot, projectName, onOpen, setTree, on
       <div
         key={node.id}
         className="tree-item tree-file"
+        draggable
+        onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.setData("application/moset-path", fullPath); }}
         style={{ paddingLeft: `${indent + 24}px`, backgroundColor: inContext ? "rgba(0,168,255,0.05)" : undefined }}
         onClick={() => onOpen(node, fullPath)}
         onContextMenu={(e) => {

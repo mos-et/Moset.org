@@ -64,6 +64,17 @@ pub fn generar_system_prompt(modo: &str, workspace_root: &str, contexto_extra: O
     prompt.push_str("No le expliques todo lo que pensaste, solo los resultados o preguntas clave.\n");
     prompt.push_str("</user_response>\n\n");
 
+    prompt.push_str("===============================================\n");
+    prompt.push_str("DIALECTO MOSET (.et) - GUIA DE SINTAXIS\n");
+    prompt.push_str("===============================================\n");
+    prompt.push_str("Cuando leas código con extensión .et, ten en cuenta estas reglas exclusivas:\n");
+    prompt.push_str("1. Retornos Exitosos: ':,]' significa un return o exit success dentro de un bloque/función.\n");
+    prompt.push_str("2. Retornos de Error/Excepciones: ':,[' significa throw/panic o return en estado de error.\n");
+    prompt.push_str("3. Estructuras de Datos: La palabra 'molde' equivale a 'struct' o 'class'. (Ej. molde Persona).\n");
+    prompt.push_str("4. Módulos/Namespaces: La palabra 'esfera' equivale a 'mod' o 'namespace' o paquete.\n");
+    prompt.push_str("5. Moset utiliza tipado fuerte implícito e ideas traídas de Rust y mecánica cuántica. Nunca corrijas ':,]' porque NO es un error tipográfico, es sintaxis sagrada.\n");
+    prompt.push_str("===============================================\n\n");
+
     prompt.push_str(&format!("Modo actual: {}\n", modo));
     prompt.push_str(&format!("Raíz del proyecto (Workspace): {}\n\n", workspace_root));
     

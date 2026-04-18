@@ -685,23 +685,34 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
 
 /* ─── Layout integrado del Chat ──────────────────────────────────────────────── */
 .chat-overlay {
-  grid-column: 3;
-  grid-row: 1;
-  width: 380px;
   display: flex;
   flex-direction: column;
-  z-index: 10;
-  border-right: 1px solid var(--border);
+  z-index: 100; /* Por encima del editor y sidebar */
   overflow: hidden;
-  position: relative;
-  animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+  position: absolute;
+  background: var(--bg-1);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  transition: border-radius 0.2s ease, box-shadow 0.2s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.chat-overlay.docked {
+  border-right: 1px solid var(--border);
+  box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+  border-radius: 0;
+}
+
+.chat-overlay.floating {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.05);
+  animation: fadeIn 0.2s ease-out both;
 }
 
 .chat-resizer {
   position: absolute;
   top: 0;
-  right: 0;
-  width: 4px;
+  width: 5px;
   height: 100%;
   cursor: ew-resize;
   z-index: 20;
@@ -1808,4 +1819,208 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
 }
 .chat-code-block:hover .chat-copy-btn {
   opacity: 1;
+}
+
+/* ─── Volume-style Sliders ──────────────────────────────────────────────────── */
+input[type=range] {
+  -webkit-appearance: none;
+  width: 100%;
+  background: transparent;
+}
+input[type=range]:focus {
+  outline: none;
+}
+input[type=range]::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 6px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+input[type=range]::-webkit-slider-thumb {
+  height: 14px;
+  width: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  -webkit-appearance: none;
+  margin-top: -5px;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
+  transition: transform 0.1s;
+}
+input[type=range]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.6);
+}
+input[type=range]::-moz-range-track {
+  width: 100%;
+  height: 6px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+input[type=range]::-moz-range-thumb {
+  height: 14px;
+  width: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
+}
+
+/* ─── Context Selector & history drawer ───────────────────────────────────────── */
+.chat-tabs-container {
+  max-height: 250px;
+  overflow-y: auto;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.chat-input-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 2px;
+}
+
+.context-selector {
+  position: relative;
+}
+
+.context-trigger {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-3);
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.context-trigger:hover {
+  background: var(--bg-4);
+  color: var(--text-2);
+  border-color: var(--text-3);
+}
+
+.context-trigger.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.context-trigger svg {
+  width: 13px;
+  height: 13px;
+}
+
+.context-label {
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.send-btn {
+  width: 30px;
+  height: 30px;
+  background: var(--bg-3);
+  border: none;
+  border-radius: 6px;
+  color: var(--text-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.send-btn:hover {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #000;
+  box-shadow: 0 4px 12px var(--accent-glow);
+  transform: translateY(-1px);
+}
+
+.chat-history-drawer {
+  background: var(--bg-1);
+  backdrop-filter: blur(10px);
+}
+
+.session-item {
+  padding: 10px 12px;
+  margin: 4px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.session-item:hover {
+  background: var(--bg-3);
+  border-color: var(--border);
+  transform: translateX(4px);
+}
+
+.session-item.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+
+.session-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.session-date {
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+.session-delete {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  padding: 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s;
+}
+
+.session-item:hover .session-delete {
+  opacity: 1;
+}
+
+.session-delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--red);
 }

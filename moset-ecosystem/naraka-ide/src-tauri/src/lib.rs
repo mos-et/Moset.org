@@ -56,10 +56,10 @@ async fn ejecutar(_app: tauri::AppHandle, codigo: String, idioma: Option<String>
 }
 
 #[tauri::command]
-fn validate_code(codigo: String) -> Vec<moset_core::linter::Diagnostic> {
+fn validate_code(codigo: String, idioma: Option<String>) -> Vec<moset_core::linter::Diagnostic> {
     use moset_core::{lexer::Lexer, parser::Parser, linter::Linter};
 
-    let mut lex = Lexer::nuevo(&codigo, Some("es"));
+    let mut lex = Lexer::nuevo(&codigo, idioma.as_deref());
     let tokens = match lex.tokenizar() {
         Ok(t) => t,
         Err(e) => {
@@ -259,6 +259,40 @@ struct ContextChunk {
     score: f32,
 }
 
+fn extract_moset_skeleton(content: &str) -> String {
+    let mut skeleton = String::new();
+    let mut in_skeleton_block = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("importar ") || trimmed.starts_with("usar ") {
+            skeleton.push_str(line);
+            skeleton.push('\n');
+        } else if trimmed.starts_with("esfera ") || trimmed.starts_with("molde ") || trimmed.starts_with("fn ") || trimmed.starts_with("pub fn ") {
+            skeleton.push_str(line);
+            skeleton.push('\n');
+            if !trimmed.ends_with("{") && !trimmed.ends_with(";") {
+                in_skeleton_block = true;
+            } else if trimmed.ends_with("{") {
+                skeleton.push_str("    // ... impl condensado para ahorrar tokens ...\n");
+                skeleton.push_str("}\n");
+            }
+        } else if in_skeleton_block {
+            skeleton.push_str(line);
+            skeleton.push('\n');
+            if trimmed.ends_with("{") || trimmed.contains("{") {
+                in_skeleton_block = false;
+                skeleton.push_str("    // ... impl condensado para ahorrar tokens ...\n");
+                skeleton.push_str("}\n");
+            }
+        }
+    }
+    if skeleton.trim().is_empty() {
+        content.to_string()
+    } else {
+        format!("/* [MOSET U-AST SKELETON - OPTIMIZADO PARA IA] */\n{}", skeleton)
+    }
+}
+
 #[tauri::command]
 fn fetch_full_context(paths: Vec<String>, query: Option<String>) -> Result<String, String> {
     const MAX_CHARS: usize = 10000;
@@ -294,8 +328,13 @@ fn fetch_full_context(paths: Vec<String>, query: Option<String>) -> Result<Strin
         if path.is_file() {
             if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
                 if valid_extensions.contains(&ext.to_lowercase().as_str()) {
-                    if let Ok(content) = std::fs::read_to_string(path) {
+                    if let Ok(mut content) = std::fs::read_to_string(path) {
                         let rel_path = path.strip_prefix(base_path).unwrap_or(path).to_string_lossy().to_string();
+                        
+                        let ext_str = ext.to_lowercase();
+                        if ext_str == "et" {
+                            content = extract_moset_skeleton(&content);
+                        }
                         
                         // Dividir el archivo en trozos (por ejemplo, bloques separados por dobles saltos de línea o simplemente bloques fijos)
                         // Para simplificar: tomaremos todo el archivo como un chunk, pero si es muy grande, le damos su propio score
@@ -880,6 +919,9 @@ pub fn run() {
                 if ai_state.clean_cuda_on_exit.load(std::sync::atomic::Ordering::Relaxed) {
                     let _ = clean_cuda_cache();
                 }
+            } else if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
+                // Emitir evento global de archivos arrastrados
+                let _ = window.emit("global-file-drop", paths);
             }
         })
         .plugin(tauri_plugin_opener::init())
