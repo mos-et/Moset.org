@@ -318,8 +318,8 @@ function renderContent(text: string, isActionable: boolean = false, projectRoot?
 function AgentModeSelector({ mode, onChange }: { mode: AgentMode; onChange: (m: AgentMode) => void }) {
   return (
     <div className="agent-mode-selector">
-      <button className={mode === "planear" ? "active" : ""} onClick={() => onChange("planear")}>{Icons.brain} Planear</button>
-      <button className={mode === "actuar" ? "active" : ""} onClick={() => onChange("actuar")}>{Icons.zap} Actuar</button>
+      <button className={`agent-mode-btn ${mode === "planear" ? "active" : ""}`} onClick={() => onChange("planear")}>{Icons.brain} Planear</button>
+      <button className={`agent-mode-btn ${mode === "actuar" ? "active" : ""}`} onClick={() => onChange("actuar")}>{Icons.zap} Actuar</button>
     </div>
   );
 }
@@ -335,7 +335,7 @@ export default function ChatPanel({ projectRoot, contextPaths, setContextPaths, 
   onDragStart?: (e: React.MouseEvent) => void;
 }) {
   const ideConfig = useIdeConfig();
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(true);
   const [showInlineSettings, setShowInlineSettings] = useState(false);
 
   // Determinar contextos efectivos
@@ -354,6 +354,13 @@ export default function ChatPanel({ projectRoot, contextPaths, setContextPaths, 
     }
   }, [ideConfig.contextMode, ideConfig]);
 
+  // Asegurar que modo cambie a 'selected' automáticamente si se elige un archivo/directorio con el Cerebro
+  useEffect(() => {
+    if (contextPaths && contextPaths.length > 0 && ideConfig.contextMode === "none") {
+      ideConfig.setContextMode("selected");
+    }
+  }, [contextPaths, ideConfig.contextMode, ideConfig]);
+
   const chat = useSoberanoChat(ideConfig, projectRoot, effectiveContextPaths);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -370,7 +377,7 @@ export default function ChatPanel({ projectRoot, contextPaths, setContextPaths, 
       <div className={`moset-chat-panel ${isFloating ? 'floating' : ''}`}>
         <ChatHeader 
           Icons={Icons} config={config} lastMetrics={chat.lastMetrics} modelLoading={chat.loading}
-          newChat={() => chat.setActiveSessionId(Date.now().toString())}
+          newChat={chat.newChat}
           showHistory={showHistory} setShowHistory={setShowHistory}
           showInlineSettings={showInlineSettings} setShowInlineSettings={setShowInlineSettings}
           isFloating={isFloating} onToggleFloating={onToggleFloating} onDragStart={onDragStart} onClose={onClose}

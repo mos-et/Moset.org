@@ -735,7 +735,7 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
 }
 
 /* ─── Chat panel interior ────────────────────────────────────────────────────── */
-.chat-panel {
+.moset-chat-panel {
   display: flex;
   flex-direction: column;
   height: 100%;

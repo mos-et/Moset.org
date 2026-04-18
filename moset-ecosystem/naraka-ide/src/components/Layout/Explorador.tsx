@@ -268,7 +268,8 @@ export function Explorador({ tree, projectRoot, projectName, onOpen, setTree, on
             onClick={async (e) => {
               e.stopPropagation();
               try {
-                await invoke("git_auto_sync", { workspacePath: projectRoot });
+                const token = localStorage.getItem("moset_github_api_key") || undefined;
+                await invoke("git_auto_sync", { workspacePath: projectRoot, githubApiKey: token });
                 refreshTree();
                 const { message } = await import("@tauri-apps/plugin-dialog");
                 await message("Sincronización Git completada con éxito.", { title: "Git Auto-Sync", kind: "info" });

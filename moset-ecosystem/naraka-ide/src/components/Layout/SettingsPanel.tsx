@@ -21,12 +21,16 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
   const [openaiApiKey, setOpenaiApiKey] = useState(() => localStorage.getItem("moset_openai_api_key") || "");
   const [openaiBaseUrl, setOpenaiBaseUrl] = useState(() => localStorage.getItem("moset_openai_base_url") || "");
   const [customModelId, setCustomModelId] = useState(() => localStorage.getItem("moset_custom_model_id") || "");
+  const [mistralApiKey, setMistralApiKey] = useState(() => localStorage.getItem("moset_mistral_api_key") || "");
+  const [localMaxTokens, setLocalMaxTokens] = useState(() => localStorage.getItem("moset_local_max_tokens") || "2048");
+  const [cloudMaxTokens, setCloudMaxTokens] = useState(() => localStorage.getItem("moset_cloud_max_tokens") || "4096");
 
   // Orquestador
   const [orqLocalIp, setorqLocalIp] = useState(() => localStorage.getItem("moset_orq_local_ip") || "");
   const [orqRemoteIp, setorqRemoteIp] = useState(() => localStorage.getItem("moset_orq_remote_ip") || "");
   const [orqApiPort, setOrqApiPort] = useState(() => localStorage.getItem("moset_orq_api_port") || "8000");
   const [orqProfilePath, setOrqProfilePath] = useState(() => localStorage.getItem("moset_orq_profile_path") || "");
+  const [githubApiKey, setGithubApiKey] = useState(() => localStorage.getItem("moset_github_api_key") || "");
 
   // Vigilante
   const [vigProhibidos, setVigProhibidos] = useState(() => localStorage.getItem("moset_vig_prohibidos") || "");
@@ -59,11 +63,15 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
     localStorage.setItem("moset_openai_api_key", openaiApiKey);
     localStorage.setItem("moset_openai_base_url", openaiBaseUrl);
     localStorage.setItem("moset_custom_model_id", customModelId);
+    localStorage.setItem("moset_mistral_api_key", mistralApiKey);
+    localStorage.setItem("moset_local_max_tokens", localMaxTokens);
+    localStorage.setItem("moset_cloud_max_tokens", cloudMaxTokens);
 
     localStorage.setItem("moset_orq_local_ip", orqLocalIp);
     localStorage.setItem("moset_orq_remote_ip", orqRemoteIp);
     localStorage.setItem("moset_orq_api_port", orqApiPort);
     localStorage.setItem("moset_orq_profile_path", orqProfilePath);
+    localStorage.setItem("moset_github_api_key", githubApiKey);
 
     localStorage.setItem("moset_vig_prohibidos", vigProhibidos);
     localStorage.setItem("moset_vig_peligrosos", vigPeligrosos);
@@ -128,7 +136,7 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
   const menuItems = [
     { id: "ide", label: "General & Modelos", icon: "⚙️" },
     { id: "ai_providers", label: "Inteligencia Artificial", icon: "🧠" },
-    { id: "orquestador", label: "Orquestador N5", icon: "🔗" },
+    { id: "orquestador", label: "Orquestador", icon: "🔗" },
     { id: "vigilante", label: "Vigilante (Seguridad)", icon: "🛡️" },
     { id: "quantum", label: "Computación GPU & Quantum", icon: "⚛️" }
   ];
@@ -183,10 +191,29 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
               </div>
             ))}
             
-            <div style={{ marginTop: "auto", padding: "16px", borderTop: "1px solid var(--border)" }}>
+            <div style={{ marginTop: "auto", padding: "16px", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <button 
+                onClick={() => { save(); onClose(); }}
+                style={{
+                  width: "100%", padding: "10px 14px",
+                  background: "var(--accent)", color: "#000",
+                  border: "none", borderRadius: "8px",
+                  cursor: "pointer", fontSize: "13px", fontWeight: "bold",
+                  transition: "all 0.2s"
+                }}
+                onMouseOver={e => e.currentTarget.style.filter = "brightness(1.1)"}
+                onMouseOut={e => e.currentTarget.style.filter = "brightness(1)"}
+              >
+                Guardar Cambios
+              </button>
               <button 
                 onClick={() => { import('@tauri-apps/plugin-opener').then(m => m.openUrl("https://moset.org")).catch(e => console.error(e)); }}
-                style={{ width: "100%", padding: "10px", background: "transparent", border: "1px solid var(--border)", color: "var(--accent)", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: 500, transition: "all 0.2s" }}
+                style={{
+                  width: "100%", padding: "10px 14px",
+                  background: "transparent", color: "var(--text-3)",
+                  border: "1px solid var(--border)", borderRadius: "8px",
+                  cursor: "pointer", fontSize: "12px", transition: "all 0.2s"
+                }}
                 onMouseOver={e => e.currentTarget.style.background = "rgba(90, 200, 255, 0.1)"}
                 onMouseOut={e => e.currentTarget.style.background = "transparent"}
               >
@@ -222,6 +249,14 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
                   <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '8px', marginLeft: "25px" }}>
                     Desactívalo en PCs con bajos recursos y sin GPU dedicada. Mejora el rendimiento en reposo.
                   </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: "24px" }}>
+                  <label style={labelStyle}>GitHub Classic Token (Para Autosync de Repositorios)</label>
+                  <input type="password" value={githubApiKey} onChange={e => setGithubApiKey(e.target.value)} placeholder="ghp_..." className="search-input" style={{ width: '100%', padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }} />
+                  <span className="form-hint" style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '6px', display: 'block' }}>
+                    ℹ️ Utilizado por el motor Naraka para realizar push/pull automático y sincronizar el estado del proyecto.
+                  </span>
                 </div>
 
                 <div className="form-group" style={{ marginBottom: "24px" }}>
@@ -268,6 +303,7 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
                       <option value="openai">Ecosistema OpenAI (GPT / API Compatible / LM Studio / OpenRouter)</option>
                       <option value="google">Ecosistema Google (Gemini, Vertex)</option>
                       <option value="anthropic">Ecosistema Anthropic (Claube 3.5)</option>
+                      <option value="mistral">Ecosistema Mistral (Mistral AI)</option>
                     </select>
                   </div>
                 )}
@@ -293,6 +329,13 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
                     </div>
                   )}
 
+                  {(aiProvider === "nube" || aiProvider === "mixto") && cloudProvider === "mistral" && (
+                    <div className="form-group">
+                      <label style={labelStyle}>Mistral API Key</label>
+                      <input type="password" value={mistralApiKey} onChange={e => setMistralApiKey(e.target.value)} placeholder="EjLW2eQ0..." className="search-input" style={{ width: '100%', padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }} />
+                    </div>
+                  )}
+
                   {(aiProvider === "nube" || aiProvider === "mixto") && cloudProvider === "openai" && (
                     <>
                       <div className="form-group" style={{ marginBottom: "16px" }}>
@@ -304,6 +347,24 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
                         <input type="text" value={openaiBaseUrl} onChange={e => setOpenaiBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" className="search-input" style={{ width: '100%', padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }} />
                       </div>
                     </>
+                  )}
+                </div>
+
+                <div style={{ padding: "16px", background: "rgba(255, 255, 255, 0.02)", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.05)", marginTop: "24px" }}>
+                  <h4 style={{ margin: "0 0 16px 0", fontSize: "13px", color: "var(--text-1)" }}>Límites de Tokens Máximos</h4>
+                  
+                  {(aiProvider === "soberano" || aiProvider === "mixto") && (
+                    <div className="form-group" style={{ marginBottom: aiProvider === "mixto" ? "16px" : "0" }}>
+                      <label style={labelStyle}>Modelo Local (Soberano): {localMaxTokens} tokens</label>
+                      <input type="range" min="512" max="8192" step="512" value={localMaxTokens} onChange={e => setLocalMaxTokens(e.target.value)} style={{ width: '100%' }} />
+                    </div>
+                  )}
+
+                  {(aiProvider === "nube" || aiProvider === "mixto") && (
+                    <div className="form-group">
+                      <label style={labelStyle}>Modelo en la Nube (API): {cloudMaxTokens} tokens</label>
+                      <input type="range" min="1024" max="128000" step="1024" value={cloudMaxTokens} onChange={e => setCloudMaxTokens(e.target.value)} style={{ width: '100%' }} />
+                    </div>
                   )}
                 </div>
               </div>

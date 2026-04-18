@@ -668,7 +668,7 @@ export default function App() {
           style={{ 
             width: chatWidth,
             height: chatIsFloating ? '75vh' : undefined, /* Altura fija en modo flotante para no contraerse */
-            left: chatIsFloating ? chatPos.x : 'var(--activity-w)',
+            left: chatIsFloating ? chatPos.x : (sidebarPanel ? 'calc(var(--activity-w) + var(--sidebar-w))' : 'var(--activity-w)'),
             top: chatIsFloating ? chatPos.y : 0,
             bottom: chatIsFloating ? undefined : 0, /* Cuando dockeado llega hasta abajo */
             right: chatIsFloating ? undefined : undefined,

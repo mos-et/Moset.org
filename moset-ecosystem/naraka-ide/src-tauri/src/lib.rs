@@ -814,7 +814,7 @@ async fn git_status(workspace_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn git_auto_sync(workspace_path: String) -> Result<String, String> {
+async fn git_auto_sync(workspace_path: String, github_api_key: Option<String>) -> Result<String, String> {
     let add_output = std::process::Command::new("git")
         .args(["add", "."])
         .current_dir(&workspace_path)
@@ -830,6 +830,18 @@ async fn git_auto_sync(workspace_path: String) -> Result<String, String> {
         .current_dir(&workspace_path)
         .output()
         .map_err(|e| e.to_string())?;
+
+    // Optionally set credentials if key is provided
+    if let Some(token) = github_api_key {
+        if !token.is_empty() {
+             std::process::Command::new("git")
+                .args(["config", "credential.helper", "!f() { echo password=$1; }; f"])
+                .env("1", &token)
+                .current_dir(&workspace_path)
+                .output()
+                .ok();
+        }
+    }
 
     let push_output = std::process::Command::new("git")
         .args(["push"])
