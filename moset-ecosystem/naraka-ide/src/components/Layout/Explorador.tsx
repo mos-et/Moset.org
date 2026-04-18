@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { FileIcon } from "../../App";
+import { FileIcon } from "../../utils/iconMap";
 
 export interface TreeNode {
   id: string;

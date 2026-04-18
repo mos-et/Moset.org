@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./styles/index.css";
+import { WorkspaceProvider } from "./hooks/useWorkspace";
 
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
   constructor(props: {children: React.ReactNode}) {
@@ -31,7 +32,9 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      <WorkspaceProvider>
+        <App />
+      </WorkspaceProvider>
     </ErrorBoundary>
   </React.StrictMode>,
 );

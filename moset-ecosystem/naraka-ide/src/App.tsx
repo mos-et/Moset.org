@@ -9,6 +9,7 @@ import { ActivityBar } from "./components/Layout/ActivityBar";
 
 // Configurar Monaco para usar la instancia local (offline)
 loader.config({ monaco });
+setupMonaco(monaco);
 import ChatPanel from "./ChatPanel";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
@@ -17,181 +18,12 @@ import { invoke } from "@tauri-apps/api/core";
 import "@xterm/xterm/css/xterm.css";
 import "./styles/index.css";
 
-// ─── Iconos Retro (importaciones estáticas via Vite) ─────────────────────────
-import iconScript from "./assets/icons/script_file.ico";
-import iconText from "./assets/icons/text_file.ico";
-import iconWebpage from "./assets/icons/webpage_file.ico";
-import iconImage from "./assets/icons/image_file.ico";
-import iconAudio from "./assets/icons/audio_file.ico";
-import iconVideo from "./assets/icons/video_file.ico";
-import iconWorkspace from "./assets/icons/workspace.ico";
-import iconSpreadsheet from "./assets/icons/spreadsheet_file.ico";
-import iconGithub from "./assets/icons/github.ico";
-import iconPassword from "./assets/icons/password_manager.ico";
-import iconStickyNote from "./assets/icons/sticky_note.ico";
-import iconPaint from "./assets/icons/paint.ico";
-
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-interface FileTab {
-  id: string;
-  name: string;
-  fullPath: string | null; // null = archivo virtual (sin guardar en disco)
-  language: string;
-  content: string;
-  modified: boolean;
-}
-
-interface TreeNode {
-  id: string;
-  name: string;
-  type: "folder" | "file";
-  language?: string;
-  children?: TreeNode[];
-  open?: boolean;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function getLanguage(filename: string): string {
-  const ext = filename.split(".").pop()?.toLowerCase();
-  switch (ext) {
-    case "et": case "moset": return "moset";
-    case "md": case "markdown": return "markdown";
-    case "js": return "javascript";
-    case "ts": return "typescript";
-    case "tsx": return "typescript";
-    case "json": return "json";
-    case "rs": return "rust";
-    case "py": return "python";
-    case "html": return "html";
-    case "css": return "css";
-    default: return "plaintext";
-  }
-}
-
-interface Extension {
-  id: string;
-  name: string;
-  description: string;
-  version: string;
-  enabled: boolean;
-}
-
-// ─── Datos iniciales ──────────────────────────────────────────────────────────
-const WELCOME_CODE = `:@ Bienvenido a Moset IDE — Motor Soberano
-:@ Lenguaje Moset v0.2 | Archivos: .et
-
-molde Persona:
-    nombre: Texto
-    edad:   Entero
-
-:,] saludar(p):
-    devolver "Hola, " + p.nombre + "!"
-
-:@ Quantum bit — colapsa al observarse con !
-x = Bit:~
-si x!:
-    mostrar "Cara"
-sino:
-    mostrar "Seca"
-`;
-
-const INITIAL_TABS: FileTab[] = [
-  { id: "main", name: "main.et", fullPath: null, language: "moset", content: WELCOME_CODE, modified: false },
-];
-
-const FILE_ICON_MAP: Record<string, string> = {
-  ".et":   iconScript,    // Moset files → script retro icon
-  ".rs":   iconScript,
-  ".toml": iconWorkspace,
-  ".md":   iconStickyNote,
-  ".ts":   iconScript,
-  ".tsx":  iconScript,
-  ".json": iconSpreadsheet,
-  ".css":  iconPaint,
-  ".py":   iconScript,
-  ".js":   iconScript,
-  ".html": iconWebpage,
-  ".sh":   iconScript,
-  ".txt":  iconText,
-  ".lock": iconPassword,
-  ".png":  iconImage,
-  ".jpg":  iconImage,
-  ".jpeg": iconImage,
-  ".svg":  iconImage,
-  ".gif":  iconImage,
-  ".webp": iconImage,
-  ".mp3":  iconAudio,
-  ".wav":  iconAudio,
-  ".ogg":  iconAudio,
-  ".mp4":  iconVideo,
-  ".webm": iconVideo,
-  ".yml":  iconWorkspace,
-  ".yaml": iconWorkspace,
-  ".git":  iconGithub,
-};
-
-function getIconSrc(name: string): string {
-  if (name === "folder") return iconWorkspace;
-  const ext = name.slice(name.lastIndexOf("."));
-  return FILE_ICON_MAP[ext] ?? iconText;
-}
-
-export function FileIcon({ name, size = 15 }: { name: string; size?: number }) {
-  return <img src={getIconSrc(name)} alt="" width={size} height={size} style={{ imageRendering: "pixelated" }} />;
-}
-
-
-// ─── Componentes ──────────────────────────────────────────────────────────────
-
-function ExtensionManager() {
-  const [extensions, setExtensions] = useState<Extension[]>([]);
-  const [extSearchQuery, setExtSearchQuery] = useState("");
-
-  useEffect(() => {
-    invoke("fetch_extensions").then((res: any) => setExtensions(res)).catch(console.error);
-  }, []);
-
-  const toggle = async (id: string, enabled: boolean) => {
-    try {
-      await invoke("toggle_extension", { id, enabled });
-      setExtensions(exts => exts.map(e => e.id === id ? { ...e, enabled } : e));
-    } catch (err) {
-      console.error("Failed to toggle extension:", err);
-    }
-  };
-
-  return (
-    <div className="extension-manager sidebar-placeholder">
-      <div className="sidebar-section-title">EXTENSIONES INSTALADAS</div>
-      <input
-        className="search-input"
-        placeholder="Buscar extensiones..."
-        value={extSearchQuery}
-        onChange={(e) => setExtSearchQuery(e.target.value)}
-        style={{ marginTop: '10px', marginBottom: '5px', width: '100%', boxSizing: 'border-box' }}
-      />
-      <div className="ext-list" style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '10px' }}>
-        {extensions
-          .filter(ext => ext.name.toLowerCase().includes(extSearchQuery.toLowerCase()) || ext.description.toLowerCase().includes(extSearchQuery.toLowerCase()))
-          .map(ext => (
-          <div key={ext.id} className="ext-item-card" style={{ background: 'var(--bg-3)', padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-            <div className="ext-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-              <span className="ext-name" style={{ fontWeight: 'bold', fontSize: '13px' }}>{ext.name}</span>
-              <span className="ext-version" style={{ fontSize: '11px', color: '#888' }}>v{ext.version}</span>
-            </div>
-            <div className="ext-desc" style={{ fontSize: '12px', color: '#aaa', marginBottom: '10px', lineHeight: '1.4' }}>{ext.description}</div>
-            <label className="ext-toggle" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', cursor: 'pointer' }}>
-              <input type="checkbox" checked={ext.enabled} onChange={(e) => toggle(ext.id, e.target.checked)} />
-              <span style={{ color: ext.enabled ? 'var(--accent)' : '#aaa', fontWeight: ext.enabled ? 'bold' : 'normal' }}>
-                {ext.enabled ? "Habilitada" : "Apagada"}
-              </span>
-            </label>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+import { FileTab, TreeNode, getLanguage } from "./utils/fileTypes";
+import { FileIcon, getIconSrc } from "./utils/iconMap";
+import { ExtensionManager } from "./components/Layout/ExtensionManager";
+import { useWorkspace } from "./hooks/useWorkspace";
+import { setupMonaco } from "./utils/monacoSetup";
+import { WELCOME_CODE } from "./utils/constants";
 
 // Import SettingsPanel dynamically or direct import
 import { SettingsPanel } from "./components/Layout/SettingsPanel";
@@ -199,7 +31,7 @@ import { SettingsPanel } from "./components/Layout/SettingsPanel";
 
 function TabBar({ tabs, activeId, onSelect, onClose }: {
   tabs: FileTab[];
-  activeId: string;
+  activeId: string | null;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
 }) {
@@ -331,275 +163,13 @@ function StatusBar({ file, lang, projectRoot, saved, cursorPos }: {
   );
 }
 
-// ������ Setup Monaco para Moset ����������������������������������������������������������������������������������������������������
-function setupMonaco(monacoInstance: Monaco) {
-  monacoInstance.languages.register({ id: "moset" });
-
-  monacoInstance.languages.setMonarchTokensProvider("moset", {
-    keywords: [
-      "molde", "devolver", "si", "sino", "mientras",
-      "por", "cada", "en", "mostrar", "importar",
-      "verdadero", "falso", "nulo", "pensar",
-    ],
-    typeKeywords: ["Texto", "Entero", "Decimal", "Booleano", "Lista"],
-    tokenizer: {
-      root: [
-        [/:@.*$/, "comment"],
-        [/\/\/.*$/, "comment"],
-        [/"[^"]*"/, "string"],
-        [/\b\d+(\.\d+)?\b/, "number"],
-        [/\b(molde|devolver|si|sino|mientras|por|cada|en|mostrar|importar|verdadero|falso|nulo|pensar)\b/, "keyword"],
-        [/\b(Texto|Entero|Decimal|Booleano|Lista)\b/, "type"],
-        [/[a-zA-Z_]\w*/, "identifier"],
-        [/[{}()[\]]/, "delimiter.bracket"],
-        [/[+\-*\/=<>!]+/, "operator"],
-      ],
-    },
-  });
-
-  monacoInstance.editor.defineTheme("moset-dark", {
-    base: "vs-dark",
-    inherit: true,
-    rules: [
-      { token: "keyword",    foreground: "00A8FF", fontStyle: "bold" },
-      { token: "type",       foreground: "00E5A0" },
-      { token: "string",     foreground: "8BC4E8" },
-      { token: "comment",    foreground: "3D4A6B", fontStyle: "italic" },
-      { token: "number",     foreground: "7CB9FF" },
-      { token: "operator",   foreground: "8899BB" },
-      { token: "identifier", foreground: "DCE4F5" },
-    ],
-    colors: {
-      "editor.background":                 "#070810",
-      "editor.foreground":                 "#DCE4F5",
-      "editorLineNumber.foreground":       "#252840",
-      "editorLineNumber.activeForeground": "#8899BB",
-      "editor.selectionBackground":        "#00A8FF22",
-      "editor.lineHighlightBackground":    "#10121E",
-      "editorCursor.foreground":           "#00A8FF",
-      "editorWhitespace.foreground":       "#181B2A",
-    },
-  });
-
-  // ������ Tab Snippets para Moset ������������������������������������������������������������������������������������������
-  monacoInstance.languages.registerCompletionItemProvider("moset", {
-    triggerCharacters: [".", "@"],
-    provideCompletionItems(model: any, position: any) {
-      const wordInfo = model.getWordUntilPosition(position);
-      const range = {
-        startLineNumber: position.lineNumber,
-        endLineNumber: position.lineNumber,
-        startColumn: wordInfo.startColumn,
-        endColumn: position.column,
-      };
-
-      // Look at what's before the cursor on this line
-
-      const suggestions: monaco.languages.CompletionItem[] = [
-        // `:,]` � definir función
-        {
-          label: "..",
-          kind: monacoInstance.languages.CompletionItemKind.Snippet,
-          insertText: ",] ${1:nombre}(${2:args}):\n    ${3:cuerpo}",
-          insertTextRules: monacoInstance.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: ":,] � Definir función/rutina en Moset",
-          detail: ":,] función",
-          range,
-        },
-        // `:,[` � catch inline
-        {
-          label: "...",
-          kind: monacoInstance.languages.CompletionItemKind.Snippet,
-          insertText: ",[ ${1:error}:\n    ${2:manejo}",
-          insertTextRules: monacoInstance.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: ":,[ � Catch en línea (manejo de errores)",
-          detail: ":,[ catch",
-          range,
-        },
-        // `:,\` � esperar
-        {
-          label: "....",
-          kind: monacoInstance.languages.CompletionItemKind.Snippet,
-          insertText: ",\\ ${1:promesa}",
-          insertTextRules: monacoInstance.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: ":,\\ � Esperar (async/await)",
-          detail: ":,\\ esperar",
-          range,
-        },
-        // `:@` � comentario
-        {
-          label: "@",
-          kind: monacoInstance.languages.CompletionItemKind.Snippet,
-          insertText: "@ ${1:comentario}",
-          insertTextRules: monacoInstance.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: ":@ � Comentario en Moset",
-          detail: ":@ comentario",
-          range,
-        },
-        // molde completo
-        {
-          label: "molde",
-          kind: monacoInstance.languages.CompletionItemKind.Snippet,
-          insertText: "molde ${1:Nombre}:\n    ${2:campo}: ${3:Texto}",
-          insertTextRules: monacoInstance.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Definir un Molde (struct)",
-          detail: "molde Nombre:",
-          range,
-        },
-        // pensar
-        {
-          label: "pensar",
-          kind: monacoInstance.languages.CompletionItemKind.Snippet,
-          insertText: "pensar {\n    ${1:codigo}\n}",
-          insertTextRules: monacoInstance.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Shadow Environment � simula sin efectos colaterales",
-          detail: "pensar { }",
-          range,
-        },
-        // Bit cuántico
-        {
-          label: "Bit:~",
-          kind: monacoInstance.languages.CompletionItemKind.Snippet,
-          insertText: "Bit:~",
-          documentation: "Bit cuántico en superposición 50/50",
-          detail: "Bit cuántico",
-          range,
-        },
-        // Bit sesgado
-        {
-          label: "Bit:[]",
-          kind: monacoInstance.languages.CompletionItemKind.Snippet,
-          insertText: "Bit:[${1:0.85}]",
-          insertTextRules: monacoInstance.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Bit cuántico sesgado con probabilidad custom",
-          detail: "Bit:[prob]",
-          range,
-        },
-      ];
-
-      // Filtramos según si la línea empieza con ':'
-      return { suggestions };
-    },
-  });
-
-  // ������ Atajo Tab para caritas Moset ����������������������������������������������������������������������������������
-  // Monaco maneja Tab completions via el provider de arriba, pero para
-  // el caso de escribir literalmente ".." seguido de Tab sin popup:
-  monacoInstance.editor.addEditorAction({
-    id: "moset.tab-snippet",
-    label: "Moset: Insertar carita",
-    keybindings: [monacoInstance.KeyCode.Tab],
-    precondition: undefined,
-    run(editor: any) {
-      const model = editor.getModel();
-      if (!model) return;
-      const pos = editor.getPosition();
-      if (!pos) return;
-
-      const line = model.getLineContent(pos.lineNumber);
-      const before = line.slice(0, pos.column - 1);
-
-      // Casos de sustitución directa de puntos y @
-      const replacements: [RegExp, string][] = [
-        [/:\.\.\.\.$/, ":,\\"],   // :.... �  :,\
-        [/:\.\.\.$/, ":["],       // :...  �  :,[  (pero con el formato completo)
-        [/:\.\.$/, ":,]"],        // :..   �  :,]
-        [/:@$/, ":@"],            // :@    �  :@  (ya correcto, solo confirma)
-      ];
-
-      for (const [pattern, replacement] of replacements) {
-        const m = before.match(pattern);
-        if (m) {
-          const start = pos.column - m[0].length;
-          editor.executeEdits("moset-snippet", [{
-            range: new monacoInstance.Range(
-              pos.lineNumber, start,
-              pos.lineNumber, pos.column
-            ),
-            text: replacement,
-          }]);
-          return; // consumimos el Tab
-        }
-      }
-
-      // Si no hubo match, comportamiento normal de Tab
-      editor.trigger("keyboard", "tab", {});
-    },
-  });
-
-  // ������ Inline Completions (AI Autocomplete) ������������������������������������������������������������
-  // Debounce + guard: sólo dispara si el usuario para de escribir 800ms
-  let _aiDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-  let _aiModelLoaded = false;
-
-  // Chequeo lazy: intentamos saber si hay modelo cargado una vez
-  invoke("autocomplete_soberano", { prefix: "test", suffix: "" })
-    .then(() => { _aiModelLoaded = true; })
-    .catch(() => { _aiModelLoaded = false; });
-
-  monacoInstance.languages.registerInlineCompletionsProvider("moset", {
-    provideInlineCompletions: async (model: any, position: any, _ctx: any, token: any) => {
-      // Si no hay modelo cargado, no intentar nada
-      if (!_aiModelLoaded) return { items: [] };
-
-      const textUntilPosition = model.getValueInRange({
-        startLineNumber: Math.max(1, position.lineNumber - 20),
-        startColumn: 1,
-        endLineNumber: position.lineNumber,
-        endColumn: position.column
-      });
-
-      const prefix = textUntilPosition.slice(-500);
-      if (prefix.trim().length < 5) return { items: [] };
-
-      const textAfterPosition = model.getValueInRange({
-        startLineNumber: position.lineNumber,
-        startColumn: position.column,
-        endLineNumber: Math.min(model.getLineCount(), position.lineNumber + 10),
-        endColumn: model.getLineMaxColumn(Math.min(model.getLineCount(), position.lineNumber + 10))
-      });
-      const suffix = textAfterPosition.slice(0, 300);
-
-      // Debounce: esperamos 800ms de inactividad antes de consultar
-      return new Promise((resolve) => {
-        if (_aiDebounceTimer) clearTimeout(_aiDebounceTimer);
-        _aiDebounceTimer = setTimeout(async () => {
-          if (token.isCancellationRequested) { resolve({ items: [] }); return; }
-          try {
-            const result: string = await invoke("autocomplete_soberano", { prefix, suffix });
-            if (token.isCancellationRequested) { resolve({ items: [] }); return; }
-            let clean = result.replace(/<\|fim_[^>]*\|>/g, "").replace(/<\|endoftext\|>/g, "").trimEnd();
-            if (!clean) { resolve({ items: [] }); return; }
-            resolve({
-              items: [{
-                insertText: clean,
-                range: new monacoInstance.Range(position.lineNumber, position.column, position.lineNumber, position.column)
-              }]
-            });
-          } catch {
-            resolve({ items: [] });
-          }
-        }, 800);
-      });
-    },
-    freeInlineCompletions: () => {}
-  });
-}
 
 // ������ App principal ������������������������������������������������������������������������������������������������������������������������
 export default function App() {
-  const [tabs, setTabs] = useState<FileTab[]>(() => {
-    const saved = localStorage.getItem("moset_ide_tabs");
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
-    }
-    return INITIAL_TABS;
-  });
+  const { tabs, activeTab, setTabs, setActiveTab, addTab, removeTab, updateTabContent } = useWorkspace();
+
   const tabsRef = useRef(tabs);
   useEffect(() => { tabsRef.current = tabs; }, [tabs]);
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    return localStorage.getItem("moset_ide_active_tab") || "main";
-  });
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [projectRoot, setProjectRoot] = useState<string | null>(() => {
     return localStorage.getItem("moset_ide_project_root") || null;
@@ -681,7 +251,7 @@ export default function App() {
   }, [searchQuery, projectRoot]);
 
   useEffect(() => { localStorage.setItem("moset_ide_tabs", JSON.stringify(tabs)); }, [tabs]);
-  useEffect(() => { localStorage.setItem("moset_ide_active_tab", activeTab); }, [activeTab]);
+  useEffect(() => { if (activeTab) localStorage.setItem("moset_ide_active_tab", activeTab); }, [activeTab]);
   useEffect(() => { if (projectRoot) localStorage.setItem("moset_ide_project_root", projectRoot); }, [projectRoot]);
   useEffect(() => { localStorage.setItem("moset_ide_project_name", projectName); }, [projectName]);
   useEffect(() => { localStorage.setItem("moset_ide_sidebar_panel", sidebarPanel); }, [sidebarPanel]);
