@@ -1,0 +1,134 @@
+/* Component: FileExplorer (Explorador.tsx) */
+
+.explorer-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.explorer-modal-content {
+  background-color: var(--moset-gray-900);
+  border: 1px solid var(--moset-gray-700);
+  padding: 20px;
+  border-radius: 8px;
+  min-width: 350px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.explorer-modal-title {
+  margin: 0 0 15px 0;
+  color: var(--moset-fg);
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.explorer-modal-input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 20px;
+  background-color: var(--moset-gray-800);
+  border: 1px solid var(--moset-gray-700);
+  color: var(--moset-fg);
+  box-sizing: border-box;
+  outline: none;
+  border-radius: 4px;
+  transition: border-color 0.2s;
+}
+
+.explorer-modal-input:focus {
+  border-color: var(--moset-accent);
+}
+
+.explorer-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn-explorer-cancel {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--moset-gray-700);
+  color: var(--moset-gray-400);
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.btn-explorer-cancel:hover {
+  background: var(--moset-gray-800);
+  color: var(--moset-fg);
+}
+
+.btn-explorer-accept {
+  padding: 8px 16px;
+  background: var(--moset-accent);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.btn-explorer-accept:hover {
+  filter: brightness(1.1);
+}
+
+.git-badge {
+  margin-left: auto;
+  margin-right: 8px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.explorer-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  padding: 30px 20px;
+  text-align: center;
+  color: var(--text-2);
+}
+
+.explorer-empty-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin: 0 0 8px 0;
+}
+
+.explorer-empty-desc {
+  font-size: 11px;
+  color: var(--text-3);
+  margin: 0 0 24px 0;
+  line-height: 1.4;
+}
+
+.btn-open-folder {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.btn-open-folder:hover {
+  filter: brightness(1.15);
+}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FileIcon } from "../../utils/iconMap";
+import "../../styles/components/FileExplorer.css";
 
 export interface TreeNode {
   id: string;
@@ -55,9 +56,9 @@ export function Explorador({ tree, projectRoot, projectName, onOpen, setTree, on
     useEffect(() => { setVal(promptConfig?.defaultValue || ""); }, [promptConfig]);
     if (!promptConfig?.isOpen) return null;
     return (
-      <div className="modal-overlay" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="modal-content" style={{ backgroundColor: 'var(--moset-gray-900)', border: '1px solid var(--moset-gray-700)', padding: '20px', borderRadius: '8px', minWidth: '350px', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
-          <h3 style={{ margin: '0 0 15px 0', color: 'var(--moset-fg)', fontSize: '14px', fontWeight: 'bold' }}>{promptConfig.title}</h3>
+      <div className="explorer-modal-overlay">
+        <div className="explorer-modal-content" onClick={e => e.stopPropagation()}>
+          <h3 className="explorer-modal-title">{promptConfig.title}</h3>
           <input 
             autoFocus
             type="text" 
@@ -67,11 +68,11 @@ export function Explorador({ tree, projectRoot, projectName, onOpen, setTree, on
               if (e.key === 'Enter' && val.trim()) promptConfig.onConfirm(val.trim());
               if (e.key === 'Escape') promptConfig.onCancel();
             }}
-            style={{ width: '100%', padding: '10px', marginBottom: '20px', backgroundColor: 'var(--moset-gray-800)', border: '1px solid var(--moset-gray-700)', color: 'var(--moset-fg)', boxSizing: 'border-box', outline: 'none', borderRadius: '4px' }}
+            className="explorer-modal-input"
           />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-            <button onClick={(e) => { e.stopPropagation(); promptConfig.onCancel(); }} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid var(--moset-gray-700)', color: 'var(--moset-gray-400)', cursor: 'pointer', borderRadius: '4px', fontSize: '13px' }}>Cancelar</button>
-            <button onClick={(e) => { e.stopPropagation(); if(val.trim()) promptConfig.onConfirm(val.trim()); }} style={{ padding: '8px 16px', background: 'var(--moset-accent)', border: 'none', color: '#fff', cursor: 'pointer', borderRadius: '4px', fontSize: '13px', fontWeight: 'bold' }}>Aceptar</button>
+          <div className="explorer-modal-actions">
+            <button onClick={(e) => { e.stopPropagation(); promptConfig.onCancel(); }} className="btn-explorer-cancel">Cancelar</button>
+            <button onClick={(e) => { e.stopPropagation(); if(val.trim()) promptConfig.onConfirm(val.trim()); }} className="btn-explorer-accept">Aceptar</button>
           </div>
         </div>
       </div>
@@ -105,7 +106,7 @@ export function Explorador({ tree, projectRoot, projectName, onOpen, setTree, on
       else if (statusStr.includes("R") || statusStr.includes("C")) { color = "#519aba"; text = "R"; }
 
       badgeEl = (
-        <span style={{ marginLeft: "auto", marginRight: "8px", color, fontSize: "11px", fontWeight: "bold" }}>
+        <span className="git-badge" style={{ color }}>
           {text}
         </span>
       );
@@ -139,7 +140,7 @@ export function Explorador({ tree, projectRoot, projectName, onOpen, setTree, on
                 </svg>
               )}
             </span>
-            <span>{node.name}</span>
+            <span className="tree-name">{node.name}</span>
             <button 
               className={`tree-context-btn ${inContext ? 'active' : ''}`} 
               onClick={(e) => {
@@ -149,7 +150,7 @@ export function Explorador({ tree, projectRoot, projectName, onOpen, setTree, on
               }}
               title="Alternar contexto IA"
             >
-              �x��
+              &#x1F9E0;
             </button>
           </div>
           {node.open && node.children?.map((c: any) => renderNode(c, depth + 1, currentPath))}
@@ -171,7 +172,7 @@ export function Explorador({ tree, projectRoot, projectName, onOpen, setTree, on
         }}
       >
         <span className="tree-file-icon"><FileIcon name={node.name} /></span>
-        <span style={{ display: 'flex', alignItems: 'center', flex: 1, gap: '6px' }}>
+        <span className="tree-name">
           {node.name}
         </span>
         {badgeEl}
@@ -300,37 +301,17 @@ export function Explorador({ tree, projectRoot, projectName, onOpen, setTree, on
       </div>
 
       {tree.length === 0 ? (
-        <div className="sidebar-empty" style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          height: '200px', padding: '30px 20px', textAlign: 'center', color: 'var(--text-2)'
-        }}>
+        <div className="sidebar-empty explorer-empty-state">
           <svg style={{ opacity: 0.3, marginBottom: '16px' }} width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
           </svg>
-          <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-1)', margin: '0 0 8px 0' }}>Sin proyecto abierto</h3>
-          <p style={{ fontSize: '11px', color: 'var(--text-3)', margin: '0 0 24px 0', lineHeight: 1.4 }}>
+          <h3 className="explorer-empty-title">Sin proyecto abierto</h3>
+          <p className="explorer-empty-desc">
             Abre una carpeta local para explorar y editar archivos en Moset IDE.
           </p>
           <button 
             className="btn-open-folder" 
             onClick={onOpenProject}
-            style={{
-               background: 'var(--accent)',
-               color: '#fff',
-               border: 'none',
-               padding: '8px 16px',
-               borderRadius: '6px',
-               fontSize: '12px',
-               fontWeight: 500,
-               cursor: 'pointer',
-               display: 'flex',
-               alignItems: 'center',
-               gap: '8px',
-               transition: 'all 0.2s',
-               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-            }}
-            onMouseOver={e => e.currentTarget.style.filter = 'brightness(1.15)'}
-            onMouseOut={e => e.currentTarget.style.filter = 'none'}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                <line x1="12" y1="5" x2="12" y2="19"></line>

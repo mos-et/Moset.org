@@ -18,22 +18,29 @@ export function ChatAgentTabs({
 }: ChatAgentTabsProps) {
   const deleteSession = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (sessions.length <= 1) return;
+    if (sessions.length <= 1) {
+      // Último agente: reemplazar con uno nuevo vacío
+      const newId = crypto.randomUUID();
+      setSessions([{ id: newId, title: "Nueva Conversación", messages: [], ts: Date.now() }]);
+      setActiveSessionId(newId);
+      return;
+    }
     const isEditing = activeSessionId === id;
+    const idx = sessions.findIndex(s => s.id === id);
     setSessions(prev => prev.filter(s => s.id !== id));
     if (isEditing) {
-      const idx = sessions.findIndex(s => s.id === id);
-      const nextIdx = idx > 0 ? idx - 1 : 1;
-      if (sessions[nextIdx]) {
-        setActiveSessionId(sessions[nextIdx].id);
+      const nextIdx = idx > 0 ? idx - 1 : 0;
+      const remaining = sessions.filter(s => s.id !== id);
+      if (remaining[nextIdx]) {
+        setActiveSessionId(remaining[nextIdx].id);
       }
     }
   };
 
   return (
     <div className="chat-history-drawer active p-4">
-      <div className="history-header" style={{ marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: "12px", color: "var(--text-2)", fontWeight: "600", textTransform: "uppercase", letterSpacing: "1px" }}>Historial de Agentes</span>
+      <div className="history-header">
+        <span className="history-header-title">Historial de Agentes</span>
       </div>
       <div className="session-list">
         {sessions.map(s => (
@@ -46,15 +53,13 @@ export function ChatAgentTabs({
                <span className="session-title">{s.title}</span>
                <span className="session-date">{new Date(s.ts).toLocaleDateString()} {new Date(s.ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
              </div>
-             {sessions.length > 1 && (
-               <button 
-                 className="session-delete" 
-                 onClick={(e) => deleteSession(e, s.id)}
-                 title="Eliminar sesión"
-               >
-                 {Icons.trash}
-               </button>
-             )}
+             <button 
+               className="session-delete" 
+               onClick={(e) => deleteSession(e, s.id)}
+               title="Eliminar sesión"
+             >
+               {Icons.trash}
+             </button>
           </div>
         ))}
       </div>

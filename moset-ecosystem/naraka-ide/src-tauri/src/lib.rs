@@ -908,7 +908,6 @@ pub fn run() {
                 extensions: Arc::new(Mutex::new(exts)),
                 config_path,
             });
-            tauri_bridge::spawn_pty(app.handle().clone());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -951,6 +950,7 @@ pub fn run() {
             cancel_inference,
             descargar_modelo,
             set_clean_cuda_on_exit,
+            tauri_bridge::spawn_pty,
             tauri_bridge::write_pty,
             tauri_bridge::resize_pty,
             tauri_bridge::kill_pty,

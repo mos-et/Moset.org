@@ -8,6 +8,7 @@ import { ChatAgentTabs } from "./components/Chat/ChatAgentTabs";
 import { ChatDropZone } from "./components/Chat/ChatDropZone";
 import { ContextSelector } from "./components/Chat/ContextSelector";
 import { DiffEditor } from "@monaco-editor/react";
+import "./styles/components/ChatPanel.css";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface ChatMessage {
@@ -83,6 +84,11 @@ const Icons = {
       <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
     </svg>
   ),
+  stop: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <rect x="6" y="6" width="12" height="12" rx="2" ry="2"/>
+    </svg>
+  ),
   file: (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
@@ -108,11 +114,7 @@ const Icons = {
       <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
     </svg>
   ),
-  stop: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-      <rect x="4" y="4" width="16" height="16" rx="2"/>
-    </svg>
-  ),
+
   refresh: (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
@@ -229,7 +231,7 @@ function ActionCard({ filepath, code, lang, projectRoot }: { filepath: string; c
       </div>
       <div className="action-card-code">
         {expanded && originalCode !== null ? (
-          <div style={{ height: "300px", width: "100%", borderRadius: "4px", overflow: "hidden", border: "1px solid var(--border)", marginTop: "4px" }}>
+          <div className="action-card-diff">
             <DiffEditor original={originalCode} modified={code} language={lang || "text"} theme="vs-dark" options={{ minimap: { enabled: false } }} />
           </div>
         ) : (
@@ -281,11 +283,54 @@ function ThoughtBlock({ content, isClosed }: { content: string, isClosed: boolea
   const [expanded, setExpanded] = useState(false);
   return (
     <div className="thought-block">
-      <div className="thought-header" onClick={() => setExpanded(!expanded)}>
+      <div className={`thought-header ${expanded ? 'open' : ''}`} onClick={() => setExpanded(!expanded)}>
         {isClosed ? Icons.brain : <span className="thinking-dots">...</span>}
         <span>{isClosed ? "Razonamiento" : "Pensando..."}</span>
+        {isClosed && (
+          <span style={{ marginLeft: 'auto', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'flex' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </span>
+        )}
       </div>
       {(expanded || !isClosed) && <div className="thought-content">{content}</div>}
+    </div>
+  );
+}
+
+function ArtifactBlock({ name, content, onOpenArtifact }: { name: string, content: string, onOpenArtifact?: (n: string, c: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="action-card action-card-applied" style={{ marginBottom: "10px" }}>
+      <div className="action-card-header">
+        <div className="action-card-file">
+          {Icons.file}
+          <span className="action-card-path">{name}</span>
+        </div>
+        <div className="action-card-btns">
+          <button className="action-btn" onClick={() => onOpenArtifact && onOpenArtifact(name, content)}>
+            {Icons.expand} Pantalla Completa
+          </button>
+        </div>
+      </div>
+      <div className="action-card-code">
+        {expanded ? (
+          <pre style={{ whiteSpace: "pre-wrap" }}><code>{content}</code></pre>
+        ) : (
+          <pre style={{ whiteSpace: "pre-wrap" }}><code>{content.split("\n").slice(0, 5).join("\n")}{content.split("\n").length > 5 ? "\n..." : ""}</code></pre>
+        )}
+        {!expanded && content.split("\n").length > 5 && (
+          <button className="action-expand-btn" onClick={() => setExpanded(true)} style={{ marginTop: "5px" }}>
+            {Icons.expand} Ver completo
+          </button>
+        )}
+        {expanded && (
+          <button className="action-expand-btn" onClick={() => setExpanded(false)} style={{ marginTop: "5px" }}>
+            Contraer
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -297,6 +342,25 @@ function renderContent(text: string, isActionable: boolean = false, projectRoot?
   processedText = processedText.replace(/(?:<)?(?:think|thought)>([\s\S]*?)((?:<\/)?(?:think|thought)>|$)/gi, (_m, content, closing) => {
     const isClosed = closing.toLowerCase().includes("think>") || closing.toLowerCase().includes("thought>");
     parts.push(<ThoughtBlock key={parts.length} content={content} isClosed={isClosed} />);
+    return "";
+  });
+
+  processedText = processedText.replace(/\[ARTIFACT:([^\]]+)\]([\s\S]*?)(?:\[\/ARTIFACT\]|\[\/ARTACT\]|$)/gi, (_m, name, content) => {
+    parts.push(<ArtifactBlock key={parts.length} name={name.trim()} content={content.trim()} onOpenArtifact={onOpenArtifact} />);
+    return "";
+  });
+
+  // Parsear <system_action> como ToolInterceptorCard interactivas
+  processedText = processedText.replace(/<system_action>([\s\S]*?)<\/system_action>/gi, (_m, rawJson) => {
+    try {
+      const parsed = JSON.parse(rawJson.trim());
+      if (parsed && parsed.tool) {
+        parts.push(<ToolInterceptorCard key={parts.length} toolCall={parsed} onToolExecuted={onToolExecuted} />);
+      }
+    } catch {
+      // Si el JSON es inválido, mostrarlo como bloque de código
+      parts.push(<div key={parts.length} className="chat-code-block"><pre><code>{rawJson.trim()}</code></pre></div>);
+    }
     return "";
   });
 
@@ -315,11 +379,13 @@ function renderContent(text: string, isActionable: boolean = false, projectRoot?
   return <>{parts}</>;
 }
 
-function AgentModeSelector({ mode, onChange }: { mode: AgentMode; onChange: (m: AgentMode) => void }) {
+function AgentModeSelector({ mode, onChange, contextMode, onContextChange, Icons }: any) {
   return (
     <div className="agent-mode-selector">
-      <button className={`agent-mode-btn ${mode === "planear" ? "active" : ""}`} onClick={() => onChange("planear")}>{Icons.brain} Planear</button>
-      <button className={`agent-mode-btn ${mode === "actuar" ? "active" : ""}`} onClick={() => onChange("actuar")}>{Icons.zap} Actuar</button>
+      <button className={`agent-mode-btn planear ${mode === "planear" ? "active" : ""}`} onClick={() => onChange("planear")}>{Icons.brain} Planear</button>
+      <button className={`agent-mode-btn actuar ${mode === "actuar" ? "active" : ""}`} onClick={() => onChange("actuar")}>{Icons.zap} Actuar</button>
+      <div className="agent-mode-separator" />
+      <ContextSelector Icons={Icons} mode={contextMode} onChange={onContextChange} />
     </div>
   );
 }
@@ -337,6 +403,14 @@ export default function ChatPanel({ projectRoot, contextPaths, setContextPaths, 
   const ideConfig = useIdeConfig();
   const [showHistory, setShowHistory] = useState(true);
   const [showInlineSettings, setShowInlineSettings] = useState(false);
+  const [sessionMaxTokens, setSessionMaxTokens] = useState<number | null>(null);
+  const [sessionContextTokens, setSessionContextTokens] = useState<number | null>(null);
+
+  const effectiveIdeConfig = useMemo(() => ({
+    ...ideConfig,
+    maxTokens: sessionMaxTokens !== null ? sessionMaxTokens : ideConfig.maxTokens,
+    contextTokens: sessionContextTokens !== null ? sessionContextTokens : ideConfig.contextTokens
+  }), [ideConfig, sessionMaxTokens, sessionContextTokens]);
 
   // Determinar contextos efectivos
   const effectiveContextPaths = useMemo(() => {
@@ -354,14 +428,17 @@ export default function ChatPanel({ projectRoot, contextPaths, setContextPaths, 
     }
   }, [ideConfig.contextMode, ideConfig]);
 
-  // Asegurar que modo cambie a 'selected' automáticamente si se elige un archivo/directorio con el Cerebro
+  // Ensure that the mode switches to 'selected' automatically if files are selected, but only if it's reacting to changes in contextPaths
+  const previousContextPathsLength = useRef(contextPaths?.length || 0);
   useEffect(() => {
-    if (contextPaths && contextPaths.length > 0 && ideConfig.contextMode === "none") {
+    const currentLength = contextPaths?.length || 0;
+    if (currentLength > previousContextPathsLength.current && ideConfig.contextMode === "none") {
       ideConfig.setContextMode("selected");
     }
-  }, [contextPaths, ideConfig.contextMode, ideConfig]);
+    previousContextPathsLength.current = currentLength;
+  }, [contextPaths]);
 
-  const chat = useSoberanoChat(ideConfig, projectRoot, effectiveContextPaths);
+  const chat = useSoberanoChat(effectiveIdeConfig, projectRoot, effectiveContextPaths);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -382,6 +459,29 @@ export default function ChatPanel({ projectRoot, contextPaths, setContextPaths, 
           showInlineSettings={showInlineSettings} setShowInlineSettings={setShowInlineSettings}
           isFloating={isFloating} onToggleFloating={onToggleFloating} onDragStart={onDragStart} onClose={onClose}
         />
+        {showInlineSettings && (
+          <div className="chat-inline-settings-panel">
+            <div className="chat-inline-settings-row">
+              <label>Tokens de Contexto (Def: {ideConfig.contextTokens}):</label>
+              <input 
+                type="number" step="512" min="512" 
+                value={effectiveIdeConfig.contextTokens} 
+                onChange={e => setSessionContextTokens(parseInt(e.target.value) || 2048)} 
+              />
+            </div>
+            <div className="chat-inline-settings-row">
+              <label>Tokens Max Output (Def: {ideConfig.maxTokens}):</label>
+              <input 
+                type="number" step="512" min="512" 
+                value={effectiveIdeConfig.maxTokens} 
+                onChange={e => setSessionMaxTokens(parseInt(e.target.value) || 1024)} 
+              />
+            </div>
+            <div className="chat-inline-settings-row" style={{flex: 0, minWidth: 'auto'}}>
+              <button className="chat-inline-settings-reset" onClick={() => { setSessionMaxTokens(null); setSessionContextTokens(null); }}>Resetear</button>
+            </div>
+          </div>
+        )}
         {showHistory && (
           <div className="chat-tabs-container">
             <ChatAgentTabs sessions={chat.sessions} activeSessionId={chat.activeSessionId} setActiveSessionId={chat.setActiveSessionId} setSessions={chat.setSessions} Icons={Icons} />
@@ -390,14 +490,20 @@ export default function ChatPanel({ projectRoot, contextPaths, setContextPaths, 
         <div className="chat-messages">
           {chat.messages.map((m, idx) => (
             <div key={idx} className={`chat-msg ${m.role}`}>
-              <div className="chat-msg-content">{renderContent(m.content, true, projectRoot)}</div>
+              <div className="chat-msg-content">{renderContent(m.content, true, projectRoot, undefined, onOpenArtifact)}</div>
             </div>
           ))}
           {chat.loading && <div className="chat-thinking">Pensando...</div>}
           <div ref={bottomRef} />
         </div>
         <div className="chat-input-area">
-          <AgentModeSelector mode={ideConfig.agentMode} onChange={ideConfig.setAgentMode} />
+          <AgentModeSelector 
+            mode={ideConfig.agentMode} 
+            onChange={ideConfig.setAgentMode}
+            contextMode={ideConfig.contextMode}
+            onContextChange={ideConfig.setContextMode}
+            Icons={Icons}
+          />
           <div className="chat-input-wrapper">
             <textarea 
               ref={textareaRef}
@@ -407,12 +513,11 @@ export default function ChatPanel({ projectRoot, contextPaths, setContextPaths, 
               onKeyDown={e => e.key === "Enter" && !e.shiftKey && chat.sendMessage()} 
             />
               <div className="chat-input-actions">
-                <ContextSelector 
-                  Icons={Icons} 
-                  mode={ideConfig.contextMode} 
-                  onChange={ideConfig.setContextMode} 
-                />
-                <button className="send-btn" onClick={() => chat.sendMessage()}>{Icons.send}</button>
+                {chat.loading ? (
+                  <button className="send-btn stop-btn stop-btn-color" onClick={() => chat.handleStop()}>{Icons.stop}</button>
+                ) : (
+                  <button className="send-btn" onClick={() => chat.sendMessage()}>{Icons.send}</button>
+                )}
               </div>
           </div>
         </div>

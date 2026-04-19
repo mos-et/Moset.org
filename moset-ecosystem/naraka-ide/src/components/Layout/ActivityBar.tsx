@@ -1,4 +1,5 @@
 import React from "react";
+import "../../styles/components/ActivityBar.css";
 
 interface ActivityBarProps {
   active: string;
@@ -34,8 +35,8 @@ export function ActivityBar({ active, setActive, chatOpen, setChatOpen }: Activi
 
   return (
     <div className="activity-bar">
-      <div className="activity-bar-logo" title="Moset IDE" style={{ display: "flex", justifyContent: "center", alignItems: "center", marginBottom: "15px" }}>
-        <img src="/moset-logo.png" alt="Moset" style={{ width: 34, height: 34, objectFit: "contain", backgroundColor: "white", padding: "2px", filter: "drop-shadow(0 0 8px rgba(0,229,255,0.4))", borderRadius: "8px" }} />
+      <div className="activity-bar-logo activity-bar-logo-container" title="Moset IDE">
+        <img src="/moset-logo.png" alt="Moset" className="activity-bar-logo-img" />
       </div>
       {items.map(item => (
         <button

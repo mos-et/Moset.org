@@ -85,6 +85,7 @@ export function useTauriTerminal() {
       unlistenExit();
       term.dispose();
       xtermRef.current = null;
+      invoke("kill_pty").catch(err => console.error("Error matando PTY:", err));
     };
   }, []);
 

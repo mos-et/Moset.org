@@ -332,7 +332,7 @@ impl Compilador {
             },
 
             // ─── POR CADA ───────────────────────────────────────────────────
-            Nodo::PorCada { variable, iterable, cuerpo } => {
+            Nodo::PorCada { variable: _, iterable, cuerpo: _ } => {
                 // Compilamos como: iterable en pila, luego iteramos con un contador
                 // Simplificación: delegamos a la VM que maneje la iteración
                 // Por ahora, fallback a error descriptivo si no es una lista literal

@@ -5,10 +5,10 @@
 
 :root {
   --bg-0:       #0A0A0F;
-  --bg-1:       rgba(15, 17, 26, 0.65); /* Más translúcido para que el glassmorphism brille */
-  --bg-2:       rgba(20, 22, 32, 0.70);
-  --bg-3:       rgba(26, 28, 40, 0.60);
-  --bg-4:       rgba(32, 35, 50, 0.50);
+  --bg-1:       #0F111A;
+  --bg-2:       #141620;
+  --bg-3:       #1A1C28;
+  --bg-4:       #202332;
   --border:     rgba(255, 255, 255, 0.08); /* Borde sutil y premium */
   --border-hover: rgba(255, 255, 255, 0.15);
   --accent:     #00E5FF; /* Cian más vibrante */
@@ -17,8 +17,8 @@
   --accent-glow:rgba(0, 229, 255, 0.3);
   --accent-neon: 0 0 10px var(--accent-glow), 0 0 25px rgba(0, 229, 255, 0.15);
   --text-1:     #F3F4F6;
-  --text-2:     #A1A1AA;
-  --text-3:     #71717A;
+  --text-2:     #B8BAC0;
+  --text-3:     #8C8E96;
   --green:      #10B981;
   --blue:       #3B82F6;
   --cyan:       #06B6D4;
@@ -34,6 +34,11 @@
 
 html, body, #root { height: 100%; width: 100%; overflow: hidden; }
 body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); color: var(--text-1); }
+
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 /* ─── Layout principal (igual a VS Code) ─────────────────────────────────────  */
 .ide-root {
@@ -214,10 +219,15 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
   border-radius: 6px;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   margin: 1px 8px;
   transition: all 0.2s ease-in-out;
   border: 1px solid transparent;
+}
+.tree-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .tree-item:hover { 
   background: var(--accent-dim); 
@@ -380,6 +390,8 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
 
 .editor-container {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   background: var(--bg-1);
 }
@@ -392,7 +404,14 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
   justify-content: center;
   height: 100%;
   gap: 32px;
-  background: radial-gradient(circle at center, rgba(0, 229, 255, 0.03) 0%, transparent 70%);
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.05) 0%, rgba(10, 10, 15, 0.8) 100%);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.5);
+  border-radius: 16px;
+  margin: 20px;
+  height: calc(100% - 40px);
   animation: fadeIn 0.8s ease-out;
 }
 
@@ -590,6 +609,7 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
   transition: all 0.2s;
   margin-left: auto;
   font-size: 11px;
+  flex-shrink: 0;
 }
 .tree-item:hover .tree-context-btn {
   opacity: 0.5;
@@ -689,7 +709,6 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
   flex-direction: column;
   z-index: 100; /* Por encima del editor y sidebar */
   overflow: hidden;
-  position: absolute;
   background: var(--bg-1);
   backdrop-filter: var(--glass);
   -webkit-backdrop-filter: var(--glass);
@@ -697,8 +716,11 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
 }
 
 .chat-overlay.docked {
+  position: relative;
+  grid-row: 1;
+  grid-column: 3;
   border-right: 1px solid var(--border);
-  box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+  box-shadow: 10px 0 30px rgba(0,0,0,0.3);
   border-radius: 0;
 }
 
@@ -750,9 +772,7 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
   justify-content: space-between;
   padding: 0 14px;
   height: 48px;
-  background: linear-gradient(135deg, rgba(20, 22, 35, 0.75), rgba(15, 17, 26, 0.85));
-  backdrop-filter: var(--glass);
-  -webkit-backdrop-filter: var(--glass);
+  background: #141623;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   position: relative;
@@ -1398,6 +1418,11 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
   color: #000; 
   box-shadow: 0 2px 8px var(--accent-glow);
 }
+.agent-mode-btn.contexto.active { 
+  background: linear-gradient(135deg, #10b981, #34d399); 
+  color: #000; 
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+}
 
 /* ─── Copy Button ────────────────────────────────────────────────────────────── */
 .chat-msg-actions {
@@ -2023,4 +2048,128 @@ input[type=range]::-moz-range-thumb {
 .session-delete:hover {
   background: rgba(239, 68, 68, 0.1);
   color: var(--red);
+}
+/* Context Selector */
+.context-selector {
+  position: relative;
+  display: inline-block;
+}
+
+.context-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+}
+
+.context-trigger:hover, .context-trigger.active {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(3, 169, 244, 0.5); /* Brand cyan tint */
+}
+
+.context-label {
+  font-weight: 500;
+}
+
+.context-menu {
+  position: absolute;
+  bottom: 100%; /* pop up above the button */
+  left: 0;
+  right: auto;
+  margin-bottom: 8px;
+  min-width: 240px;
+  background: #0f1419; /* Solid deep dark */
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transform-origin: bottom left;
+}
+
+.context-menu-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 4px 8px 8px;
+  font-weight: 600;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.context-menu-item.active {
+  background: rgba(3, 169, 244, 0.1);
+  border: 1px solid rgba(3, 169, 244, 0.2);
+}
+
+.context-menu-item.active .item-icon {
+  color: #03A9F4;
+}
+
+.item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+}
+
+.item-text {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.item-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+.item-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.item-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #03A9F4;
+  margin-left: 12px;
+  animation: scaleIn 0.2s ease-out;
+}
+
+@keyframes scaleIn {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }

@@ -30,9 +30,9 @@ export function ContextSelector({ Icons, mode, onChange }: ContextSelectorProps)
     },
     { 
       id: "selected", 
-      label: "Archivo Activo", 
-      sub: "Solo la pestaña actual", 
-      icon: Icons.file 
+      label: "Selección Manual", 
+      sub: "Solo los cerebritos 🧠 tildados en el explorador", 
+      icon: Icons.brain 
     },
     { 
       id: "none", 
@@ -45,16 +45,16 @@ export function ContextSelector({ Icons, mode, onChange }: ContextSelectorProps)
   return (
     <div className="context-selector" ref={menuRef}>
       <button 
-        className={`context-trigger ${mode !== 'none' ? 'active' : ''}`}
+        className={`agent-mode-btn contexto ${mode !== 'none' ? 'active' : ''}`}
         onClick={() => setIsOpen(!isOpen)}
         title={`Contexto actual: ${mode}`}
       >
         {mode === "none" && Icons.close}
-        {mode === "selected" && Icons.file}
+        {mode === "selected" && Icons.brain}
         {mode === "project" && Icons.folder}
         <span className="context-label">Contexto</span>
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ marginLeft: '4px', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-          <path d="M6 9l6 6 6-6"/>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`context-selector-icon ${isOpen ? 'open' : ''}`}>
+          <polyline points="6 9 12 15 18 9"/>
         </svg>
       </button>
 

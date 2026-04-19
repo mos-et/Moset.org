@@ -1,7 +1,7 @@
 [package]
 name = "moset-ide"
 version = "0.2.0"
-description = "Moset Studio IDE"
+description = "Naraka Studio - Moset IDE"
 authors = ["Moset Studio"]
 edition = "2021"
 

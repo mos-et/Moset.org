@@ -7,15 +7,10 @@ import { useFileDrop } from "./hooks/useFileDrop";
 import { CodeEditor } from "./components/Editor/CodeEditor";
 import { ActivityBar } from "./components/Layout/ActivityBar";
 
-// Configurar Monaco para usar la instancia local (offline)
-loader.config({ monaco });
-setupMonaco(monaco);
 import ChatPanel from "./ChatPanel";
-import { Terminal as XTerm } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import "@xterm/xterm/css/xterm.css";
+import { SoberanaTerminal } from "./components/Terminal/SoberanaTerminal";
 import "./styles/index.css";
 
 import { FileTab, TreeNode, getLanguage } from "./utils/fileTypes";
@@ -23,148 +18,18 @@ import { FileIcon, getIconSrc } from "./utils/iconMap";
 import { ExtensionManager } from "./components/Layout/ExtensionManager";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { setupMonaco } from "./utils/monacoSetup";
+
 import { WELCOME_CODE } from "./utils/constants";
-
-// Import SettingsPanel dynamically or direct import
 import { SettingsPanel } from "./components/Layout/SettingsPanel";
+import { TabBar } from "./components/Layout/TabBar";
+import { StatusBar } from "./components/Layout/StatusBar";
+
+// Configurar Monaco para usar la instancia local (offline)
+loader.config({ monaco });
+setupMonaco(monaco);
 
 
-function TabBar({ tabs, activeId, onSelect, onClose }: {
-  tabs: FileTab[];
-  activeId: string | null;
-  onSelect: (id: string) => void;
-  onClose: (id: string) => void;
-}) {
-  return (
-    <div className="tab-bar">
-      {tabs.map(tab => (
-        <div
-          key={tab.id}
-          className={`tab ${activeId === tab.id ? "tab-active" : ""}`}
-          onClick={() => onSelect(tab.id)}
-        >
-          <span className="tab-icon"><FileIcon name={tab.name} size={13} /></span>
-          <span className="tab-name">{tab.name}</span>
-          {tab.modified && <span className="tab-dot">��</span>}
-          <button
-            className="tab-close"
-            onClick={e => { e.stopPropagation(); onClose(tab.id); }}
-          >�</button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TerminalComponent() {
-  const terminalRef = useRef<HTMLDivElement>(null);
-  const xtermRef = useRef<XTerm | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
-
-  useEffect(() => {
-    if (!terminalRef.current) return;
-
-    const term = new XTerm({
-      fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace",
-      fontSize: 14,
-      theme: {
-        background: "#070810",
-        foreground: "#DCE4F5",
-        cursor: "#00A8FF",
-        black: "#181B2A",
-        brightBlack: "#3D4A6B",
-        blue: "#00A8FF",
-        cyan: "#00D4FF",
-        green: "#00E5A0",
-      },
-      cursorBlink: true,
-    });
-
-    const fitAddon = new FitAddon();
-    term.loadAddon(fitAddon);
-    term.open(terminalRef.current);
-    fitAddon.fit();
-
-    xtermRef.current = term;
-    fitAddonRef.current = fitAddon;
-
-    const onDataDisposable = term.onData(data => {
-      invoke("write_pty", { data }).catch(err => console.error("PTY Write Error:", err));
-    });
-
-    const onResizeDisposable = term.onResize(({ cols, rows }) => {
-      invoke("resize_pty", { cols, rows }).catch(err => console.error("PTY Resize Error:", err));
-    });
-
-    let unlisten: (() => void) | null = null;
-    listen<string>("pty-read", (event) => {
-      term.write(event.payload);
-    }).then(u => {
-      unlisten = u;
-    });
-
-    let unlistenExit: (() => void) | null = null;
-    listen<void>("pty-exit", () => {
-      term.write("\r\n\x1b[31m[Process exited] PTY connection lost.\x1b[0m\r\n");
-    }).then(u => {
-      unlistenExit = u;
-    });
-
-    const handleResize = () => fitAddon.fit();
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      onDataDisposable.dispose();
-      onResizeDisposable.dispose();
-      unlisten?.();
-      unlistenExit?.();
-      window.removeEventListener("resize", handleResize);
-      term.dispose();
-    };
-  }, []);
-
-  return (
-    <div className="terminal">
-      <div className="terminal-header">
-        <span>MOSET PTY</span>
-        <span className="terminal-tabs">
-          <span className="terminal-tab active">powershell</span>
-        </span>
-      </div>
-      <div className="terminal-body pty-container" ref={terminalRef} style={{ height: "100%", width: "100%", paddingLeft: "8px" }} />
-    </div>
-  );
-}
-
-function StatusBar({ file, lang, projectRoot, saved, cursorPos }: {
-  file: string;
-  lang: string;
-  projectRoot: string | null;
-  saved: boolean;
-  cursorPos: { lineNumber: number; column: number };
-}) {
-  const projectName = projectRoot
-    ? projectRoot.replace(/\\/g, "/").split("/").pop() ?? "proyecto"
-    : null;
-
-  return (
-    <div className="status-bar">
-      <div className="status-left">
-        {projectName && <span className="status-item status-project">�! {projectName}</span>}
-        <span className="status-item">�� Moset IDE v0.2</span>
-      </div>
-      <div className="status-right">
-        {file && <span className={`status-item ${saved ? "" : "status-unsaved"}`}>{file}{saved ? "" : " ��"}</span>}
-        {lang && <span className="status-item">{lang.toUpperCase()}</span>}
-        <span className="status-item">UTF-8</span>
-        <span className="status-item">Ln {cursorPos.lineNumber}, Col {cursorPos.column}</span>
-      </div>
-    </div>
-  );
-}
-
-
-// ������ App principal ������������������������������������������������������������������������������������������������������������������������
+//     App principal                                                             
 export default function App() {
   const { tabs, activeTab, setTabs, setActiveTab, addTab, removeTab, updateTabContent } = useWorkspace();
 
@@ -545,22 +410,23 @@ export default function App() {
               />
               {isSearching && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '10px' }}>Buscando...</div>}
               <div className="search-results-container" style={{ marginTop: '10px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                {searchResults.map((res: any, idx: number) => {
-                  const relativePath = projectRoot ? res.file_path.replace(projectRoot + "/", "").replace(projectRoot + "\\", "") : res.file_path;
+                {Array.isArray(searchResults) && searchResults.map((res: any, idx: number) => {
+                  if (!res) return null;
+                  const relativePath = projectRoot && typeof res.file_path === 'string' ? res.file_path.replace(projectRoot + "/", "").replace(projectRoot + "\\", "") : res.file_path;
                   return (
                     <div key={idx} className="search-result-item" 
                         style={{ padding: '8px', borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.2s' }}
                         onMouseOver={(e) => e.currentTarget.style.background = 'var(--bg-3)'}
                         onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-                        onClick={() => openFile({ id: res.file_path, name: res.file_path.split(/[\\/]/).pop(), type: "file" } as TreeNode, res.file_path)}
+                        onClick={() => openFile({ id: res.file_path, name: String(res.file_path).split(/[\\/]/).pop() || '', type: "file" } as TreeNode, res.file_path)}
                     >
                       <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--accent)', wordBreak: 'break-all', marginBottom: '4px' }}>
                         {relativePath}
                       </div>
-                      {res.matches.map((m: any, midx: number) => (
+                      {Array.isArray(res.matches) && res.matches.map((m: any, midx: number) => (
                         <div key={midx} style={{ fontSize: '11px', color: '#aaa', marginTop: '2px', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          <span style={{ color: '#fff', marginRight: '4px' }}>L{m.line_number}:</span>
-                          {m.line_content.trim()}
+                          <span style={{ color: '#fff', marginRight: '4px' }}>L{m?.line_number}:</span>
+                          {m?.line_content?.trim()}
                         </div>
                       ))}
                     </div>
@@ -646,7 +512,7 @@ export default function App() {
             )}
           </div>
 
-          {showTerminal && <TerminalComponent />}
+          {showTerminal && <SoberanaTerminal />}
         </div>
       </div>
 
@@ -665,21 +531,20 @@ export default function App() {
       {chatOpen && (
         <div 
           className={`chat-overlay ${chatIsFloating ? 'floating' : 'docked'}`} 
-          style={{ 
+          style={chatIsFloating ? { 
             width: chatWidth,
-            height: chatIsFloating ? '75vh' : undefined, /* Altura fija en modo flotante para no contraerse */
-            left: chatIsFloating ? chatPos.x : (sidebarPanel ? 'calc(var(--activity-w) + var(--sidebar-w))' : 'var(--activity-w)'),
-            top: chatIsFloating ? chatPos.y : 0,
-            bottom: chatIsFloating ? undefined : 0, /* Cuando dockeado llega hasta abajo */
-            right: chatIsFloating ? undefined : undefined,
+            height: '75vh',
+            left: chatPos.x,
+            top: chatPos.y,
+            position: 'absolute',
+            zIndex: 100
+          } : {
+            width: chatWidth
           }}
         >
           <div 
             className="chat-resizer" 
-            style={{ 
-              right: chatIsFloating ? undefined : 0, /* Resizer a la der si está anclado a la izquierda */
-              left: chatIsFloating ? 0 : undefined /* Resizer a la izq si está flotando */
-            }}
+            style={{ right: -5, left: undefined }}
             onMouseDown={(e) => {
               isResizingRef.current = true;
               document.body.style.cursor = "ew-resize";

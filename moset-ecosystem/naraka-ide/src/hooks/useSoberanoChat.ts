@@ -29,7 +29,7 @@ export function useSoberanoChat(ideConfig: any, projectRoot?: string | null, con
   const {
     agentMode, includeContext, maxTokens, contextTokens, activeProvider,
     cloudApi, customModelId, openAiKey, anthropicKey, googleKey,
-    groqKey, modelPath, tokenizerPath
+    groqKey, mistralKey, modelPath, tokenizerPath
   } = ideConfig;
 
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
@@ -49,6 +49,7 @@ export function useSoberanoChat(ideConfig: any, projectRoot?: string | null, con
   const streamBufferRef = useRef("");
   const streamBlockedRef = useRef(false);
   const listenerRef = useRef<(() => void) | null>(null);
+  const lastRenderRef = useRef<number>(0);
 
   const activeSession = sessions.find(s => s.id === activeSessionId) || sessions[0];
   const messages = activeSession ? activeSession.messages : [];
@@ -93,7 +94,12 @@ export function useSoberanoChat(ideConfig: any, projectRoot?: string | null, con
             return;
           }
           streamBufferRef.current = result.text;
-          setStreamBuffer(result.text);
+          
+          const now = Date.now();
+          if (now - lastRenderRef.current > 40) {
+            setStreamBuffer(result.text);
+            lastRenderRef.current = now;
+          }
         });
         
         if (cancelled) unlisten();
@@ -159,7 +165,8 @@ export function useSoberanoChat(ideConfig: any, projectRoot?: string | null, con
       const apiKeySetting = aiProvider === "openai" ? openAiKey :
                             aiProvider === "anthropic" ? anthropicKey :
                             aiProvider === "google" ? googleKey :
-                            aiProvider === "groq" ? groqKey : "";
+                            aiProvider === "groq" ? groqKey :
+                            aiProvider === "mistral" ? mistralKey : "";
 
       const payloadMessages = newMessages.map(m => ({
         role: m.role === "system" ? "system" : m.role === "user" ? "user" : "assistant",

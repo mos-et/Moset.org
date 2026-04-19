@@ -17,7 +17,7 @@ export function CodeEditor({ language, content, onChange, onMount }: CodeEditorP
   const currentLanguage = language === "moset" ? "moset" : (language || "plaintext");
 
   return (
-    <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+    <div style={{ flex: 1, height: "100%", width: "100%", overflow: "hidden", position: "relative" }}>
       <Editor
         theme="mosetTheme"
         language={currentLanguage}

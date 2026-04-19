@@ -1,0 +1,41 @@
+/* Component: ActivityBar (ActivityBar.tsx) */
+
+.activity-bar-logo-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.activity-bar-logo-img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  background-color: white;
+  padding: 2px;
+  filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.4));
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.activity-bar-logo-img:hover {
+  filter: drop-shadow(0 0 12px rgba(0, 229, 255, 0.8));
+  transform: scale(1.05);
+}
+
+.activity-btn {
+  transition: all 0.2s ease-in-out;
+}
+
+.activity-btn:hover {
+  color: var(--accent);
+  background: rgba(0, 168, 255, 0.1);
+  border-radius: 8px;
+  transform: translateY(-1px);
+}
+
+.activity-btn.active {
+  color: var(--accent);
+  border-left: 2px solid var(--accent);
+  background: rgba(0, 168, 255, 0.05);
+}

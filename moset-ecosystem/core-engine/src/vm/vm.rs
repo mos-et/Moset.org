@@ -391,7 +391,7 @@ impl VM {
                             // Compilar la función en un chunk separado
                             let mut sub_compilador = crate::compiler::Compilador::nuevo();
                             // Definimos los parámetros como locales
-                            for (i, param) in params.iter().enumerate() {
+                            for (i, _param) in params.iter().enumerate() {
                                 // El argumento ya está en la pila
                                 let valor = self.pila[func_slot + 1 + i].clone();
                                 sub_compilador.chunk.añadir_constante(valor.clone());

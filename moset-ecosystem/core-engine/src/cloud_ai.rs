@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::io::Read;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Mensaje {
@@ -25,12 +24,12 @@ impl MotorCloud {
         }
     }
 
-    pub fn inferir<F>(&self, system_prompt: &str, msgs: &[Mensaje], mut on_partial: F) -> Result<String, String>
+    pub fn inferir<F>(&self, system_prompt: &str, msgs: &[Mensaje], on_partial: F) -> Result<String, String>
     where
         F: FnMut(String) -> bool,
     {
         match self.provider.as_str() {
-            "openai" => self.inferir_openai(system_prompt, msgs, on_partial),
+            "openai" | "mistral" => self.inferir_openai(system_prompt, msgs, on_partial),
             "anthropic" => self.inferir_anthropic(system_prompt, msgs, on_partial),
             "google" => self.inferir_google(system_prompt, msgs, on_partial),
             _ => Err(format!("Proveedor desconocido: {}", self.provider)),
@@ -49,7 +48,11 @@ impl MotorCloud {
             let line = line_res.map_err(|e| format!("Error leyendo línea SSE: {}", e))?;
             let trimmed = line.trim();
 
-            if trimmed.starts_with("data: ") && trimmed != "data: [DONE]" {
+            if trimmed == "data: [DONE]" {
+                break;
+            }
+
+            if trimmed.starts_with("data: ") {
                 let json_str = &trimmed[6..]; // despues de "data: "
                 if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
                     let text_chunk = if is_google {
@@ -76,28 +79,54 @@ impl MotorCloud {
     where
         F: FnMut(String) -> bool,
     {
-        let base = self.base_url.as_deref().unwrap_or("https://api.openai.com/v1");
+        let default_base = if self.provider == "mistral" {
+            "https://api.mistral.ai/v1"
+        } else {
+            "https://api.openai.com/v1"
+        };
+        let base = self.base_url.as_deref().unwrap_or(default_base);
         let url = format!("{}/chat/completions", base.trim_end_matches('/'));
+
+        let mut merged_system = system_prompt.to_string();
+        for m in msgs {
+            if m.role == "system" {
+                merged_system.push_str("\n\n");
+                merged_system.push_str(&m.content);
+            }
+        }
 
         let mut all_msgs = vec![json!({
             "role": "system",
-            "content": system_prompt
+            "content": merged_system
         })];
 
         for m in msgs {
-            all_msgs.push(json!({
-                "role": m.role,
-                "content": m.content
-            }));
+            if m.role != "system" {
+                all_msgs.push(json!({
+                    "role": m.role,
+                    "content": m.content
+                }));
+            }
+        }
+
+        let mut actual_model = self.model.as_str();
+        if actual_model.is_empty() || actual_model == "Motor Soberano" {
+            if self.provider == "mistral" {
+                actual_model = "mistral-small-latest";
+            } else if self.provider == "groq" {
+                actual_model = "llama3-8b-8192";
+            } else {
+                actual_model = "gpt-3.5-turbo";
+            }
         }
 
         let body = json!({
-            "model": self.model,
+            "model": actual_model,
             "messages": all_msgs,
             "stream": true,
         });
 
-        let client = reqwest::blocking::Client::new();
+        let client = reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(30)).build().unwrap_or_else(|_| reqwest::blocking::Client::new());
         let mut builder = client.post(&url)
             .header("Content-Type", "application/json");
 
@@ -124,15 +153,26 @@ impl MotorCloud {
     {
         let url = "https://api.anthropic.com/v1/messages";
 
+        let mut merged_system = system_prompt.to_string();
+        let mut clean_msgs = Vec::new();
+        for m in msgs {
+            if m.role == "system" {
+                merged_system.push_str("\n\n");
+                merged_system.push_str(&m.content);
+            } else {
+                clean_msgs.push(m.clone());
+            }
+        }
+
         let body = json!({
             "model": self.model,
             "max_tokens": 4096,
-            "system": system_prompt,
-            "messages": msgs,
+            "system": merged_system,
+            "messages": clean_msgs,
             "stream": true,
         });
 
-        let client = reqwest::blocking::Client::new();
+        let client = reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(30)).build().unwrap_or_else(|_| reqwest::blocking::Client::new());
         let builder = client.post(url)
             .header("Content-Type", "application/json")
             .header("x-api-key", &self.api_key)
@@ -160,23 +200,29 @@ impl MotorCloud {
             self.model, self.api_key
         );
 
+        let mut merged_system = system_prompt.to_string();
         let mut contents = Vec::new();
         for m in msgs {
-            let role = if m.role == "assistant" { "model" } else { "user" };
-            contents.push(json!({
-                "role": role,
-                "parts": [{"text": m.content}]
-            }));
+            if m.role == "system" {
+                merged_system.push_str("\n\n");
+                merged_system.push_str(&m.content);
+            } else {
+                let role = if m.role == "assistant" { "model" } else { "user" };
+                contents.push(json!({
+                    "role": role,
+                    "parts": [{"text": m.content}]
+                }));
+            }
         }
 
         let body = json!({
             "systemInstruction": {
-                "parts": [{"text": system_prompt}]
+                "parts": [{"text": merged_system}]
             },
             "contents": contents,
         });
 
-        let client = reqwest::blocking::Client::new();
+        let client = reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(30)).build().unwrap_or_else(|_| reqwest::blocking::Client::new());
         let res = client.post(&url)
             .header("Content-Type", "application/json")
             .json(&body)

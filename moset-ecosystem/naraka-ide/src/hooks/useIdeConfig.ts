@@ -46,6 +46,9 @@ export interface IdeConfigState {
   
   groqKey: string;
   setGroqKey: (key: string) => void;
+  
+  mistralKey: string;
+  setMistralKey: (key: string) => void;
 }
 
 export function useIdeConfig(): IdeConfigState {
@@ -80,6 +83,9 @@ export function useIdeConfig(): IdeConfigState {
   const [groqKey, setGroqKey] = useState(
     () => localStorage.getItem("moset_groq_api_key") || ""
   );
+  const [mistralKey, setMistralKey] = useState(
+    () => localStorage.getItem("moset_mistral_api_key") || ""
+  );
   
   const [modelPath, setModelPath] = useState(
     () => localStorage.getItem("moset_model_path") || ""
@@ -99,11 +105,12 @@ export function useIdeConfig(): IdeConfigState {
     localStorage.setItem("moset_anthropic_api_key", anthropicKey);
     localStorage.setItem("moset_google_api_key", googleKey);
     localStorage.setItem("moset_groq_api_key", groqKey);
+    localStorage.setItem("moset_mistral_api_key", mistralKey);
     localStorage.setItem("moset_model_path", modelPath);
     localStorage.setItem("moset_tokenizer_path", tokenizerPath);
   }, [
     includeContext, contextMode, activeProvider, cloudApi, customModelId, 
-    openAiKey, anthropicKey, googleKey, groqKey, modelPath, tokenizerPath
+    openAiKey, anthropicKey, googleKey, groqKey, mistralKey, modelPath, tokenizerPath
   ]);
 
   return {
@@ -119,6 +126,7 @@ export function useIdeConfig(): IdeConfigState {
     anthropicKey, setAnthropicKey,
     googleKey, setGoogleKey,
     groqKey, setGroqKey,
+    mistralKey, setMistralKey,
     modelPath, setModelPath,
     tokenizerPath, setTokenizerPath,
   };

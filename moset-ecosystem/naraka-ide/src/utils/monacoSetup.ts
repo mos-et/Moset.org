@@ -2,7 +2,12 @@ import { Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
 import { invoke } from "@tauri-apps/api/core";
 
+let isMonacoSetup = false;
+
 export function setupMonaco(monacoInstance: Monaco) {
+  if (isMonacoSetup) return;
+  isMonacoSetup = true;
+
   monacoInstance.languages.register({ id: "moset" });
 
   monacoInstance.languages.setMonarchTokensProvider("moset", {

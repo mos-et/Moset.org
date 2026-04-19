@@ -55,7 +55,8 @@ pub fn kill_pty(state: State<'_, PtyState>) -> Result<String, String> {
     Ok("No había PTY activa.".into())
 }
 
-pub fn spawn_pty(app: AppHandle) {
+#[tauri::command]
+pub fn spawn_pty(app: AppHandle) -> Result<String, String> {
     let pty_system = NativePtySystem::default();
     let size = PtySize {
         rows: 24,
@@ -68,8 +69,9 @@ pub fn spawn_pty(app: AppHandle) {
     let pair = match pty_system.openpty(size) {
         Ok(pair) => pair,
         Err(e) => {
-            let _ = app.emit("pty-error", format!("Fallo al inicializar PTY: {}", e));
-            return;
+            let msg = format!("Fallo al inicializar PTY: {}", e);
+            let _ = app.emit("pty-error", &msg);
+            return Err(msg);
         }
     };
 
@@ -84,8 +86,9 @@ pub fn spawn_pty(app: AppHandle) {
             match pair.slave.spawn_command(cmd2) {
                 Ok(child_fallback) => child_fallback,
                 Err(e2) => {
-                    let _ = app.emit("pty-error", format!("Fallo al iniciar PowerShell y CMD: {}", e2));
-                    return;
+                    let msg = format!("Fallo al iniciar PowerShell y CMD: {}", e2);
+                    let _ = app.emit("pty-error", &msg);
+                    return Err(msg);
                 }
             }
         }
@@ -94,15 +97,17 @@ pub fn spawn_pty(app: AppHandle) {
     let reader = match pair.master.try_clone_reader() {
         Ok(r) => r,
         Err(e) => {
-            let _ = app.emit("pty-error", format!("Fallo obteniendo reader PTY: {}", e));
-            return;
+            let msg = format!("Fallo obteniendo reader PTY: {}", e);
+            let _ = app.emit("pty-error", &msg);
+            return Err(msg);
         }
     };
     let writer = match pair.master.take_writer() {
         Ok(w) => w,
         Err(e) => {
-            let _ = app.emit("pty-error", format!("Fallo obteniendo writer PTY: {}", e));
-            return;
+            let msg = format!("Fallo obteniendo writer PTY: {}", e);
+            let _ = app.emit("pty-error", &msg);
+            return Err(msg);
         }
     };
 
@@ -148,4 +153,6 @@ pub fn spawn_pty(app: AppHandle) {
             }
         };
     });
+
+    Ok("Terminado".into())
 }

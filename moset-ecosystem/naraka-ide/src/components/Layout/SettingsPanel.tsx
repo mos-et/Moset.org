@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import "../../styles/components/SettingsPanel.css";
 
 export function SettingsPanel({ onUpdate, onClose }: { onUpdate: () => void; onClose: () => void }) {
   const [modelPath, setModelPath] = useState(() => localStorage.getItem("moset_model_path") || "");
   const [glassEnabled, setGlassEnabled] = useState(() => localStorage.getItem("moset_glass_enabled") !== "false");
-  const defaultPrePrompt = `Eres Antigravity (Soberano AI). Eres un ingeniero experto y tu proceso cognitivo debe estar ESTRICTAMENTE encapsulado.
+  const defaultPrePrompt = `Eres Naraka, la Inteligencia Soberana integrada en Moset IDE. Eres un arquitecto experto y tu proceso cognitivo debe estar ESTRICTAMENTE encapsulado.
 Usa SIEMPRE la etiqueta <thought> para estructurar tu razonamiento, planear y analizar archivos antes de responder.
 Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente directa, concisa, sin ruido y enfocada únicamente en el código, los resultados o la acción solicitada. Sé ultra eficiente con los tokens.`;
 
   const [prePrompt, setPrePrompt] = useState(() => {
     const saved = localStorage.getItem("moset_pre_prompt");
+    // Hard refresh si tenían guardado el identity de Antigravity viejo
+    if (saved && saved.includes("Antigravity")) {
+      return defaultPrePrompt;
+    }
     return saved !== null && saved !== "" ? saved : defaultPrePrompt;
   });
 
@@ -85,6 +90,9 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
 
     localStorage.setItem("moset_cuda_autoclean", cudaCacheAutoClean ? "true" : "false");
     
+    // Fix: Connect the orphaned rust endpoint
+    invoke("set_clean_cuda_on_exit", { enabled: cudaCacheAutoClean }).catch((e: any) => console.error("Error enviando estado CUDA:", e));
+
     // Trigger update dispatch correctly
     window.dispatchEvent(new Event("settings-updated"));
     onUpdate(); 
@@ -141,81 +149,41 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
     { id: "quantum", label: "Computación GPU & Quantum", icon: "⚛️" }
   ];
 
-  const labelStyle: React.CSSProperties = { fontSize: "12px", color: "var(--text-3)", marginBottom: "6px", display: "block", fontWeight: 500 };
-  const textareaStyle: React.CSSProperties = {
-    width: "100%", boxSizing: "border-box", padding: "10px", fontSize: "12px",
-    backgroundColor: "var(--bg-0)", border: "1px solid var(--border)",
-    color: "var(--text-1)", borderRadius: "6px", resize: "vertical", minHeight: "70px",
-    fontFamily: "monospace", transition: "border 0.2s"
-  };
+
+
 
   return (
-    <div className="settings-overlay anim-fade-in" onClick={() => { save(); onClose(); }} style={{
-      position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.6)",
-      backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center"
-    }}>
-      <div className="settings-modal" onClick={e => e.stopPropagation()} style={{
-        background: "var(--bg-1)",
-        border: "1px solid var(--border)", borderRadius: "14px",
-        width: "780px", maxWidth: "90vw", height: "600px", maxHeight: "85vh",
-        display: "flex", flexDirection: "column",
-        boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
-        overflow: "hidden"
-      }}>
-        <div className="settings-header" style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "16px 24px", borderBottom: "1px solid var(--border)",
-          background: "rgba(255,255,255,0.02)"
-        }}>
-          <h2 style={{ fontSize: "16px", margin: 0, color: "var(--text-1)", fontWeight: 600 }}>Parámetros y Preferencias</h2>
-          <button onClick={() => { save(); onClose(); }} style={{ background: "transparent", border: "none", color: "var(--text-3)", cursor: "pointer", fontSize: "20px", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+    <div className="settings-overlay anim-fade-in" onClick={() => { save(); onClose(); }}>
+      <div className="settings-modal" onClick={e => e.stopPropagation()}>
+        <div className="settings-header">
+          <h2 className="settings-title">Parámetros y Preferencias</h2>
+          <button className="settings-close-btn" onClick={() => { save(); onClose(); }}>✕</button>
         </div>
 
         {/* ── Tabs Layout ─────────────────────────────────── */}
-        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        <div className="settings-layout">
           {/* Sidebar Tabs */}
-          <div style={{ width: "230px", borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column", background: "rgba(0,0,0,0.2)" }}>
+          <div className="settings-sidebar">
             {menuItems.map(item => (
               <div 
                 key={item.id} 
                 onClick={() => setActiveTab(item.id)}
-                style={{
-                  padding: "14px 18px", cursor: "pointer", fontSize: "13px", fontWeight: 500,
-                  color: activeTab === item.id ? "var(--text-1)" : "var(--text-3)",
-                  background: activeTab === item.id ? "rgba(255,255,255,0.05)" : "transparent",
-                  borderLeft: activeTab === item.id ? "3px solid var(--accent)" : "3px solid transparent",
-                  display: "flex", alignItems: "center", gap: "10px", transition: "all 0.2s ease"
-                }}
+                className={`settings-tab ${activeTab === item.id ? 'active' : ''}`}
               >
                 <span>{item.icon}</span> {item.label}
               </div>
             ))}
             
-            <div style={{ marginTop: "auto", padding: "16px", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div className="settings-sidebar-footer">
               <button 
+                className="btn-primary"
                 onClick={() => { save(); onClose(); }}
-                style={{
-                  width: "100%", padding: "10px 14px",
-                  background: "var(--accent)", color: "#000",
-                  border: "none", borderRadius: "8px",
-                  cursor: "pointer", fontSize: "13px", fontWeight: "bold",
-                  transition: "all 0.2s"
-                }}
-                onMouseOver={e => e.currentTarget.style.filter = "brightness(1.1)"}
-                onMouseOut={e => e.currentTarget.style.filter = "brightness(1)"}
               >
                 Guardar Cambios
               </button>
               <button 
+                className="btn-secondary"
                 onClick={() => { import('@tauri-apps/plugin-opener').then(m => m.openUrl("https://moset.org")).catch(e => console.error(e)); }}
-                style={{
-                  width: "100%", padding: "10px 14px",
-                  background: "transparent", color: "var(--text-3)",
-                  border: "1px solid var(--border)", borderRadius: "8px",
-                  cursor: "pointer", fontSize: "12px", transition: "all 0.2s"
-                }}
-                onMouseOver={e => e.currentTarget.style.background = "rgba(90, 200, 255, 0.1)"}
-                onMouseOut={e => e.currentTarget.style.background = "transparent"}
               >
                 Visitar moset.org ↗
               </button>
@@ -223,51 +191,51 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
           </div>
           
           {/* Content Area */}
-          <div className="settings-content" style={{ flex: 1, padding: "26px 30px", overflowY: "auto", color: "var(--text-1)" }}>
+          <div className="settings-content-area">
             {activeTab === "ide" && (
               <div className="anim-fade-in">
-                <h3 style={{ margin: "0 0 20px 0", color: "var(--accent)", fontSize: "15px", fontWeight: 600 }}>Ajustes del IDE y Modelo Base</h3>
+                <h3 className="settings-section-title">Ajustes del IDE y Modelo Base</h3>
                 
-                <div className="form-group" style={{ marginBottom: "24px" }}>
-                  <label style={labelStyle}>Ruta del Modelo Soberano (Archivo GGUF)</label>
+                <div className="form-group">
+                  <label className="settings-label">Ruta del Modelo Soberano (Archivo GGUF)</label>
                   <div className="form-input-row" style={{ display: "flex", gap: "10px" }}>
-                    <input type="text" value={modelPath} onChange={e => setModelPath(e.target.value)} placeholder="C:/ruta/a/mi/modelo.gguf" className="search-input" style={{ flex: 1, padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }} />
-                    <button className="form-browse-btn" onClick={() => openFileSelectorWrapper(setModelPath)} style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-1)", cursor: "pointer", padding: "0 14px", transition: "background 0.2s" }} onMouseOver={e => e.currentTarget.style.background = "var(--border)"} onMouseOut={e => e.currentTarget.style.background = "var(--bg-3)"}>
+                    <input type="text" value={modelPath} onChange={e => setModelPath(e.target.value)} placeholder="C:/ruta/a/mi/modelo.gguf" className="settings-input" />
+                    <button className="btn-secondary" style={{ width: "auto" }} onClick={() => openFileSelectorWrapper(setModelPath)}>
                       Examinar
                     </button>
                   </div>
-                  <span className="form-hint" style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '6px', display: 'block' }}>
+                  <span className="form-hint">
                     ℹ️ Se usará para inferencia local a menos que habilites Inteligencia en la Nube.
                   </span>
                 </div>
 
-                <div className="form-group" style={{ marginBottom: "24px", padding: "16px", borderRadius: "8px", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
-                  <label className="ext-toggle" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>
-                    <input type="checkbox" checked={glassEnabled} onChange={e => setGlassEnabled(e.target.checked)} style={{ transform: "scale(1.2)" }} />
+                <div className="settings-card">
+                  <label className="settings-checkbox-container">
+                    <input type="checkbox" checked={glassEnabled} onChange={e => setGlassEnabled(e.target.checked)} className="settings-checkbox" />
                     <span>Activar Efectos Glassmorphism (Transparencia e Iluminación Premium)</span>
                   </label>
-                  <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '8px', marginLeft: "25px" }}>
+                  <div className="form-hint" style={{ marginLeft: "25px" }}>
                     Desactívalo en PCs con bajos recursos y sin GPU dedicada. Mejora el rendimiento en reposo.
                   </div>
                 </div>
 
-                <div className="form-group" style={{ marginBottom: "24px" }}>
-                  <label style={labelStyle}>GitHub Classic Token (Para Autosync de Repositorios)</label>
-                  <input type="password" value={githubApiKey} onChange={e => setGithubApiKey(e.target.value)} placeholder="ghp_..." className="search-input" style={{ width: '100%', padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }} />
-                  <span className="form-hint" style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '6px', display: 'block' }}>
+                <div className="form-group">
+                  <label className="settings-label">GitHub Classic Token (Para Autosync de Repositorios)</label>
+                  <input type="password" value={githubApiKey} onChange={e => setGithubApiKey(e.target.value)} placeholder="ghp_..." className="settings-input" />
+                  <span className="form-hint">
                     ℹ️ Utilizado por el motor Naraka para realizar push/pull automático y sincronizar el estado del proyecto.
                   </span>
                 </div>
 
-                <div className="form-group" style={{ marginBottom: "24px" }}>
-                  <label style={labelStyle}>Pre-Prompt (Directiva de Sistema AI)</label>
+                <div className="form-group">
+                  <label className="settings-label">Pre-Prompt (Directiva de Sistema AI)</label>
                   <textarea 
-                    style={textareaStyle} 
+                    className="settings-textarea" 
                     value={prePrompt} 
                     onChange={e => setPrePrompt(e.target.value)} 
                     placeholder="Instrucciones base para la IA..." 
                   />
-                  <span className="form-hint" style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '6px', display: 'block' }}>
+                  <span className="form-hint">
                     ℹ️ Instrucciones inyectadas antes de cada mensaje para moldear la respuesta (Ej: "Habla solo en español y usa siempre Async").
                   </span>
                 </div>
@@ -276,14 +244,13 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
 
             {activeTab === "ai_providers" && (
               <div className="anim-fade-in">
-                <h3 style={{ margin: "0 0 20px 0", color: "var(--accent)", fontSize: "15px", fontWeight: 600 }}>Proveedores de Inteligencia y APIs</h3>
-                <div className="form-group" style={{ marginBottom: "20px" }}>
-                  <label style={labelStyle}>Proveedor de Inteligencia Principal</label>
+                <h3 className="settings-section-title">Proveedores de Inteligencia y APIs</h3>
+                <div className="form-group">
+                  <label className="settings-label">Proveedor de Inteligencia Principal</label>
                   <select 
                     value={aiProvider} 
                     onChange={e => setAiProvider(e.target.value)} 
-                    className="search-input" 
-                    style={{ width: '100%', padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }}
+                    className="settings-input" 
                   >
                     <option value="soberano">Motor Soberano (Local GGUF - Offline Segura)</option>
                     <option value="nube">Nube Estricta (APIs Externas solas)</option>
@@ -292,13 +259,12 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
                 </div>
 
                 {(aiProvider === "nube" || aiProvider === "mixto") && (
-                  <div className="form-group" style={{ marginBottom: "20px" }}>
-                    <label style={labelStyle}>Servicios en la Nube y Agentes</label>
+                  <div className="form-group">
+                    <label className="settings-label">Servicios en la Nube y Agentes</label>
                     <select 
                       value={cloudProvider} 
                       onChange={e => setCloudProvider(e.target.value)} 
-                      className="search-input" 
-                      style={{ width: '100%', padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }}
+                      className="settings-input" 
                     >
                       <option value="openai">Ecosistema OpenAI (GPT / API Compatible / LM Studio / OpenRouter)</option>
                       <option value="google">Ecosistema Google (Gemini, Vertex)</option>
@@ -308,61 +274,61 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
                   </div>
                 )}
 
-                <div className="form-group" style={{ marginBottom: "24px" }}>
-                  <label style={labelStyle}>ID de Modelo Personalizado (Ej: claude-3-5-sonnet-20241022, gemini-1.5-pro, gpt-4o)</label>
-                  <input type="text" value={customModelId} onChange={e => setCustomModelId(e.target.value)} placeholder="Dejar en blanco para usar el model predeterminado" className="search-input" style={{ width: '100%', padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }} />
+                <div className="form-group">
+                  <label className="settings-label">ID de Modelo Personalizado (Ej: claude-3-5-sonnet-20241022, gemini-1.5-pro, gpt-4o)</label>
+                  <input type="text" value={customModelId} onChange={e => setCustomModelId(e.target.value)} placeholder="Dejar en blanco para usar el model predeterminado" className="settings-input" />
                 </div>
 
-                <div style={{ padding: "16px", background: "rgba(255, 255, 255, 0.02)", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                <div className="settings-card">
                   <h4 style={{ margin: "0 0 16px 0", fontSize: "13px", color: "var(--text-1)" }}>Autenticación para API {cloudProvider.toUpperCase()}</h4>
                   {(aiProvider === "nube" || aiProvider === "mixto") && cloudProvider === "google" && (
                     <div className="form-group">
-                      <label style={labelStyle}>Google API Key</label>
-                      <input type="password" value={googleApiKey} onChange={e => setGoogleApiKey(e.target.value)} placeholder="AIzaSy..." className="search-input" style={{ width: '100%', padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }} />
+                      <label className="settings-label">Google API Key</label>
+                      <input type="password" value={googleApiKey} onChange={e => setGoogleApiKey(e.target.value)} placeholder="AIzaSy..." className="settings-input" />
                     </div>
                   )}
 
                   {(aiProvider === "nube" || aiProvider === "mixto") && cloudProvider === "anthropic" && (
                     <div className="form-group">
-                      <label style={labelStyle}>Anthropic API Key</label>
-                      <input type="password" value={anthropicApiKey} onChange={e => setAnthropicApiKey(e.target.value)} placeholder="sk-ant-api03-..." className="search-input" style={{ width: '100%', padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }} />
+                      <label className="settings-label">Anthropic API Key</label>
+                      <input type="password" value={anthropicApiKey} onChange={e => setAnthropicApiKey(e.target.value)} placeholder="sk-ant-api03-..." className="settings-input" />
                     </div>
                   )}
 
                   {(aiProvider === "nube" || aiProvider === "mixto") && cloudProvider === "mistral" && (
                     <div className="form-group">
-                      <label style={labelStyle}>Mistral API Key</label>
-                      <input type="password" value={mistralApiKey} onChange={e => setMistralApiKey(e.target.value)} placeholder="EjLW2eQ0..." className="search-input" style={{ width: '100%', padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }} />
+                      <label className="settings-label">Mistral API Key</label>
+                      <input type="password" value={mistralApiKey} onChange={e => setMistralApiKey(e.target.value)} placeholder="EjLW2eQ0..." className="settings-input" />
                     </div>
                   )}
 
                   {(aiProvider === "nube" || aiProvider === "mixto") && cloudProvider === "openai" && (
                     <>
                       <div className="form-group" style={{ marginBottom: "16px" }}>
-                        <label style={labelStyle}>OpenAI API Key (O tu token para APIs Compatibles)</label>
-                        <input type="password" value={openaiApiKey} onChange={e => setOpenaiApiKey(e.target.value)} placeholder="sk-..." className="search-input" style={{ width: '100%', padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }} />
+                        <label className="settings-label">OpenAI API Key (O tu token para APIs Compatibles)</label>
+                        <input type="password" value={openaiApiKey} onChange={e => setOpenaiApiKey(e.target.value)} placeholder="sk-..." className="settings-input" />
                       </div>
                       <div className="form-group">
-                        <label style={labelStyle}>Base URL Endpoint (Ideal para usar con Ollama remoto o LM Studio)</label>
-                        <input type="text" value={openaiBaseUrl} onChange={e => setOpenaiBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" className="search-input" style={{ width: '100%', padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }} />
+                        <label className="settings-label">Base URL Endpoint (Ideal para usar con Ollama remoto o LM Studio)</label>
+                        <input type="text" value={openaiBaseUrl} onChange={e => setOpenaiBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" className="settings-input" />
                       </div>
                     </>
                   )}
                 </div>
 
-                <div style={{ padding: "16px", background: "rgba(255, 255, 255, 0.02)", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.05)", marginTop: "24px" }}>
+                <div className="settings-card">
                   <h4 style={{ margin: "0 0 16px 0", fontSize: "13px", color: "var(--text-1)" }}>Límites de Tokens Máximos</h4>
                   
                   {(aiProvider === "soberano" || aiProvider === "mixto") && (
                     <div className="form-group" style={{ marginBottom: aiProvider === "mixto" ? "16px" : "0" }}>
-                      <label style={labelStyle}>Modelo Local (Soberano): {localMaxTokens} tokens</label>
+                      <label className="settings-label">Modelo Local (Soberano): {localMaxTokens} tokens</label>
                       <input type="range" min="512" max="8192" step="512" value={localMaxTokens} onChange={e => setLocalMaxTokens(e.target.value)} style={{ width: '100%' }} />
                     </div>
                   )}
 
                   {(aiProvider === "nube" || aiProvider === "mixto") && (
                     <div className="form-group">
-                      <label style={labelStyle}>Modelo en la Nube (API): {cloudMaxTokens} tokens</label>
+                      <label className="settings-label">Modelo en la Nube (API): {cloudMaxTokens} tokens</label>
                       <input type="range" min="1024" max="128000" step="1024" value={cloudMaxTokens} onChange={e => setCloudMaxTokens(e.target.value)} style={{ width: '100%' }} />
                     </div>
                   )}
@@ -372,41 +338,41 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
 
             {activeTab === "orquestador" && (
               <div className="anim-fade-in">
-                <h3 style={{ margin: "0 0 20px 0", color: "var(--accent)", fontSize: "15px", fontWeight: 600 }}>Comunicaciones del Orquestador N5</h3>
+                <h3 className="settings-section-title">Comunicaciones del Orquestador N5</h3>
                 <div style={{ marginBottom: "20px", padding: "12px 16px", background: "rgba(0,229,255,0.05)", borderRadius: "8px", border: "1px solid rgba(0,229,255,0.15)", fontSize: "12px", color: "var(--accent)", lineHeight: 1.5 }}>
                   💡 Estas IPs dirigen a dónde enviará Moset sus delegaciones cuando la IA no tenga suficiente poder local.
                 </div>
                 
-                <div className="form-group" style={{ marginBottom: "16px" }}>
-                  <label style={labelStyle}>Nodo Primario (IP Local)</label>
-                  <input type="text" value={orqLocalIp} onChange={e => setorqLocalIp(e.target.value)} placeholder="127.0.0.1" className="search-input" style={{ width: '100%', padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }} />
+                <div className="form-group">
+                  <label className="settings-label">Nodo Primario (IP Local)</label>
+                  <input type="text" value={orqLocalIp} onChange={e => setorqLocalIp(e.target.value)} placeholder="127.0.0.1" className="settings-input" />
                 </div>
-                <div className="form-group" style={{ marginBottom: "16px" }}>
-                  <label style={labelStyle}>Nodo Cómputo (Server Remoto IP)</label>
-                  <input type="text" value={orqRemoteIp} onChange={e => setorqRemoteIp(e.target.value)} placeholder="192.168.1.100" className="search-input" style={{ width: '100%', padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }} />
+                <div className="form-group">
+                  <label className="settings-label">Nodo Cómputo (Server Remoto IP)</label>
+                  <input type="text" value={orqRemoteIp} onChange={e => setorqRemoteIp(e.target.value)} placeholder="192.168.1.100" className="settings-input" />
                 </div>
-                <div className="form-group" style={{ marginBottom: "16px" }}>
-                  <label style={labelStyle}>Puerto de Conexión N5 API</label>
-                  <input type="text" value={orqApiPort} onChange={e => setOrqApiPort(e.target.value)} placeholder="8000" className="search-input" style={{ width: "120px", padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }} />
+                <div className="form-group">
+                  <label className="settings-label">Puerto de Conexión N5 API</label>
+                  <input type="text" value={orqApiPort} onChange={e => setOrqApiPort(e.target.value)} placeholder="8000" className="settings-input" style={{ width: "120px" }} />
                 </div>
                 <div className="form-group" style={{ borderTop: "1px solid var(--border)", paddingTop: "16px", marginTop: "16px" }}>
-                  <label style={labelStyle}>Ruta del Perfil de Entorno (PowerShell Profile script)</label>
-                  <input type="text" value={orqProfilePath} onChange={e => setOrqProfilePath(e.target.value)} placeholder="C:/Users/.../profile.ps1" className="search-input" style={{ width: '100%', padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-0)" }} />
+                  <label className="settings-label">Ruta del Perfil de Entorno (PowerShell Profile script)</label>
+                  <input type="text" value={orqProfilePath} onChange={e => setOrqProfilePath(e.target.value)} placeholder="C:/Users/.../profile.ps1" className="settings-input" />
                 </div>
               </div>
             )}
 
             {activeTab === "vigilante" && (
               <div className="anim-fade-in">
-                <h3 style={{ margin: "0 0 20px 0", color: "var(--accent)", fontSize: "15px", fontWeight: 600 }}>Configuración de Vigilante (Módulo de Seguridad)</h3>
+                <h3 className="settings-section-title">Configuración de Vigilante (Módulo de Seguridad)</h3>
                 
                 <div style={{ marginBottom: "20px", padding: "12px 16px", background: "rgba(255,80,80,0.05)", borderRadius: "8px", border: "1px solid rgba(255,80,80,0.15)", fontSize: "12px", color: "var(--danger)", lineHeight: 1.5 }}>
                   🛡️ El módulo Vigilante auditará cada proxy local y prohibirá la ejecución a través de perfiles de restricción léxica.
                 </div>
 
-                <div className="form-group" style={{ marginBottom: "16px" }}>
+                <div className="form-group">
                   <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
-                    <label style={{...labelStyle, marginBottom: 0, fontWeight: 600}}>⛔ Prohibidos Completamente</label>
+                    <label className="settings-label" style={{marginBottom: 0, fontWeight: 600}}>⛔ Prohibidos Completamente</label>
                     <select onChange={(e) => applySecurityPreset('prohibidos', e.target.value)} style={{background: 'var(--bg-3)', color: 'var(--text-1)', border: '1px solid var(--border)', fontSize: '11px', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', outline: 'none'}}>
                       <option value="">Carga Rápida Preset...</option>
                       <option value="libertad">Anarquía (0 Restricciones)</option>
@@ -414,54 +380,71 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
                       <option value="suave">Aislado (Full Restricción)</option>
                     </select>
                   </div>
-                  <textarea style={textareaStyle} value={vigProhibidos} onChange={e => setVigProhibidos(e.target.value)} placeholder="rm -rf /,format c:" />
+                  <textarea className="settings-textarea" value={vigProhibidos} onChange={e => setVigProhibidos(e.target.value)} placeholder="rm -rf /,format c:" />
                 </div>
 
-                <div className="form-group" style={{ marginBottom: "16px" }}>
+                <div className="form-group">
                   <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
-                    <label style={{...labelStyle, marginBottom: 0, fontWeight: 600}}>🔴 Peligrosos Condicionados (Requieren confirmación humana o Q=0.95)</label>
+                    <label className="settings-label" style={{marginBottom: 0, fontWeight: 600}}>🔴 Peligrosos Condicionados (Requieren confirmación humana o Q=0.95)</label>
+                    <select onChange={(e) => applySecurityPreset('peligrosos', e.target.value)} style={{background: 'var(--bg-3)', color: 'var(--text-1)', border: '1px solid var(--border)', fontSize: '11px', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', outline: 'none'}}>
+                      <option value="">Carga Rápida Preset...</option>
+                      <option value="libertad">Anarquía (0 Restricciones)</option>
+                      <option value="moderado">Medio (Sistema Base)</option>
+                      <option value="suave">Aislado (Full Restricción)</option>
+                    </select>
                   </div>
-                  <textarea style={textareaStyle} value={vigPeligrosos} onChange={e => setVigPeligrosos(e.target.value)} placeholder="rm,del,shutdown,kill" />
+                  <textarea className="settings-textarea" value={vigPeligrosos} onChange={e => setVigPeligrosos(e.target.value)} placeholder="rm,del,shutdown,kill" />
                 </div>
 
-                <div className="form-group" style={{ marginBottom: "16px" }}>
+                <div className="form-group">
                   <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
-                    <label style={{...labelStyle, marginBottom: 0, fontWeight: 600}}>🟡 Cautelosos (Solo modo seguro)</label>
+                    <label className="settings-label" style={{marginBottom: 0, fontWeight: 600}}>🟡 Cautelosos (Solo modo seguro)</label>
+                    <select onChange={(e) => applySecurityPreset('cautelosos', e.target.value)} style={{background: 'var(--bg-3)', color: 'var(--text-1)', border: '1px solid var(--border)', fontSize: '11px', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', outline: 'none'}}>
+                      <option value="">Carga Rápida Preset...</option>
+                      <option value="libertad">Anarquía (0 Restricciones)</option>
+                      <option value="moderado">Medio (Sistema Base)</option>
+                      <option value="suave">Aislado (Full Restricción)</option>
+                    </select>
                   </div>
-                  <textarea style={textareaStyle} value={vigCautelosos} onChange={e => setVigCautelosos(e.target.value)} placeholder="curl,wget,ssh,cargo" />
+                  <textarea className="settings-textarea" value={vigCautelosos} onChange={e => setVigCautelosos(e.target.value)} placeholder="curl,wget,ssh,cargo" />
                 </div>
 
-                <div className="form-group" style={{ marginBottom: "16px" }}>
+                <div className="form-group">
                   <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
-                    <label style={{...labelStyle, marginBottom: 0, fontWeight: 600}}>🟢 Rutas Libres Autorizadas (Sandbox Bypasses)</label>
+                    <label className="settings-label" style={{marginBottom: 0, fontWeight: 600}}>🟢 Rutas Libres Autorizadas (Sandbox Bypasses)</label>
+                    <select onChange={(e) => applySecurityPreset('sandbox', e.target.value)} style={{background: 'var(--bg-3)', color: 'var(--text-1)', border: '1px solid var(--border)', fontSize: '11px', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', outline: 'none'}}>
+                      <option value="">Carga Rápida Preset...</option>
+                      <option value="libertad">Anarquía (0 Restricciones)</option>
+                      <option value="moderado">Medio (Sistema Base)</option>
+                      <option value="suave">Aislado (Full Restricción)</option>
+                    </select>
                   </div>
-                  <textarea style={textareaStyle} value={vigSandboxPaths} onChange={e => setVigSandboxPaths(e.target.value)} placeholder="/workspace/project, C:/Proyectos" />
+                  <textarea className="settings-textarea" value={vigSandboxPaths} onChange={e => setVigSandboxPaths(e.target.value)} placeholder="/workspace/project, C:/Proyectos" />
                 </div>
               </div>
             )}
 
             {activeTab === "quantum" && (
               <div className="anim-fade-in">
-                <h3 style={{ margin: "0 0 20px 0", color: "var(--accent)", fontSize: "15px", fontWeight: 600 }}>Opciones VRAM/GPU y Computación Avanzada</h3>
+                <h3 className="settings-section-title">Opciones VRAM/GPU y Computación Avanzada</h3>
                 
-                <div style={{ padding: "20px", background: "var(--bg-0)", border: "1px solid var(--border)", borderRadius: "8px", marginBottom: "20px" }}>
+                <div className="settings-card">
                   <h4 style={{ margin: "0 0 12px 0", fontSize: "13px", color: "var(--text-1)" }}>Sistema Cuántico · Entrelazamiento AST</h4>
-                  <div className="form-group" style={{ marginBottom: "16px" }}>
-                    <label style={labelStyle}>Técnica de Colapso (OP_QUANTUM_COLLAPSE)</label>
+                  <div className="form-group">
+                    <label className="settings-label">Técnica de Colapso (OP_QUANTUM_COLLAPSE)</label>
                     <select
                       value={qCollapseMethod}
                       onChange={e => setQCollapseMethod(e.target.value)}
-                      className="search-input"
-                      style={{ width: "100%", padding: "10px", fontSize: "12px", borderRadius: "6px", backgroundColor: "var(--bg-1)" }}
+                      className="settings-input"
                     >
                       <option value="probabilistic">Determinador Probabilístico</option>
                       <option value="deterministic">Booleano Determinístco Clásico</option>
                       <option value="ai_assisted">Controlado por Motor Soberano (IA)</option>
                     </select>
                   </div>
-                  <div className="form-group" style={{ marginBottom: "16px" }}>
-                    <label style={labelStyle}>Alpha Inicial (Amplitud por defecto)</label>
-                    <input type="text" value={qDefaultAlpha} onChange={e => setQDefaultAlpha(e.target.value)} placeholder="0.7071" className="search-input" style={{ width: "120px", padding: "10px", borderRadius: "6px", backgroundColor: "var(--bg-1)" }} />
+                  <div className="form-group">
+                    <label className="settings-label">Alpha Inicial (Amplitud por defecto)</label>
+                    <input type="text" value={qDefaultAlpha} onChange={e => setQDefaultAlpha(e.target.value)} placeholder="0.7071" className="settings-input" style={{ width: "120px" }} />
                   </div>
                   <div className="form-group" style={{ marginBottom: "10px" }}>
                     <label className="ext-toggle" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12px' }}>
@@ -477,7 +460,7 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
                   </div>
                 </div>
 
-                <div style={{ padding: "20px", background: "var(--bg-0)", border: "1px solid var(--border)", borderRadius: "8px", marginBottom: "20px" }}>
+                <div className="settings-card">
                   <h4 style={{ margin: "0 0 12px 0", fontSize: "13px", color: "var(--text-1)" }}>Memoria y Hardware Dedicado (Compute/CUDA)</h4>
                   <div className="form-group" style={{ marginBottom: "16px" }}>
                     <label className="ext-toggle" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12px' }}>
@@ -495,9 +478,7 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
                           alert("Error descargando modelo: " + e);
                         }
                       }}
-                      style={{ flex: 1, padding: "10px", background: "rgba(255,80,80,0.1)", border: "1px solid rgba(255,80,80,0.3)", color: "var(--fg-1)", borderRadius: "6px", cursor: "pointer", fontSize: "12px", transition: "all 0.2s", fontWeight: 500 }}
-                      onMouseOver={e => e.currentTarget.style.background = "rgba(255,80,80,0.2)"}
-                      onMouseOut={e => e.currentTarget.style.background = "rgba(255,80,80,0.1)"}
+                      className="btn-danger"
                     >
                       Expulsar Modelo de vRAM
                     </button>
@@ -510,9 +491,7 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
                           alert("Error borrando caché CUDA: " + e);
                         }
                       }}
-                      style={{ flex: 1, padding: "10px", background: "rgba(80,200,255,0.1)", border: "1px solid rgba(80,200,255,0.3)", color: "var(--fg-1)", borderRadius: "6px", cursor: "pointer", fontSize: "12px", transition: "all 0.2s", fontWeight: 500 }}
-                      onMouseOver={e => e.currentTarget.style.background = "rgba(80,200,255,0.2)"}
-                      onMouseOut={e => e.currentTarget.style.background = "rgba(80,200,255,0.1)"}
+                      className="btn-info"
                     >
                       Forzar Purga de Caché
                     </button>
