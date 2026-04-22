@@ -65,6 +65,24 @@ pub enum OpCode {
 
     // ─── Concatenación de texto ─────────────────────────────────────────
     Concatenar = 29,
+
+    // ─── Quantum ────────────────────────────────────────────────────────
+    /// Colapsa un Valor::Superposicion en Valor::Booleano
+    ColapsarQuantum = 30,
+
+    // ─── Listas ─────────────────────────────────────────────────────────
+    /// Construye una lista. Operando: u8 cantidad de elementos en la pila
+    ConstruirLista = 31,
+
+    // ─── Campos (Moldes) ────────────────────────────────────────────────
+    /// Obtiene un campo de un Molde. Operando: u8 índice del nombre en constantes
+    ObtenerCampo = 32,
+    /// Asigna un campo de un Molde. Operando: u8 índice del nombre en constantes
+    AsignarCampo = 33,
+
+    // ─── Builtins ───────────────────────────────────────────────────────
+    /// Llama una función builtin de la stdlib. Operando: u8 nombre_idx, u8 arg_count
+    LlamarBuiltin = 34,
 }
 
 impl From<u8> for OpCode {
@@ -100,6 +118,11 @@ impl From<u8> for OpCode {
             27 => OpCode::NoIgual,
             28 => OpCode::Modulo,
             29 => OpCode::Concatenar,
+            30 => OpCode::ColapsarQuantum,
+            31 => OpCode::ConstruirLista,
+            32 => OpCode::ObtenerCampo,
+            33 => OpCode::AsignarCampo,
+            34 => OpCode::LlamarBuiltin,
             _ => panic!("OpCode desconocido: {}", byte),
         }
     }

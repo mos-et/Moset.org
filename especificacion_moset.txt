@@ -102,3 +102,79 @@ Cuando un programador estadounidense importa esa librería, su entorno lee los I
 
 Mi vision es técnicamente viable y es lo que hace a Moset revolucionario. Todo el código fuente `.et` se convierte en un esqueleto matemático, y el idioma es solo una "piel" visual que se pone encima.
 
+
+
+===========================================================================
+ADDENDUM 2026-04-20: ARQUITECTURA mos.et Y VISIÓN ORQUESTADORA
+===========================================================================
+
+6. ESTRUCTURA DE PLATAFORMA DE LENGUAJE (mos.et/)
+───────────────────────────────────────────────────
+La carpeta mos.et/ es la super-carpeta semántica que agrupa toda la
+Plataforma del Lenguaje Moset, separando la teoría del motor duro de Rust.
+
+  mos.et/
+  ├── examples/                 → 15 scripts .et de demostración y plantillas
+  │   (aritmetica, bits_cuanticos, brazos_demo, bucles, condicionales,
+  │    funciones, hola_mundo, moldes, moldes_elasticos, mythos_ia,
+  │    pensar, quantum_bias, quantum_flip, sistema, variables_tipos)
+  ├── moset-lang/
+  │   ├── idiomas_humanos/       → Diccionarios humanos (es.toml, en.toml)
+  │   │   Mapean: palabra_humana → TOKEN_U-AST
+  │   │   Permiten que "si", "if", "se", "wenn" → TOKEN_SI
+  │   └── idiomas_computadora/   → Conectores de lenguajes externos [futuro]
+  │       Mapearán: sintaxis_externa → Conector_Ejecución
+  │       Ej: "def " → ConectorPython, "public class" → ConectorJava
+  └── orquestadores/             → Puentes web y bridges externos [futuro]
+      Ej: moset-vercel-serverless/, moset-python-bridge/
+
+7. MOSET COMO ORQUESTADOR POLÍGLOTA (Visión Fase 13+)
+───────────────────────────────────────────────────────
+Moset está diseñado para evolucionar en un Orquestador Universal que
+gobierne otros lenguajes desde un único archivo .et.
+
+  MECANISMO: Bloques de lenguaje explícitos
+  ──────────────────────────────────────────
+  var nombre = "Proyecto Soberano"
+
+  @python {
+    import torch
+    resultado = torch.rand(5).mean()
+  }
+
+  mostrar("Resultado de PyTorch: " + resultado)
+
+  MECANISMO: Auto-detección de sintaxis [futuro]
+  ───────────────────────────────────────────────
+  El compilador detecta patrones ("def ", "import", "public class") y
+  delega automáticamente al Conector correspondiente en idiomas_computadora/.
+
+  RUTAS DE DESPLIEGUE WEB SIN IDE
+  ─────────────────────────────────
+  1. WASM: core-engine compilado a WebAssembly → ejecución browser-native.
+     HTML carga moset.wasm, fetch("logica.et"), ejecutar en el navegador.
+  2. Serverless: Vercel Functions en Rust → procesa .et, consulta Firebase,
+     retorna HTML al cliente. Sin servidor propio.
+  3. CLI: moset run archivo.et sin interfaz gráfica. Instalable via PATH.
+
+8. MOTOR DE EJECUCIÓN VISUAL (MosetOutputPanel — Fase 12)
+───────────────────────────────────────────────────────────
+El comando Tauri "ejecutar" retorna JSON estructurado con tipos de línea:
+
+  { "lines": [
+    { "type": "header",   "content": "═══ Resultado ═══" },
+    { "type": "quantum",  "content": "Bit:[0.75]", "value": 0.75 },
+    { "type": "molde",    "content": "Usuario { nombre: Ana, edad: 30 }" },
+    { "type": "error",    "content": "Variable no definida: x" },
+    { "type": "text",     "content": "Hola Mundo" },
+    { "type": "separator","content": "───────────────" }
+  ]}
+
+  classify_output_line() en lib.rs detecta el tipo de cada línea de output
+  del Motor para que el frontend lo renderice con su componente visual.
+
+  Arquitectura de eventos:
+    window.dispatchEvent(new CustomEvent("run-moset-code", {
+      detail: { codigo: "...", filename: "archivo.et", language: "moset" }
+    }))
+  El handler en App.tsx invoca directamente al Motor via Tauri invoke().

@@ -1,4 +1,4 @@
-#  BIBLIA MOSET — Documento Definitivo del Ecosistema (Motor Soberano)
+﻿#  BIBLIA MOSET — Documento Definitivo del Ecosistema (Motor Soberano)
 
 > **Este archivo define la arquitectura, visión, estado real y auditoría completa de Moset IDE y su ecosistema.**
 > Última consolidación: 2026-04-17 — **v0.2.3 (RAG Heurístico, Sandbox Expandido, Renderizado Robusto)**
@@ -948,5 +948,28 @@ Además de los endpoints del lenguaje Moset, el IDE incluye un **agente autónom
   <i>Moset 2026 - Desarrollado por <b>narakastudio.com</b></i>
 </div>
 
-## �ltima Actualizaci�n
-- 2026-04-17: Moset IDE branding estabilizado a moset.org. Chatbot fix (capturas regex en Node) y arquitectura de web migrada a Astro con protecci�n EULA y redirecci�n GitHub para source compile.
+
+---
+
+## Última Actualización
+
+**2026-04-20 — Fase 12: Estabilización Motor Visual + Arquitectura mos.et**
+
+### Motor de Ejecución Visual (MosetOutputPanel)
+- [x] **Backend Rust refactorizado**: Comando ejecutar ahora retorna JSON estructurado con tipos (quantum, molde, header, error, 	ext, separator) via classify_output_line.
+- [x] **MosetOutputPanel.tsx**: Panel visual premium con *glassmorphism*, barras de probabilidad cuántica, tarjetas de moldes, soporte copy-to-clipboard y fuentes locales (sin dependencia Google Fonts).
+- [x] **Arquitectura de Eventos Global**: unMosetCode escucha el evento un-moset-code va window.addEventListener. El handler del event usa invoke() directo para evitar stale closures con deps=[].
+- [x] **Integración Explorador**: Menú contextual de archivos .et incluye opción "▶ Ejecutar (Run Moset)" que dispara el CustomEvent con el contenido del archivo.
+- [x] **Integración ChatPanel**: Botón "▶ Ejecutar" en la ActionCard post-aplicación de código, permitiendo testear el código generado por la IA de forma inmediata.
+
+### Arquitectura mos.et (Plataforma del Lenguaje)
+- [x] **Unificación de examples**: Las dos carpetas examples/ (raíz y core-engine/) fusionadas en una única moset-ecosystem/mos.et/examples/ con 15 archivos .et.
+- [x] **Carpeta mos.et/ creada**: Super-carpeta semántica (análoga a .github) que agrupa toda la teoría y plataforma del lenguaje, separada del motor duro de Rust (core-engine).
+- [x] **moset-lang/idiomas_humanos/**: Renombrada desde diccionarios/. Contiene es.toml y en.toml (mapeo palabra humana → TOKEN U-AST).
+- [x] **moset-lang/idiomas_computadora/**: Nueva carpeta creada. Reservada para futuros conectores (python.toml, js.toml) que permitan a Moset actuar como Orquestador Políglota.
+- [x] **orquestadores/**: Nueva carpeta dentro de mos.et/. Reservada para puentes web (Vercel Serverless, Node Express, Python Bridge) que expondrán el Motor Moset a la web sin requerir el IDE.
+
+### Visión Arquitectónica Registrada
+- **Moset como Orquestador Universal**: El lenguaje puede actuar como "burbuja soberana" que gobierna Python, Java, Node.js u otros lenguajes mediante bloques @python {} o detección automática de sintaxis externa. El usuario final solo escribe .et; los conectores hacen el trabajo sucio invisible.
+- **Ruta Web sin IDE**: Tres caminos a futuro: (1) WASM para ejecución en navegador, (2) API Serverless via Vercel + Firebase, (3) CLI moset archivo.et sin interfaz gráfica.
+- **Arquitectura de 3 capas de Diccionarios**: Palabras humanas (idiomas_humanos/), plantillas de dominio (examples/), y gramáticas de lenguajes externos (idiomas_computadora/) — todo bajo mos.et/.

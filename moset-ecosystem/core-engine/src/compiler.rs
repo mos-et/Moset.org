@@ -3,6 +3,13 @@ use crate::valor::Valor;
 use crate::ast::{Nodo, OpBinario, OpUnario};
 use std::collections::HashMap;
 
+/// Schema de un molde registrado en compilación
+#[derive(Debug, Clone)]
+struct MoldeSchema {
+    campos: Vec<String>,
+    elastico: bool,
+}
+
 /// Representa una variable local en el scope del compilador
 #[derive(Debug, Clone)]
 struct Local {
@@ -18,6 +25,8 @@ pub struct Compilador {
     profundidad_scope: i32,
     /// Tabla de nombres globales → índice en constantes
     globales: HashMap<String, usize>,
+    /// Tabla de moldes registrados
+    moldes: HashMap<String, MoldeSchema>,
     /// Directorio base del archivo fuente en ejecución.
     /// Cuando está seteado, `importar` resuelve rutas relativas contra él
     /// en lugar del CWD del proceso (BUG-026 fix).
@@ -31,6 +40,7 @@ impl Compilador {
             locales: Vec::new(),
             profundidad_scope: 0,
             globales: HashMap::new(),
+            moldes: HashMap::new(),
             ruta_base: None,
         }
     }
@@ -313,36 +323,10 @@ impl Compilador {
                 }
             },
 
-            // ─── LLAMADAS ───────────────────────────────────────────────────
-            Nodo::Llamada { funcion, args } => {
-                // Compilar la función (poner en pila)
-                self.compilar_nodo(funcion, linea)?;
-                // Compilar cada argumento
-                for arg in args {
-                    self.compilar_nodo(arg, linea)?;
-                }
-                // Emitir llamada con cantidad de argumentos
-                self.emitir_bytes(OpCode::Llamar as u8, args.len() as u8, linea);
-            },
-
             // ─── RETORNAR ───────────────────────────────────────────────────
             Nodo::Retornar(expr) => {
                 self.compilar_nodo(expr, linea)?;
                 self.emitir_byte(OpCode::Retorno as u8, linea);
-            },
-
-            // ─── POR CADA ───────────────────────────────────────────────────
-            Nodo::PorCada { variable: _, iterable, cuerpo: _ } => {
-                // Compilamos como: iterable en pila, luego iteramos con un contador
-                // Simplificación: delegamos a la VM que maneje la iteración
-                // Por ahora, fallback a error descriptivo si no es una lista literal
-                self.compilar_nodo(iterable, linea)?;
-                // Placeholder: el `por cada` se expande a un while con index counter
-                // En la VM, manejamos esto con un pattern especial
-                return Err(format!(
-                    "Línea {}: `por cada` aún no está soportado en el compilador bytecode. Usa `mientras` como alternativa.",
-                    linea
-                ));
             },
 
             // ─── COMENTARIOS (no-op) ────────────────────────────────────────
@@ -391,6 +375,198 @@ impl Compilador {
                 self.ruta_base = old_base;
             },
 
+            // ─── SUPERPOSICIÓN CUÁNTICA ─────────────────────────────────────
+            Nodo::SuperposicionLit { alpha, beta } => {
+                let idx = self.chunk.añadir_constante(Valor::Superposicion {
+                    alpha: *alpha,
+                    beta: *beta,
+                });
+                self.emitir_bytes(OpCode::Constante as u8, idx as u8, linea);
+            },
+
+            // ─── COLAPSO CUÁNTICO (observar: !) ─────────────────────────────
+            Nodo::Colapsar(expr) => {
+                self.compilar_nodo(expr, linea)?;
+                self.emitir_byte(OpCode::ColapsarQuantum as u8, linea);
+            },
+
+            // ─── LISTAS ─────────────────────────────────────────────────────
+            Nodo::ListaLit(elementos) => {
+                let count = elementos.len();
+                for elem in elementos {
+                    self.compilar_nodo(elem, linea)?;
+                }
+                self.emitir_bytes(OpCode::ConstruirLista as u8, count as u8, linea);
+            },
+
+            // ─── MOLDE DEFINICIÓN ───────────────────────────────────────────
+            Nodo::MoldeDefinicion { nombre, campos, elastico } => {
+                // Registrar molde en tabla interna para el compilador
+                self.moldes.insert(nombre.clone(), MoldeSchema {
+                    campos: campos.clone(),
+                    elastico: *elastico,
+                });
+                // No emitimos bytecode — solo metadata de compilación
+            },
+
+            // ─── MOLDE INSTANCIA ────────────────────────────────────────────
+            Nodo::MoldeInstancia { nombre, valores } => {
+                // Construir los campos en tiempo de compilación como constante
+                let mut campos_map = std::collections::HashMap::new();
+                // Primero, necesitamos evaluar los valores. Para moldes con valores
+                // literales podemos hacer constante directa. Para expresiones complejas,
+                // generamos código que construye en runtime.
+                
+                // Estrategia: compilar cada valor, luego emitir un opcode especial.
+                // Pero para simplificar usamos una constante si todos los valores son literales,
+                // y si no, compilamos y usamos runtime.
+                let mut all_literal = true;
+                for (campo, val) in valores {
+                    match self.try_eval_literal(val) {
+                        Some(v) => { campos_map.insert(campo.clone(), v); },
+                        None => { all_literal = false; break; },
+                    }
+                }
+
+                if all_literal {
+                    let idx = self.chunk.añadir_constante(Valor::Molde {
+                        nombre: nombre.clone(),
+                        campos: campos_map,
+                        extra: std::collections::HashMap::new(),
+                    });
+                    self.emitir_bytes(OpCode::Constante as u8, idx as u8, linea);
+                } else {
+                    // Fallback: construir pieza a pieza en runtime
+                    // Push nombre, push cada (key, val), luego ConstruirMolde
+                    // Para simplificar, construimos un molde vacío y asignamos campos
+                    let idx = self.chunk.añadir_constante(Valor::Molde {
+                        nombre: nombre.clone(),
+                        campos: std::collections::HashMap::new(),
+                        extra: std::collections::HashMap::new(),
+                    });
+                    self.emitir_bytes(OpCode::Constante as u8, idx as u8, linea);
+
+                    // Asignar como variable temporal para poder hacer set_field
+                    let temp_name = format!("__molde_temp_{}", nombre);
+                    let name_idx = self.identificador_constante(&temp_name);
+                    self.emitir_bytes(OpCode::DefinirGlobal as u8, name_idx as u8, linea);
+
+                    for (campo, val) in valores {
+                        // Push el objeto
+                        self.emitir_bytes(OpCode::ObtenerGlobal as u8, name_idx as u8, linea);
+                        // Push el valor
+                        self.compilar_nodo(val, linea)?;
+                        // Set field
+                        let field_idx = self.identificador_constante(campo);
+                        self.emitir_bytes(OpCode::AsignarCampo as u8, field_idx as u8, linea);
+                    }
+
+                    // Hacer que el resultado sea el molde
+                    self.emitir_bytes(OpCode::ObtenerGlobal as u8, name_idx as u8, linea);
+                }
+            },
+
+            // ─── ASIGNACIÓN DE CAMPO (obj.campo = valor) ────────────────────
+            Nodo::AsignacionCampo { objeto, campo, valor } => {
+                // Push el objeto
+                if let Some(slot) = self.resolver_local(objeto) {
+                    self.emitir_bytes(OpCode::ObtenerLocal as u8, slot as u8, linea);
+                } else {
+                    let idx = self.identificador_constante(objeto);
+                    self.emitir_bytes(OpCode::ObtenerGlobal as u8, idx as u8, linea);
+                }
+                // Push el valor
+                self.compilar_nodo(valor, linea)?;
+                // Emit set field
+                let field_idx = self.identificador_constante(campo);
+                self.emitir_bytes(OpCode::AsignarCampo as u8, field_idx as u8, linea);
+                // Update the variable
+                if let Some(slot) = self.resolver_local(objeto) {
+                    self.emitir_bytes(OpCode::AsignarLocal as u8, slot as u8, linea);
+                } else {
+                    let idx = self.identificador_constante(objeto);
+                    self.emitir_bytes(OpCode::AsignarGlobal as u8, idx as u8, linea);
+                }
+                // Pop the result that AsignarGlobal/AsignarLocal left
+                self.emitir_byte(OpCode::Pop as u8, linea);
+            },
+
+            // ─── ACCESO A CAMPO (obj.campo) ─────────────────────────────────
+            Nodo::AccesoCampo { objeto, campo } => {
+                self.compilar_nodo(objeto, linea)?;
+                let field_idx = self.identificador_constante(campo);
+                self.emitir_bytes(OpCode::ObtenerCampo as u8, field_idx as u8, linea);
+            },
+
+            // ─── LLAMADAS (extendido para builtins) ─────────────────────────
+            Nodo::Llamada { funcion, args } => {
+                // Check if it's a builtin call
+                let builtin_name = match funcion.as_ref() {
+                    Nodo::Identificador(name) => {
+                        match name.as_str() {
+                            "shell" | "leer" | "escribir" | "entorno" | "existe" | "peticion_get" 
+                                => Some(name.clone()),
+                            _ => None,
+                        }
+                    },
+                    _ => None,
+                };
+
+                if let Some(name) = builtin_name {
+                    // Compile arguments
+                    for arg in args {
+                        self.compilar_nodo(arg, linea)?;
+                    }
+                    let name_idx = self.identificador_constante(&name);
+                    self.emitir_byte(OpCode::LlamarBuiltin as u8, linea);
+                    self.emitir_byte(name_idx as u8, linea);
+                    self.emitir_byte(args.len() as u8, linea);
+                } else {
+                    // Regular function call
+                    self.compilar_nodo(funcion, linea)?;
+                    for arg in args {
+                        self.compilar_nodo(arg, linea)?;
+                    }
+                    self.emitir_bytes(OpCode::Llamar as u8, args.len() as u8, linea);
+                }
+            },
+
+            // ─── ACCESO A ÍNDICE (lista[i]) ─────────────────────────────────
+            Nodo::AccesoIndice { lista, indice } => {
+                self.compilar_nodo(lista, linea)?;
+                self.compilar_nodo(indice, linea)?;
+                // Usamos una llamada interna — por ahora, fallback
+                return Err(format!(
+                    "Línea {}: Acceso por índice aún no soportado en bytecode.",
+                    linea
+                ));
+            },
+
+            // ─── CATCH EN LINEA (expr :,[ fallback) ─────────────────────────
+            Nodo::CatchEnLinea { .. } => {
+                return Err(format!(
+                    "Línea {}: `catch` en línea aún no está soportado en el compilador bytecode.",
+                    linea
+                ));
+            },
+
+            // ─── ESPERAR (await) ────────────────────────────────────────────
+            Nodo::Esperar(_) => {
+                return Err(format!(
+                    "Línea {}: `esperar` aún no está soportado en el compilador bytecode.",
+                    linea
+                ));
+            },
+
+            // ─── POR CADA ──────────────────────────────────────────────────
+            Nodo::PorCada { variable: _, iterable, cuerpo: _ } => {
+                self.compilar_nodo(iterable, linea)?;
+                return Err(format!(
+                    "Línea {}: `por cada` aún no está soportado en el compilador bytecode. Usa `mientras` como alternativa.",
+                    linea
+                ));
+            },
+
             // ─── FALLBACK ───────────────────────────────────────────────────
             _ => return Err(format!(
                 "Línea {}: El compilador no soporta todavía el nodo: {:?}", 
@@ -409,6 +585,24 @@ impl Compilador {
     fn emitir_bytes(&mut self, byte1: u8, byte2: u8, linea: usize) {
         self.chunk.escribir(byte1, linea);
         self.chunk.escribir(byte2, linea);
+    }
+
+    /// Intenta evaluar un nodo como un literal constante en tiempo de compilación.
+    /// Retorna None si el nodo es demasiado complejo para evaluar estáticamente.
+    fn try_eval_literal(&self, nodo: &Nodo) -> Option<Valor> {
+        match nodo {
+            Nodo::EnteroLit(v) => Some(Valor::Entero(*v)),
+            Nodo::DecimalLit(v) => Some(Valor::Decimal(*v)),
+            Nodo::TextoLit(v) => Some(Valor::Texto(v.clone())),
+            Nodo::BooleanoLit(v) => Some(Valor::Booleano(*v)),
+            Nodo::NuloLit => Some(Valor::Nulo),
+            Nodo::SuperposicionLit { alpha, beta } => Some(Valor::Superposicion {
+                alpha: *alpha,
+                beta: *beta,
+            }),
+            Nodo::Metadata { nodo: inner, .. } => self.try_eval_literal(inner),
+            _ => None,
+        }
     }
 }
 

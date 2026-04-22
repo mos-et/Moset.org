@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
   <img src="moset-ecosystem/naraka-ide/src/assets/moset-logo.png" alt="Moset Logo" width="200" />
   
   # Moset Ecosystem
@@ -23,7 +23,7 @@
 
 ---
 
-## 🎨 Screenshots
+## 📸 Screenshots
 *(Replace IMAGEN1, IMAGEN2, etc. with the link to your screenshot when uploading to GitHub)*
 
 ### Welcome Screen & Config
@@ -32,40 +32,47 @@
 ### Moset Main IDE & Customization
 ![IDE General Interface](IMAGEN2)
 
-### The Sovereign Engine (Local Terminal)
-![Settings and Console Panel](IMAGEN3)
+### MosetOutputPanel — Visual Execution
+![MosetOutputPanel](IMAGEN3)
 
 ---
 
-## 🌌 Vision and Architecture
+## 🌐 Vision and Architecture
 
 To fully dive into the philosophy, technical foundations, and the "Lore" behind this project, we invite you to read our central documentation:
 
-👉 **[Read The Moset Bible](./Biblia_Moset.md)**
+📖 **[Read The Moset Bible (ES)](./Biblia_Moset.md)**
+📖 **[Read The Moset Bible (EN)](./Biblia_Moset_en.md)**
 
-## 🚀 Key Features
+## ✨ Key Features
 
 - **Absolute Privacy**: AI models run directly on your hardware, offline.
-- **Native Performance**: `core-engine` backend completely written in pure Rust.
-- **Cross-Platform Acceleration**: Optional CUDA support, plus proven compatibility on Windows, macOS, and Linux.
-- **Glassmorphism Frontend**: Immersive and cutting-edge Integrated Development Environment (IDE) under `naraka-ide`.
-- **Moset-Lang**: A custom programming language designed for semantic interoperability with LLMs.
+- **Native Performance**: core-engine backend completely written in pure Rust.
+- **Cross-Platform**: Proven compatibility on Windows, macOS, and Linux. Optional CUDA support.
+- **Glassmorphism Frontend**: Immersive and cutting-edge IDE under 
+araka-ide.
+- **Moset-Lang (.et)**: A custom programming language with U-AST, omnilingual keywords (Spanish, English, and more), quantum variables, and elastic molds.
+- **MosetOutputPanel**: Premium visual panel for .et script execution results (quantum bars, mold cards, glassmorphism).
+- **Universal Orchestrator (Roadmap)**: Moset is designed to become a polyglot orchestrator — executing Python, Node.js, Java and more from within a single .et file.
 
-## ⚙️ Repository Structure
+## 📁 Repository Structure
 
-The monorepo is organized as follows:
-
-```text
+`	ext
 /moset-ecosystem
- ├── core-engine/      # Pure Rust backend engine
- ├── naraka-ide/       # Tauri + React frontend
- ├── moset-lang/       # Moset language parser/library
- └── scripts/          # LLM model downloads, fine-tuning, and automations
-/logos moset/          # Visual Identity and branding
-/Iconos Retro/         # Graphic assets
-```
+ ├── core-engine/         # Pure Rust backend: Lexer, Parser, Compiler, VM, AI
+ ├── naraka-ide/          # Tauri + React IDE (MosetOutputPanel, ChatPanel, Explorer)
+ ├── mos.et/              # Language Platform (semantic super-folder)
+ │   ├── examples/            # 15 .et demo scripts (moldes, quantum, IA, etc.)
+ │   ├── moset-lang/
+ │   │   ├── idiomas_humanos/     # Human language dicts: es.toml, en.toml
+ │   │   └── idiomas_computadora/ # Future: python.toml, js.toml connectors
+ │   └── orquestadores/       # Future: Vercel/Node/Python web bridges
+ ├── scripts/             # Fine-tuning, corpus generation, CLI installer
+ └── ai-corpus/           # Training data for Moset-specific models
+/logos moset/             # Visual Identity and branding
+`
 
-## 🛠️ Installation & Basic Build
+## ⚙️ Installation & Basic Build
 
 ### Requirements
 - **Rust** and **Cargo**
@@ -73,13 +80,19 @@ The monorepo is organized as follows:
 
 ### Running the Development Environment (IDE)
 
-```bash
+`ash
 cd moset-ecosystem/naraka-ide
 npm install
 npm run tauri dev
-```
+`
 
-> **Note:** The heavy model downloads (`.safetensors`, `.gguf`) are configured using the integrated scripts, which are ignored by native version control due to their large file size.
+### Running a .et script (CLI)
+
+`ash
+moset run archivo.et
+`
+
+> **Note:** The heavy model downloads (.safetensors, .gguf) are configured using the integrated scripts, which are ignored by native version control due to their large file size.
 
 ---
 <div align="center">

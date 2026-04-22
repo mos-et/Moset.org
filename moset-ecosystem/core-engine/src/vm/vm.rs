@@ -438,6 +438,154 @@ impl VM {
                         return Ok(Valor::Nulo);
                     }
                 },
+
+                // ─── COLAPSO CUÁNTICO ──────────────────────────────
+                OpCode::ColapsarQuantum => {
+                    let val = self.pop()?;
+                    match val {
+                        Valor::Superposicion { alpha: _, beta } => {
+                            // Colapso probabilístico: β² es la probabilidad de verdadero
+                            let probabilidad = beta * beta;
+                            // Usar un hash simple del instruction_count como semilla pseudo-random
+                            let pseudo_random = {
+                                let seed = instruction_count.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                                ((seed >> 33) as f64) / (u32::MAX as f64)
+                            };
+                            let resultado = pseudo_random < probabilidad;
+                            self.push(Valor::Booleano(resultado));
+                        },
+                        // Si ya es un booleano, el colapso es idempotente
+                        Valor::Booleano(b) => self.push(Valor::Booleano(b)),
+                        other => {
+                            // Colapso de cualquier valor a booleano
+                            self.push(Valor::Booleano(!Self::es_falso(&other)));
+                        }
+                    }
+                },
+
+                // ─── CONSTRUIR LISTA ───────────────────────────────
+                OpCode::ConstruirLista => {
+                    let count = self.leer_byte() as usize;
+                    let mut items = Vec::with_capacity(count);
+                    // Los elementos están en la pila en orden: primero el [0], último el [n-1]
+                    for _ in 0..count {
+                        items.push(self.pop()?);
+                    }
+                    items.reverse();
+                    self.push(Valor::Lista(items));
+                },
+
+                // ─── OBTENER CAMPO ─────────────────────────────────
+                OpCode::ObtenerCampo => {
+                    let idx = self.leer_byte() as usize;
+                    let campo = match &self.chunk.constantes[idx] {
+                        Valor::Texto(s) => s.clone(),
+                        _ => return Err("Nombre de campo no es texto".into()),
+                    };
+                    let objeto = self.pop()?;
+                    match objeto {
+                        Valor::Molde { campos, extra, .. } => {
+                            if let Some(v) = campos.get(&campo) {
+                                self.push(v.clone());
+                            } else if let Some(v) = extra.get(&campo) {
+                                self.push(v.clone());
+                            } else {
+                                return Err(format!("Campo '{}' no encontrado en el molde", campo));
+                            }
+                        },
+                        _ => return Err(format!("No se puede acceder al campo '{}' de un valor que no es molde: {:?}", campo, objeto)),
+                    }
+                },
+
+                // ─── ASIGNAR CAMPO ─────────────────────────────────
+                OpCode::AsignarCampo => {
+                    let idx = self.leer_byte() as usize;
+                    let campo = match &self.chunk.constantes[idx] {
+                        Valor::Texto(s) => s.clone(),
+                        _ => return Err("Nombre de campo no es texto".into()),
+                    };
+                    let valor = self.pop()?;
+                    let mut objeto = self.pop()?;
+                    match &mut objeto {
+                        Valor::Molde { campos, extra, .. } => {
+                            if campos.contains_key(&campo) {
+                                campos.insert(campo, valor);
+                            } else {
+                                // Espacio latente (elástico)
+                                extra.insert(campo, valor);
+                            }
+                        },
+                        _ => return Err(format!("No se puede asignar al campo '{}' de un valor que no es molde", campo)),
+                    }
+                    self.push(objeto);
+                },
+
+                // ─── LLAMAR BUILTIN ────────────────────────────────
+                OpCode::LlamarBuiltin => {
+                    let name_idx = self.leer_byte() as usize;
+                    let arg_count = self.leer_byte() as usize;
+                    let nombre = match &self.chunk.constantes[name_idx] {
+                        Valor::Texto(s) => s.clone(),
+                        _ => return Err("Nombre de builtin no es texto".into()),
+                    };
+                    // Pop args in reverse order
+                    let mut args = Vec::with_capacity(arg_count);
+                    for _ in 0..arg_count {
+                        args.push(self.pop()?);
+                    }
+                    args.reverse();
+
+                    let resultado = match nombre.as_str() {
+                        "shell" => {
+                            if args.len() != 1 { return Err("shell() requiere 1 argumento".into()); }
+                            let cmd = format!("{}", args[0]);
+                            match crate::stdlib::shell(&cmd) {
+                                Ok(out) => Valor::Texto(out),
+                                Err(e) => return Err(e),
+                            }
+                        },
+                        "leer" => {
+                            if args.len() != 1 { return Err("leer() requiere 1 argumento".into()); }
+                            let ruta = format!("{}", args[0]);
+                            match crate::stdlib::leer(&ruta) {
+                                Ok(content) => Valor::Texto(content),
+                                Err(e) => return Err(e),
+                            }
+                        },
+                        "escribir" => {
+                            if args.len() != 2 { return Err("escribir() requiere 2 argumentos (ruta, contenido)".into()); }
+                            let ruta = format!("{}", args[0]);
+                            let contenido = format!("{}", args[1]);
+                            match crate::stdlib::escribir(&ruta, &contenido) {
+                                Ok(_) => Valor::Nulo,
+                                Err(e) => return Err(e),
+                            }
+                        },
+                        "entorno" => {
+                            if args.len() != 1 { return Err("entorno() requiere 1 argumento".into()); }
+                            let nombre = format!("{}", args[0]);
+                            match crate::stdlib::entorno(&nombre) {
+                                Ok(val) => Valor::Texto(val),
+                                Err(e) => return Err(e),
+                            }
+                        },
+                        "existe" => {
+                            if args.len() != 1 { return Err("existe() requiere 1 argumento".into()); }
+                            let ruta = format!("{}", args[0]);
+                            Valor::Booleano(crate::stdlib::existe(&ruta))
+                        },
+                        "peticion_get" => {
+                            if args.len() != 1 { return Err("peticion_get() requiere 1 argumento".into()); }
+                            let url = format!("{}", args[0]);
+                            match crate::stdlib::peticion_get(&url) {
+                                Ok(body) => Valor::Texto(body),
+                                Err(e) => return Err(e),
+                            }
+                        },
+                        _ => return Err(format!("Función builtin desconocida: '{}'", nombre)),
+                    };
+                    self.push(resultado);
+                },
             }
         }
     }

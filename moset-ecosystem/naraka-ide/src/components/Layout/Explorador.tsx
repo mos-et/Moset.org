@@ -150,7 +150,7 @@ export function Explorador({ tree, projectRoot, projectName, onOpen, setTree, on
               }}
               title="Alternar contexto IA"
             >
-              &#x1F9E0;
+              🧠
             </button>
           </div>
           {node.open && node.children?.map((c: any) => renderNode(c, depth + 1, currentPath))}
@@ -185,7 +185,7 @@ export function Explorador({ tree, projectRoot, projectName, onOpen, setTree, on
           }}
           title="Alternar contexto IA"
         >
-          �x��
+          🧠
         </button>
       </div>
     );
@@ -232,6 +232,13 @@ export function Explorador({ tree, projectRoot, projectName, onOpen, setTree, on
         if (setContextPaths) setContextPaths(prev => [...prev.filter(p => p !== path), path]);
       } else if (action === "remove_context") {
         if (setContextPaths) setContextPaths(prev => prev.filter(p => p !== path));
+      } else if (action === "run" && contextMenu.node) {
+        try {
+          const content = await invoke<string>("read_file_content", { path });
+          window.dispatchEvent(new CustomEvent("run-moset-code", { detail: { codigo: content, language: "moset", filename: nodeName } }));
+        } catch (err) {
+          console.error("Error reading file to run:", err);
+        }
       }
     } catch (e) {
       console.error("Action error:", e);
@@ -357,6 +364,9 @@ export function Explorador({ tree, projectRoot, projectName, onOpen, setTree, on
           {contextMenu.node && (
             <>
               <div style={{ height: "1px", background: "#3D4A6B", margin: "4px 0" }} />
+              {contextMenu.node.name.endsWith(".et") && (
+                <div onClick={(e) => { e.stopPropagation(); handleAction("run"); }} style={{ padding: "6px 12px", cursor: "pointer", color: "#A855F7" }} onMouseOver={e => e.currentTarget.style.background = "#A855F722"} onMouseOut={e => e.currentTarget.style.background = "transparent"}>▶ Ejecutar (Run Moset)</div>
+              )}
               <div onClick={(e) => { e.stopPropagation(); handleAction("rename"); }} style={{ padding: "6px 12px", cursor: "pointer" }} onMouseOver={e => e.currentTarget.style.background = "#00A8FF22"} onMouseOut={e => e.currentTarget.style.background = "transparent"}>Renombrar</div>
               <div onClick={(e) => { e.stopPropagation(); handleAction("delete"); }} style={{ padding: "6px 12px", cursor: "pointer", color: "#FF5C5C" }} onMouseOver={e => e.currentTarget.style.background = "#FF5C5C22"} onMouseOut={e => e.currentTarget.style.background = "transparent"}>Eliminar</div>
             </>

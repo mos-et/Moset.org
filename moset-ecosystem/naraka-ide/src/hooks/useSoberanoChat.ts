@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { flushSync } from "react-dom";
 import { sanitizeStreamChunk } from "../utils/chatUtils";
+import { IdeConfigState, AIProviderName } from "./useIdeConfig";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MAX_RENDER_CHARS = 15000;
@@ -21,15 +22,21 @@ export interface ChatSession {
   title: string;
   messages: ChatMessage[];
   ts: number;
+  config?: {
+    aiProvider?: AIProviderName;
+    customModelId?: string;
+    maxTokens?: number;
+    contextTokens?: number;
+    openRouterKey?: string;
+  };
 }
 
 function uid(): string { return crypto.randomUUID(); }
 
-export function useSoberanoChat(ideConfig: any, projectRoot?: string | null, contextPaths?: string[]) {
+export function useSoberanoChat(ideConfig: IdeConfigState, projectRoot?: string | null, contextPaths?: string[]) {
   const {
     agentMode, includeContext, maxTokens, contextTokens, activeProvider,
-    cloudApi, customModelId, openAiKey, anthropicKey, googleKey,
-    groqKey, mistralKey, modelPath, tokenizerPath
+    customModelId, openRouterKey, modelPath, tokenizerPath
   } = ideConfig;
 
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
@@ -131,6 +138,14 @@ export function useSoberanoChat(ideConfig: any, projectRoot?: string | null, con
     const messageText = retryContent || input.trim();
     if (!messageText || loading) return;
 
+    // ── Resolve effective config: session overrides > global defaults ──
+    const sc = activeSession?.config;
+    const effActiveProvider = sc?.aiProvider || activeProvider;
+    const effCustomModelId = sc?.customModelId !== undefined ? sc.customModelId : customModelId;
+    const effMaxTokens = sc?.maxTokens !== undefined ? sc.maxTokens : maxTokens;
+    const effContextTokens = sc?.contextTokens !== undefined ? sc.contextTokens : contextTokens;
+    const effOpenRouterKey = sc?.openRouterKey !== undefined ? sc.openRouterKey : openRouterKey;
+
     const baseMessages = retryContent 
       ? messages.filter((m, i) => !(i === messages.length - 1 && m.role === "system"))
       : messages;
@@ -148,9 +163,9 @@ export function useSoberanoChat(ideConfig: any, projectRoot?: string | null, con
     if (includeContext && contextPaths && contextPaths.length > 0) {
       try {
         let raw: string = await invoke("fetch_full_context", { paths: contextPaths, query: messageText });
-        const maxContextChars = contextTokens * 4;
+        const maxContextChars = effContextTokens * 4;
         if (raw.length > maxContextChars) {
-          raw = raw.slice(0, maxContextChars) + "\n[...contexto truncado a ~" + contextTokens + " tokens]";
+          raw = raw.slice(0, maxContextChars) + "\n[...contexto truncado a ~" + effContextTokens + " tokens]";
         }
         contextContent = raw;
       } catch (e) {
@@ -159,14 +174,11 @@ export function useSoberanoChat(ideConfig: any, projectRoot?: string | null, con
     }
 
     try {
-      const aiProvider = activeProvider === "soberano" ? "local_gguf" : cloudApi;
-      const finalProvider = aiProvider === "local_gguf" ? "soberano" : aiProvider;
-      
-      const apiKeySetting = aiProvider === "openai" ? openAiKey :
-                            aiProvider === "anthropic" ? anthropicKey :
-                            aiProvider === "google" ? googleKey :
-                            aiProvider === "groq" ? groqKey :
-                            aiProvider === "mistral" ? mistralKey : "";
+      const isSoberano = effActiveProvider === "soberano";
+      const finalProvider = isSoberano ? "soberano" : "nube";
+      const backendProvider = isSoberano ? "local_gguf" : "openai"; 
+      const backendBaseUrl = isSoberano ? null : "https://openrouter.ai/api/v1";
+      const apiKeySetting = isSoberano ? "" : effOpenRouterKey;
 
       const payloadMessages = newMessages.map(m => ({
         role: m.role === "system" ? "system" : m.role === "user" ? "user" : "assistant",
@@ -191,9 +203,9 @@ export function useSoberanoChat(ideConfig: any, projectRoot?: string | null, con
 
       const charsInContext = contextContent.length + newMessages.reduce((sum, m) => sum + m.content.length, 0);
       const estimatedUsedTokens = Math.ceil(charsInContext / 4);
-      const remainingTokens = Math.max(50, maxTokens - estimatedUsedTokens);
+      const remainingTokens = Math.max(50, effMaxTokens - estimatedUsedTokens);
 
-      const dimensionalVigilance = `\nDIRECTIVA DE VIGILANCIA DIMENSIONAL:\nPRESUPUESTO DINÁMICO: Tienes un remanente calculado de ~${remainingTokens} tokens para responder (basado en un MAX_TOKENS de ${maxTokens} menos ${estimatedUsedTokens} consumidos por contexto y prompt).`;
+      const dimensionalVigilance = `\nDIRECTIVA DE VIGILANCIA DIMENSIONAL:\nPRESUPUESTO DINÁMICO: Tienes un remanente calculado de ~${remainingTokens} tokens para responder (basado en un MAX_TOKENS de ${effMaxTokens} menos ${estimatedUsedTokens} consumidos por contexto y prompt).`;
       sysPromptBase += dimensionalVigilance;
 
       if (sysPromptBase !== "") {
@@ -206,7 +218,7 @@ export function useSoberanoChat(ideConfig: any, projectRoot?: string | null, con
       }
 
       const qPensarEnabled = localStorage.getItem("moset_q_pensar") !== "false";
-      if (qPensarEnabled) {
+      if (qPensarEnabled && agentMode !== "actuar") {
         const agLogic = "\n\n[DIRECTIVA COGNITIVA ESTRICTA (ESTILO ANTIGRAVITY)]:\nAntes de generar la respuesta final dirigida al usuario, DEBES usar una etiqueta <thought>...</thought> donde realizarás todo tu análisis lógico, arquitectónico y deductivo. No muestres código final aquí ni te dirijas al usuario. Tu respuesta limpia (sin ruido) deberá escribirse inmediatamente después de cerrar la etiqueta </thought>.";
         const systemMsgIndex = payloadMessages.findIndex(m => m.role === "system");
         if (systemMsgIndex >= 0) {
@@ -214,28 +226,50 @@ export function useSoberanoChat(ideConfig: any, projectRoot?: string | null, con
         } else {
           payloadMessages.unshift({ role: "system", content: agLogic });
         }
+      } else if (agentMode === "actuar") {
+        const autonomousLogic = "\n\n[DIRECTIVA AGENTE AUTÓNOMO ESTRUCTURADO]:\nEres un motor de ejecución y agente autónomo integrado profundamente en el entorno de Naraka IDE.\n\n" +
+          "REGLAS ESTRUCTURALES OBLIGATORIAS:\n" +
+          "Para interactuar con el entorno (Mandar comandos, leer o escribir archivos), DEBES obligatoriamente usar el tag XML <system_action> que contenga un objeto JSON válido.\n" +
+          "Ejemplo estricto de uso de herramienta:\n" +
+          "<system_action>\n" +
+          "{\n" +
+          "  \"tool\": \"run_command\",\n" +
+          "  \"args\": {\n" +
+          "    \"command\": \"echo 'Autonomía Activada'\"\n" +
+          "  }\n" +
+          "}\n" +
+          "</system_action>\n\n" +
+          "HERRAMIENTAS PERMITIDAS:\n" +
+          "1. 'run_command': Ejecuta comandos locales. args: { \"command\": \"str\" }\n" +
+          "2. 'read_file': Lee contenido de un archivo. args: { \"path\": \"str\" }\n" +
+          "3. 'write_file': Sobrescribe un archivo. args: { \"path\": \"str\", \"content\": \"str\" }\n" +
+          "4. 'replace_file_content': Reemplaza substring exacto. args: { \"path\": \"str\", \"targetContent\": \"str\", \"replacementContent\": \"str\" }\n" +
+          "5. 'read_directory': Lista archivos. args: { \"path\": \"str\" }\n" +
+          "6. 'git_commit': Hace add y commit automático. args: { \"path\": \"str\", \"message\": \"str\" }\n" +
+          "7. 'list_processes': Lista procesos activos (tasklist/ps). args: {}\n\n" +
+          "El sistema IDE interceptará la etiqueta <system_action> de forma silenciosa e interactiva, ejecutará la herramienta, y se retroalimentará con un `<system_response>resultado</system_response>` en el siguiente turno automáticamente. " +
+          "Usa la etiqueta <think>...</think> antes de una orden <system_action> para organizar tu pipeline de ejecución paso por paso.";
+          const systemMsgIndex = payloadMessages.findIndex(m => m.role === "system");
+          if (systemMsgIndex >= 0) {
+            payloadMessages[systemMsgIndex].content += autonomousLogic;
+          } else {
+            payloadMessages.unshift({ role: "system", content: autonomousLogic });
+          }
       }
 
-      let backendProvider = finalProvider;
-      let backendBaseUrl = "";
-      if (finalProvider === "groq") {
-          backendProvider = "openai";
-          backendBaseUrl = "https://api.groq.com/openai/v1";
-      } else if (finalProvider === "openai") {
-          backendBaseUrl = localStorage.getItem("moset_openai_base_url") || "";
-      }
+      // backendProvider and backendBaseUrl are already set above
 
       await invoke("chat_orquestado", {
         messages: payloadMessages,
         provider: backendProvider,
-        model: customModelId,
+        model: effCustomModelId,
         apiKey: apiKeySetting || "",
         baseUrl: backendBaseUrl || null,
         agentMode: agentMode,
         includeContext: includeContext,
         contextContent: contextContent,
         projectRoot: projectRoot,
-        maxTokens: maxTokens,
+        maxTokens: effMaxTokens,
         qCollapseMethod: localStorage.getItem("moset_q_collapse") || "probabilistic",
         qAlpha: parseFloat(localStorage.getItem("moset_q_alpha") || "0.7071"),
         qEntanglement: localStorage.getItem("moset_q_entanglement") === "true",
@@ -273,6 +307,15 @@ export function useSoberanoChat(ideConfig: any, projectRoot?: string | null, con
     setActiveSessionId(newId);
   };
 
+  const updateSessionConfig = (newConfig: Partial<ChatSession['config']>) => {
+    setSessions(prev => prev.map(s => {
+      if (s.id === activeSessionId) {
+        return { ...s, config: { ...(s.config || {}), ...newConfig } };
+      }
+      return s;
+    }));
+  };
+
   return {
     sessions, setSessions,
     activeSessionId, setActiveSessionId,
@@ -280,6 +323,6 @@ export function useSoberanoChat(ideConfig: any, projectRoot?: string | null, con
     input, setInput,
     loading, streamBuffer,
     lastMetrics,
-    sendMessage, handleStop, newChat
+    sendMessage, handleStop, newChat, updateSessionConfig
   };
 }

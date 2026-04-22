@@ -1,0 +1,472 @@
+/* ─── MosetOutputPanel.css ────────────────────────────────────────────────── */
+/* Fonts: Inter & JetBrains Mono already loaded by IDE main styles */
+
+/* Overlay */
+.mop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: mop-fade-in 0.18s ease;
+}
+
+@keyframes mop-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Main panel */
+.mop-panel {
+  width: min(780px, 92vw);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  background: #0d0d14;
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 1px rgba(124, 58, 237, 0.15),
+    0 32px 80px rgba(0, 0, 0, 0.7),
+    0 0 60px rgba(124, 58, 237, 0.08);
+  animation: mop-slide-up 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+@keyframes mop-slide-up {
+  from { transform: translateY(24px) scale(0.97); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* ─── Top Bar ─────────────────────────────────────────────────────────────── */
+.mop-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(135deg, rgba(124,58,237,0.12), rgba(37,99,235,0.08));
+  flex-shrink: 0;
+}
+
+.mop-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mop-topbar-logo {
+  font-size: 22px;
+  color: #7c3aed;
+  filter: drop-shadow(0 0 8px rgba(124,58,237,0.6));
+}
+
+.mop-topbar-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mop-topbar-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: #7c3aed;
+  text-transform: uppercase;
+}
+
+.mop-topbar-file {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.7);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.mop-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mop-running-badge {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  background: rgba(124,58,237,0.15);
+  border: 1px solid rgba(124,58,237,0.3);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #a78bfa;
+  letter-spacing: 0.04em;
+}
+
+.mop-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #7c3aed;
+  animation: mop-pulse-anim 1.2s ease-in-out infinite;
+}
+
+@keyframes mop-pulse-anim {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.7); }
+}
+
+.mop-btn-copy,
+.mop-btn-close {
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.55);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mop-btn-copy:hover {
+  background: rgba(124,58,237,0.2);
+  border-color: rgba(124,58,237,0.5);
+  color: #a78bfa;
+}
+
+.mop-btn-close:hover {
+  background: rgba(239,68,68,0.15);
+  border-color: rgba(239,68,68,0.4);
+  color: #f87171;
+}
+
+/* ─── Body ────────────────────────────────────────────────────────────────── */
+.mop-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124,58,237,0.3) transparent;
+}
+
+.mop-body::-webkit-scrollbar { width: 4px; }
+.mop-body::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 4px; }
+
+/* ─── Lines ───────────────────────────────────────────────────────────────── */
+.mop-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mop-line-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: rgba(255,255,255,0.82);
+  line-height: 1.6;
+  padding: 2px 0;
+}
+
+.mop-line-error {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: #f87171;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.mop-line-error-icon {
+  color: #ef4444;
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.mop-sep {
+  height: 8px;
+}
+
+/* ─── Header ──────────────────────────────────────────────────────────────── */
+.mop-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 6px;
+}
+
+.mop-header-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(124,58,237,0.5), transparent);
+}
+
+.mop-header-text {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #7c3aed;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 0 12px rgba(124,58,237,0.5);
+}
+
+/* ─── Quantum ─────────────────────────────────────────────────────────────── */
+.mop-quantum-row {
+  background: rgba(124,58,237,0.06);
+  border: 1px solid rgba(124,58,237,0.2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mop-quantum-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.7);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.mop-quantum-icon {
+  color: #7c3aed;
+  font-size: 11px;
+}
+
+.mop-quantum-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mop-quantum-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.mop-quantum-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 0 8px currentColor;
+}
+
+.mop-quantum-pct {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 36px;
+  text-align: right;
+}
+
+.mop-quantum-prob {
+  font-size: 10px;
+  color: rgba(255,255,255,0.3);
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.03em;
+}
+
+/* ─── Molde ───────────────────────────────────────────────────────────────── */
+.mop-molde {
+  background: rgba(37,99,235,0.06);
+  border: 1px solid rgba(37,99,235,0.2);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.mop-molde-raw {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+  padding: 6px 0;
+}
+
+.mop-molde-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(37,99,235,0.1);
+  border-bottom: 1px solid rgba(37,99,235,0.15);
+}
+
+.mop-molde-icon {
+  color: #3b82f6;
+  font-size: 14px;
+}
+
+.mop-molde-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.85);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.mop-molde-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #3b82f6;
+  background: rgba(37,99,235,0.15);
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid rgba(37,99,235,0.3);
+  text-transform: uppercase;
+  margin-left: auto;
+}
+
+.mop-molde-fields {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mop-molde-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.mop-molde-field.extra {
+  opacity: 0.85;
+}
+
+.mop-field-key {
+  color: #60a5fa;
+  font-weight: 500;
+  min-width: 100px;
+}
+
+.mop-field-sep {
+  color: rgba(255,255,255,0.2);
+}
+
+.mop-field-val {
+  color: rgba(255,255,255,0.75);
+}
+
+.mop-field-extra-tag {
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #7c3aed;
+  background: rgba(124,58,237,0.12);
+  padding: 2px 7px;
+  border-radius: 20px;
+  border: 1px solid rgba(124,58,237,0.25);
+}
+
+/* ─── Error block ─────────────────────────────────────────────────────────── */
+.mop-error-block {
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.25);
+  border-radius: 10px;
+  padding: 14px 18px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.mop-error-icon {
+  font-size: 20px;
+  color: #ef4444;
+  flex-shrink: 0;
+}
+
+.mop-error-content {
+  flex: 1;
+}
+
+.mop-error-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f87171;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+.mop-error-msg {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  color: rgba(248,113,113,0.85);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+
+/* ─── Loading ─────────────────────────────────────────────────────────────── */
+.mop-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 48px 0;
+  color: rgba(255,255,255,0.4);
+  font-size: 13px;
+}
+
+.mop-spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid rgba(124,58,237,0.2);
+  border-top-color: #7c3aed;
+  border-radius: 50%;
+  animation: mop-spin 0.8s linear infinite;
+}
+
+@keyframes mop-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Empty ───────────────────────────────────────────────────────────────── */
+.mop-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 0;
+  color: rgba(255,255,255,0.2);
+  font-size: 13px;
+}
+
+.mop-empty-icon {
+  font-size: 28px;
+  color: rgba(124,58,237,0.3);
+}
+
+/* ─── Footer ──────────────────────────────────────────────────────────────── */
+.mop-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  background: rgba(255,255,255,0.02);
+  font-size: 11px;
+  color: rgba(255,255,255,0.3);
+  flex-shrink: 0;
+}
+
+.mop-footer-ok {
+  color: #10b981;
+  font-weight: 500;
+}

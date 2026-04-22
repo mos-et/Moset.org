@@ -24,14 +24,14 @@ impl MotorCloud {
         }
     }
 
-    pub fn inferir<F>(&self, system_prompt: &str, msgs: &[Mensaje], on_partial: F) -> Result<String, String>
+    pub fn inferir<F>(&self, system_prompt: &str, msgs: &[Mensaje], max_tokens: Option<u32>, on_partial: F) -> Result<String, String>
     where
         F: FnMut(String) -> bool,
     {
         match self.provider.as_str() {
-            "openai" | "mistral" => self.inferir_openai(system_prompt, msgs, on_partial),
-            "anthropic" => self.inferir_anthropic(system_prompt, msgs, on_partial),
-            "google" => self.inferir_google(system_prompt, msgs, on_partial),
+            "openai" | "mistral" => self.inferir_openai(system_prompt, msgs, max_tokens, on_partial),
+            "anthropic" => self.inferir_anthropic(system_prompt, msgs, max_tokens, on_partial),
+            "google" => self.inferir_google(system_prompt, msgs, max_tokens, on_partial),
             _ => Err(format!("Proveedor desconocido: {}", self.provider)),
         }
     }
@@ -75,7 +75,7 @@ impl MotorCloud {
         Ok(final_text)
     }
 
-    fn inferir_openai<F>(&self, system_prompt: &str, msgs: &[Mensaje], on_partial: F) -> Result<String, String>
+    fn inferir_openai<F>(&self, system_prompt: &str, msgs: &[Mensaje], max_tokens: Option<u32>, on_partial: F) -> Result<String, String>
     where
         F: FnMut(String) -> bool,
     {
@@ -120,13 +120,18 @@ impl MotorCloud {
             }
         }
 
-        let body = json!({
-            "model": actual_model,
-            "messages": all_msgs,
-            "stream": true,
-        });
+        let mut body_map = serde_json::Map::new();
+        body_map.insert("model".to_string(), json!(actual_model));
+        body_map.insert("messages".to_string(), json!(all_msgs));
+        body_map.insert("stream".to_string(), json!(true));
+        if let Some(mt) = max_tokens {
+            body_map.insert("max_tokens".to_string(), json!(mt));
+        }
+        let body = serde_json::Value::Object(body_map);
 
-        let client = reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(30)).build().unwrap_or_else(|_| reqwest::blocking::Client::new());
+        let client = reqwest::blocking::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(20))
+            .build().unwrap_or_else(|_| reqwest::blocking::Client::new());
         let mut builder = client.post(&url)
             .header("Content-Type", "application/json");
 
@@ -147,7 +152,7 @@ impl MotorCloud {
         self.read_sse(res, on_partial, false, false)
     }
 
-    fn inferir_anthropic<F>(&self, system_prompt: &str, msgs: &[Mensaje], on_partial: F) -> Result<String, String>
+    fn inferir_anthropic<F>(&self, system_prompt: &str, msgs: &[Mensaje], max_tokens: Option<u32>, on_partial: F) -> Result<String, String>
     where
         F: FnMut(String) -> bool,
     {
@@ -166,13 +171,15 @@ impl MotorCloud {
 
         let body = json!({
             "model": self.model,
-            "max_tokens": 4096,
+            "max_tokens": max_tokens.unwrap_or(4096),
             "system": merged_system,
             "messages": clean_msgs,
             "stream": true,
         });
 
-        let client = reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(30)).build().unwrap_or_else(|_| reqwest::blocking::Client::new());
+        let client = reqwest::blocking::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(20))
+            .build().unwrap_or_else(|_| reqwest::blocking::Client::new());
         let builder = client.post(url)
             .header("Content-Type", "application/json")
             .header("x-api-key", &self.api_key)
@@ -191,7 +198,7 @@ impl MotorCloud {
         self.read_sse(res, on_partial, false, true)
     }
 
-    fn inferir_google<F>(&self, system_prompt: &str, msgs: &[Mensaje], on_partial: F) -> Result<String, String>
+    fn inferir_google<F>(&self, system_prompt: &str, msgs: &[Mensaje], max_tokens: Option<u32>, on_partial: F) -> Result<String, String>
     where
         F: FnMut(String) -> bool,
     {
@@ -215,14 +222,18 @@ impl MotorCloud {
             }
         }
 
-        let body = json!({
-            "systemInstruction": {
-                "parts": [{"text": merged_system}]
-            },
-            "contents": contents,
-        });
+        let mut body_map = serde_json::Map::new();
+        body_map.insert("systemInstruction".to_string(), json!({"parts": [{"text": merged_system}]}));
+        body_map.insert("contents".to_string(), json!(contents));
+        
+        if let Some(mt) = max_tokens {
+            body_map.insert("generationConfig".to_string(), json!({ "maxOutputTokens": mt }));
+        }
+        let body = serde_json::Value::Object(body_map);
 
-        let client = reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(30)).build().unwrap_or_else(|_| reqwest::blocking::Client::new());
+        let client = reqwest::blocking::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(20))
+            .build().unwrap_or_else(|_| reqwest::blocking::Client::new());
         let res = client.post(&url)
             .header("Content-Type", "application/json")
             .json(&body)

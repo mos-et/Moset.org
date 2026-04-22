@@ -31,11 +31,13 @@ pub enum Veredicto {
 /// El Vigilante: middleware de seguridad para comandos shell
 pub struct Vigilante {
     /// Comandos que NUNCA se ejecutan, sin importar la confianza
-    prohibidos: Vec<&'static str>,
+    prohibidos: Vec<String>,
     /// Comandos destructivos que requieren confianza ≥ 0.95
-    peligrosos: Vec<&'static str>,
+    peligrosos: Vec<String>,
     /// Comandos de red/escritura que requieren confianza ≥ 0.75
-    cautelosos: Vec<&'static str>,
+    cautelosos: Vec<String>,
+    /// Rutas del sistema de archivos donde el Soberano tiene acceso
+    sandbox_paths: Vec<String>,
 }
 
 impl Vigilante {
@@ -43,54 +45,78 @@ impl Vigilante {
     pub fn nuevo() -> Self {
         Vigilante {
             prohibidos: vec![
-                "rm -rf /",
-                "rm -rf /*",
-                "dd if=/dev/zero",
-                "dd if=/dev/random",
-                "mkfs",
-                ":(){:|:&};:",        // fork bomb
-                "format c:",
-                "format C:",
-                "del /f /s /q C:",
-                "rd /s /q C:",
+                "rm -rf /".into(),
+                "rm -rf /*".into(),
+                "dd if=/dev/zero".into(),
+                "dd if=/dev/random".into(),
+                "mkfs".into(),
+                ":(){:|:&};:".into(),        // fork bomb
+                "format c:".into(),
+                "format C:".into(),
+                "del /f /s /q C:".into(),
+                "rd /s /q C:".into(),
             ],
             peligrosos: vec![
-                "rm",
-                "del",
-                "rmdir",
-                "rd",
-                "format",
-                "shutdown",
-                "reboot",
-                "halt",
-                "poweroff",
-                "kill",
-                "taskkill",
-                "chmod",
-                "chown",
-                "iptables",
-                "netsh",
-                "reg",           // Windows registry
-                "regedit",
+                "rm".into(), "del".into(), "rmdir".into(), "rd".into(),
+                "format".into(), "shutdown".into(), "reboot".into(), "halt".into(),
+                "poweroff".into(), "kill".into(), "taskkill".into(),
+                "chmod".into(), "chown".into(), "iptables".into(),
+                "netsh".into(), "reg".into(), "regedit".into(),
             ],
             cautelosos: vec![
-                "curl",
-                "wget",
-                "netstat",
-                "nmap",
-                "ssh",
-                "scp",
-                "ftp",
-                "nc",            // netcat
-                "python",
-                "node",
-                "cargo",
-                "npm",
-                "pip",
-                "powershell",
-                "bash",
+                "curl".into(), "wget".into(), "netstat".into(), "nmap".into(),
+                "ssh".into(), "scp".into(), "ftp".into(), "nc".into(),
+                "python".into(), "node".into(), "cargo".into(), "npm".into(),
+                "pip".into(), "powershell".into(), "bash".into(),
+            ],
+            sandbox_paths: vec![
+                "s:/naraka studio".into(),
+                "s:/data strix".into(),
             ],
         }
+    }
+
+    /// Crear un Vigilante desde configuración dinámica (para persistencia en el IDE).
+    /// Los campos son listas separadas por comas. Las sandbox_paths se suman a los defaults.
+    pub fn nuevo_con_config(
+        prohibidos_extra: &str,
+        peligrosos_extra: &str,
+        cautelosos_extra: &str,
+        sandbox_paths_raw: &str,
+    ) -> Self {
+        let mut base = Self::nuevo();
+
+        // Agregar prohibidos extra
+        for s in prohibidos_extra.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+            let sl = s.to_lowercase();
+            if !base.prohibidos.iter().any(|p| p == &sl) {
+                base.prohibidos.push(sl);
+            }
+        }
+        // Agregar peligrosos extra
+        for s in peligrosos_extra.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+            let sl = s.to_lowercase();
+            if !base.peligrosos.iter().any(|p| p == &sl) {
+                base.peligrosos.push(sl);
+            }
+        }
+        // Agregar cautelosos extra
+        for s in cautelosos_extra.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+            let sl = s.to_lowercase();
+            if !base.cautelosos.iter().any(|p| p == &sl) {
+                base.cautelosos.push(sl);
+            }
+        }
+        // Reemplazar sandbox paths si el usuario configuró los suyos
+        let sandbox_trim: Vec<String> = sandbox_paths_raw
+            .split(',')
+            .map(|s| s.trim().replace('\\', "/").to_lowercase())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if !sandbox_trim.is_empty() {
+            base.sandbox_paths = sandbox_trim;
+        }
+        base
     }
 
     /// Auditar un comando y emitir un veredicto
@@ -118,8 +144,9 @@ impl Vigilante {
             .unwrap_or("");
 
         for peligroso in &self.peligrosos {
-            if primer_word == peligroso.to_lowercase()
-                || cmd_trimmed.starts_with(&format!("{} ", peligroso.to_lowercase()))
+            let pel_lower = peligroso.to_lowercase();
+            if primer_word == pel_lower
+                || cmd_trimmed.starts_with(&format!("{} ", pel_lower))
             {
                 return Veredicto::RequiereConfianza {
                     nivel_minimo: 0.95,
@@ -130,8 +157,9 @@ impl Vigilante {
 
         // 🟡 Verificar comandos cautelosos
         for cauteloso in &self.cautelosos {
-            if primer_word == cauteloso.to_lowercase()
-                || cmd_trimmed.starts_with(&format!("{} ", cauteloso.to_lowercase()))
+            let cau_lower = cauteloso.to_lowercase();
+            if primer_word == cau_lower
+                || cmd_trimmed.starts_with(&format!("{} ", cau_lower))
             {
                 return Veredicto::RequiereConfianza {
                     nivel_minimo: 0.75,
@@ -174,10 +202,10 @@ impl Vigilante {
     }
 
     /// Verificar si una ruta es segura para modificación por parte del Soberano (IA).
-    /// Previene Path Traversal y asegura que solo se toque S:\Naraka Studio o temporales.
+    /// Usa sandbox_paths dinámico — configurable desde los ajustes del IDE.
     pub fn autorizar_ruta(&self, ruta: &str) -> Result<(), String> {
-        let ruta_normal = ruta.replace("\\", "/");
-        
+        let ruta_normal = ruta.replace('\\', "/");
+
         // ⛔ Bloquear intentos de Directory Traversal
         // W-004 Fix: Cubrir backslash Windows y URL encoding
         let ruta_decoded = ruta_normal
@@ -187,24 +215,30 @@ impl Vigilante {
             .replace("%2F", "/")
             .replace("%5c", "\\")
             .replace("%5C", "\\");
-        if ruta_decoded.contains("../") || ruta_decoded.contains("..\\") {
+        if ruta_decoded.contains("../") || ruta_decoded.contains("..\\")
+        {
             return Err("🛑 Vigilante: PATH TRAVERSAL DETECTADO (Uso de '../'). Acceso denegado.".into());
         }
 
         let ruta_lower = ruta_normal.to_lowercase();
-        
-        // 🟢 Permitimos S:\Naraka Studio, S:\Data Strix, temporales, o relativas puras
-        if ruta_lower.starts_with("s:/naraka studio") 
-           || ruta_lower.starts_with("s:/data strix")
-           || ruta_lower.contains("/temp/") 
-           || ruta_lower.contains("/tmp/") 
-           || (!ruta_lower.starts_with("/") && !ruta_lower.contains(":/")) 
+
+        // 🟢 Temporales y rutas relativas siempre permitidos
+        if ruta_lower.contains("/temp/")
+            || ruta_lower.contains("/tmp/")
+            || (!ruta_lower.starts_with('/') && !ruta_lower.contains(":/"))
         {
+            return Ok(());
+        }
+
+        // 🟢 Verificar contra sandbox_paths configurado
+        let en_sandbox = self.sandbox_paths.iter().any(|sp| ruta_lower.starts_with(sp.as_str()));
+        if en_sandbox {
             Ok(())
         } else {
+            let sandboxes = self.sandbox_paths.join(", ");
             Err(format!(
-                "🛑 Vigilante: RUTA FUERA DEL SANDBOX ({}).\nNaraka solo tiene jurisdicción para modificar archivos dentro de S:\\Naraka Studio, S:\\Data Strix o directorios temporales.", 
-                ruta
+                "🛑 Vigilante: RUTA FUERA DEL SANDBOX ({}).\nNaraka solo tiene jurisdicción sobre: {}.",
+                ruta, sandboxes
             ))
         }
     }

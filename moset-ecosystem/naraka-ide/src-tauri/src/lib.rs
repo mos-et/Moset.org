@@ -44,14 +44,48 @@ async fn ejecutar(_app: tauri::AppHandle, codigo: String, idioma: Option<String>
 
     match maquina.ejecutar() {
         Ok(res) => {
-            let guard = output.lock().unwrap();
-            if guard.is_empty() {
-                Ok(res.to_string())
-            } else {
-                Ok(guard.clone())
-            }
+            let raw = {
+                let guard = output.lock().unwrap();
+                if guard.is_empty() {
+                    res.to_string()
+                } else {
+                    guard.clone()
+                }
+            };
+
+            // Convertir cada línea a un objeto tipado para el frontend
+            let lines: Vec<serde_json::Value> = raw
+                .lines()
+                .map(|line| {
+                    let kind = classify_output_line(line);
+                    serde_json::json!({
+                        "type": kind,
+                        "content": line
+                    })
+                })
+                .collect();
+
+            let payload = serde_json::json!({ "lines": lines });
+            Ok(payload.to_string())
         },
         Err(e) => Err(format!("Error de ejecución: {}", e)),
+    }
+}
+
+/// Clasifica una línea de salida para que el frontend sepa cómo renderizarla.
+fn classify_output_line(line: &str) -> &'static str {
+    if line.contains("Bit:") && (line.contains('\u{2588}') || line.contains('\u{2591}')) {
+        "quantum"
+    } else if line.contains(" { ") && line.contains(':') {
+        "molde"
+    } else if line.starts_with("===") && line.ends_with("===") {
+        "header"
+    } else if line.starts_with("Error:") || line.starts_with("error:") {
+        "error"
+    } else if line.trim().is_empty() {
+        "separator"
+    } else {
+        "text"
     }
 }
 
@@ -109,10 +143,14 @@ struct SearchResult {
 
 #[tauri::command]
 fn search_workspace(path: String, query: String) -> Result<Vec<SearchResult>, String> {
+    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+    vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado: {}", e))?;
+
     let mut results = Vec::new();
     let q = query.to_lowercase();
-    
+
     fn search_dir(dir: std::path::PathBuf, q: &str, results: &mut Vec<SearchResult>) {
+        if results.len() >= 500 { return; }
         if let Ok(entries) = std::fs::read_dir(dir) {
             for entry in entries.flatten() {
                 let p = entry.path();
@@ -145,6 +183,8 @@ fn search_workspace(path: String, query: String) -> Result<Vec<SearchResult>, St
 
 #[tauri::command]
 fn read_directory(path: String, max_depth: Option<u32>) -> Result<Vec<FsTreeNode>, String> {
+    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+    vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado: {}", e))?;
     let root = std::path::Path::new(&path);
     if !root.is_dir() {
         return Err(format!("No es un directorio: {}", path));
@@ -200,6 +240,8 @@ fn walk_dir(base: &std::path::Path, dir: &std::path::Path, depth: u32) -> Vec<Fs
 
 #[tauri::command]
 fn read_file_content(path: String) -> Result<String, String> {
+    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+    vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado: {}", e))?;
     std::fs::read_to_string(&path)
         .map_err(|e| format!("Error leyendo {}: {}", path, e))
 }
@@ -296,31 +338,31 @@ fn extract_moset_skeleton(content: &str) -> String {
 #[tauri::command]
 fn fetch_full_context(paths: Vec<String>, query: Option<String>) -> Result<String, String> {
     const MAX_CHARS: usize = 10000;
-    
+
     let valid_extensions = ["et", "rs", "ts", "tsx", "js", "jsx", "md", "json", "toml", "css", "py", "html", "sh"];
     let ignore_dirs = ["node_modules", ".git", "target", "dist", "build"];
-    
+
     let mut all_chunks: Vec<ContextChunk> = Vec::new();
-    
-    // Función auxiliar para extraer palabras de un texto
+
     fn extract_words(text: &str) -> Vec<String> {
         text.split(|c: char| !c.is_alphanumeric())
             .filter(|s| s.len() > 2)
             .map(|s| s.to_lowercase())
             .collect()
     }
-    
+
     let query_words = query.as_ref().map(|q| extract_words(q)).unwrap_or_default();
 
     fn process_path(
-        path: &std::path::Path, 
+        path: &std::path::Path,
         base_path: &std::path::Path,
-        chunks: &mut Vec<ContextChunk>, 
+        chunks: &mut Vec<ContextChunk>,
         query_words: &[String],
         valid_extensions: &[&str],
-        ignore_dirs: &[&str]
+        ignore_dirs: &[&str],
+        vigilante: &moset_core::vigilante::Vigilante,
     ) {
-        let path_str = path.to_string_lossy().replace("\\", "/");
+        let path_str = path.to_string_lossy().replace('\\', "/");
         if ignore_dirs.iter().any(|d| path_str.contains(&format!("/{}", d)) || path_str.ends_with(d)) {
             return;
         }
@@ -328,18 +370,19 @@ fn fetch_full_context(paths: Vec<String>, query: Option<String>) -> Result<Strin
         if path.is_file() {
             if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
                 if valid_extensions.contains(&ext.to_lowercase().as_str()) {
+                    // 🛡️ Vigilante: verificar sandbox antes de leer el archivo
+                    if vigilante.autorizar_ruta(&path_str).is_err() {
+                        return;
+                    }
                     if let Ok(mut content) = std::fs::read_to_string(path) {
                         let rel_path = path.strip_prefix(base_path).unwrap_or(path).to_string_lossy().to_string();
-                        
+
                         let ext_str = ext.to_lowercase();
                         if ext_str == "et" {
                             content = extract_moset_skeleton(&content);
                         }
-                        
-                        // Dividir el archivo en trozos (por ejemplo, bloques separados por dobles saltos de línea o simplemente bloques fijos)
-                        // Para simplificar: tomaremos todo el archivo como un chunk, pero si es muy grande, le damos su propio score
+
                         let score = if query_words.is_empty() {
-                            // Sin query explícita, los archivos más pequeños (o en orden) tienen más o igual prioridad
                             1.0
                         } else {
                             let content_words = extract_words(&content);
@@ -349,7 +392,6 @@ fn fetch_full_context(paths: Vec<String>, query: Option<String>) -> Result<Strin
                                     match_count += 1;
                                 }
                             }
-                            // Score básico: cantidad de matches, normalizado o potenciado por densidad
                             match_count as f32
                         };
 
@@ -364,16 +406,17 @@ fn fetch_full_context(paths: Vec<String>, query: Option<String>) -> Result<Strin
         } else if path.is_dir() {
             if let Ok(entries) = std::fs::read_dir(path) {
                 for entry in entries.filter_map(Result::ok) {
-                    process_path(&entry.path(), base_path, chunks, query_words, valid_extensions, ignore_dirs);
+                    process_path(&entry.path(), base_path, chunks, query_words, valid_extensions, ignore_dirs, vigilante);
                 }
             }
         }
     }
 
+    let vigilante = moset_core::vigilante::Vigilante::nuevo();
     for p in paths {
         let path = std::path::Path::new(&p);
         let base_path = if path.is_file() { path.parent().unwrap_or(path) } else { path };
-        process_path(path, base_path, &mut all_chunks, &query_words, &valid_extensions, &ignore_dirs);
+        process_path(path, base_path, &mut all_chunks, &query_words, &valid_extensions, &ignore_dirs, &vigilante);
     }
     
     // Sort chunks by score (descending)
@@ -428,7 +471,7 @@ async fn execute_agent_tool(call: moset_core::agent::ToolCall) -> Result<String,
             let path = call.args.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
             read_file_content(path)
         },
-        "write_to_file" => {
+        "write_to_file" | "write_file" => {
             let path = call.args.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
             let content = call.args.get("content").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
@@ -498,6 +541,47 @@ async fn execute_agent_tool(call: moset_core::agent::ToolCall) -> Result<String,
                 Err(e) => Err(format!("Error ejecutando comando: {}", e))
             }
         },
+        "git_commit" => {
+            let message = call.args.get("message").and_then(|v| v.as_str()).unwrap_or("Auto-commit por Agente Autónomo").to_string();
+            let path = call.args.get("path").and_then(|v| v.as_str()).unwrap_or("./").to_string();
+            
+            vigilante.autorizar("git commit", None)
+                .map_err(|e| format!("Agente bloqueado por el Vigilante:\n{}", e))?;
+
+            std::process::Command::new("git").args(["add", "."]).current_dir(&path).output().ok();
+            
+            let output = std::process::Command::new("git")
+                .args(["commit", "-m", &message])
+                .current_dir(&path)
+                .output();
+                
+            match output {
+                Ok(out) => {
+                    let res = format!("{}\n{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+                    Ok(res.trim().to_string())
+                },
+                Err(e) => Err(format!("Error ejecutando git commit: {}", e))
+            }
+        },
+        "list_processes" => {
+            #[cfg(target_os = "windows")]
+            let output = std::process::Command::new("tasklist").output();
+            
+            #[cfg(not(target_os = "windows"))]
+            let output = std::process::Command::new("ps").arg("aux").output();
+            
+            match output {
+                Ok(out) => {
+                    let mut res = String::from_utf8_lossy(&out.stdout).to_string();
+                    if res.len() > 2000 {
+                        res.truncate(2000);
+                        res.push_str("\n...[truncado]");
+                    }
+                    Ok(res)
+                },
+                Err(e) => Err(format!("Error listando procesos: {}", e))
+            }
+        },
         _ => Err(format!("Herramienta desconocida: {}", call.tool))
     }
 }
@@ -539,49 +623,6 @@ fn descargar_modelo(state: tauri::State<'_, AiState>) -> Result<String, String> 
     let mut motor = state.motor.lock().map_err(|_| "Deadlock al bloquear Motor Soberano")?;
     motor.descargar();
     Ok("Modelo descargado. RAM/VRAM liberada.".to_string())
-}
-
-#[tauri::command]
-async fn chat_soberano(
-    state: tauri::State<'_, AiState>,
-    window: tauri::Window,
-    prompt: String,
-    max_tokens: Option<u32>,
-) -> Result<String, String> {
-    let motor_clone = Arc::clone(&state.motor);
-    let cancel_flag = Arc::clone(&state.cancel_flag);
-    let tokens_limit = max_tokens.unwrap_or(2048) as usize;
-    
-    // Reset flag antes de empezar
-    cancel_flag.store(false, std::sync::atomic::Ordering::Relaxed);
-    
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut motor = motor_clone.lock().map_err(|_| "Deadlock al bloquear Motor Soberano")?;
-        let res = motor.inferir(&prompt, tokens_limit, |partial| {
-            // Emite cada token a la UI a traves del channel
-            window.emit("soberano-stream", partial).ok();
-            
-            // Retorna false si se debe cancelar
-            !cancel_flag.load(std::sync::atomic::Ordering::Relaxed)
-        }).map_err(|e| format!("Error en Motor Soberano: {}", e))?;
-
-        let (text, prompt_len, gen_len) = res;
-        
-        #[derive(serde::Serialize, Clone)]
-        struct SoberanoMetrics {
-            prompt_eval_count: usize,
-            eval_count: usize,
-        }
-        
-        window.emit("soberano-metrics", SoberanoMetrics {
-            prompt_eval_count: prompt_len,
-            eval_count: gen_len,
-        }).ok();
-
-        Ok(text)
-    })
-    .await
-    .map_err(|e| format!("Error en el hilo asíncrono: {}", e))?
 }
 
 #[tauri::command]
@@ -655,9 +696,10 @@ async fn chat_orquestado(
             Ok(res.0)
         }).await.map_err(|e| format!("Error en el hilo asíncrono: {}", e))?
     } else {
+        let max_tokens_opt = max_tokens;
         tauri::async_runtime::spawn_blocking(move || {
             let motor_cloud = moset_core::cloud_ai::MotorCloud::nuevo(&provider, &model, &api_key, base_url.as_deref());
-            let res = motor_cloud.inferir(&sys_prompt, &messages, |partial| {
+            let res = motor_cloud.inferir(&sys_prompt, &messages, max_tokens_opt, |partial| {
                 window.emit("soberano-stream", partial).ok();
                 !cancel_flag.load(std::sync::atomic::Ordering::Relaxed)
             }).map_err(|e| format!("Error en Motor Cloud: {}", e))?;
@@ -676,14 +718,16 @@ async fn autocomplete_soberano(
     let motor_clone = Arc::clone(&state.motor);
     // Formato FIM genérico (funciona con Qwen Coder o Llama FIM)
     let prompt = format!("<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>");
-    
+
     tauri::async_runtime::spawn_blocking(move || {
-        let mut motor = motor_clone.lock().map_err(|_| "Deadlock al bloquear MotorNaraka")?;
+        // try_lock en lugar de lock para evitar bloquear el runtime si el motor está ocupado
+        let mut motor = motor_clone.try_lock()
+            .map_err(|_| "Motor ocupado generando respuesta anterior. Intenta en un momento.".to_string())?;
         let mut completion_result = String::new();
-        
+
         let res = motor.inferir(&prompt, 32, |partial| {
             completion_result.push_str(&partial);
-            true // Continuar, no cancelable por ahora para ser rápido
+            true
         });
 
         match res {
@@ -699,6 +743,57 @@ mod tauri_bridge;
 use std::sync::{Arc, Mutex};
 use tauri_bridge::PtyState;
 use tauri::{Manager, Emitter};
+
+// ─── Vigilante Config Global ───────────────────────────────────────────────────
+// Permite que la configuración de la UI llegue al backend Rust en runtime.
+
+struct VigilanteConfig {
+    prohibidos: String,
+    peligrosos: String,
+    cautelosos: String,
+    sandbox_paths: String,
+}
+
+impl Default for VigilanteConfig {
+    fn default() -> Self {
+        VigilanteConfig {
+            prohibidos: String::new(),
+            peligrosos: String::new(),
+            cautelosos: String::new(),
+            sandbox_paths: String::new(),
+        }
+    }
+}
+
+/// Helper: construye un Vigilante usando la config guardada en el estado global.
+fn make_vigilante(vig_cfg: &tauri::State<'_, Mutex<VigilanteConfig>>) -> moset_core::vigilante::Vigilante {
+    if let Ok(cfg) = vig_cfg.lock() {
+        moset_core::vigilante::Vigilante::nuevo_con_config(
+            &cfg.prohibidos,
+            &cfg.peligrosos,
+            &cfg.cautelosos,
+            &cfg.sandbox_paths,
+        )
+    } else {
+        moset_core::vigilante::Vigilante::nuevo()
+    }
+}
+
+#[tauri::command]
+fn configurar_vigilante(
+    state: tauri::State<'_, Mutex<VigilanteConfig>>,
+    prohibidos: String,
+    peligrosos: String,
+    cautelosos: String,
+    sandbox_paths: String,
+) {
+    if let Ok(mut cfg) = state.lock() {
+        cfg.prohibidos = prohibidos;
+        cfg.peligrosos = peligrosos;
+        cfg.cautelosos = cautelosos;
+        cfg.sandbox_paths = sandbox_paths;
+    }
+}
 
 // ─── Extension Manager ────────────────────────────────────────────────────────
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
@@ -831,23 +926,21 @@ async fn git_auto_sync(workspace_path: String, github_api_key: Option<String>) -
         .output()
         .map_err(|e| e.to_string())?;
 
-    // Optionally set credentials if key is provided
+    let mut push_cmd = std::process::Command::new("git");
+    push_cmd.current_dir(&workspace_path);
+
     if let Some(token) = github_api_key {
         if !token.is_empty() {
-             std::process::Command::new("git")
-                .args(["config", "credential.helper", "!f() { echo password=$1; }; f"])
-                .env("1", &token)
-                .current_dir(&workspace_path)
-                .output()
-                .ok();
+             push_cmd.args([
+                 "-c", "credential.helper=", 
+                 "-c", "credential.helper=!f() { echo password=$MOSET_GIT_TOKEN; }; f"
+             ]);
+             push_cmd.env("MOSET_GIT_TOKEN", token);
         }
     }
+    push_cmd.arg("push");
 
-    let push_output = std::process::Command::new("git")
-        .args(["push"])
-        .current_dir(&workspace_path)
-        .output()
-        .map_err(|e| e.to_string())?;
+    let push_output = push_cmd.output().map_err(|e| e.to_string())?;
 
     if !push_output.status.success() {
         return Err(String::from_utf8_lossy(&push_output.stderr).to_string());
@@ -875,6 +968,7 @@ pub fn run() {
                 cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
                 clean_cuda_on_exit: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             });
+            app.manage(Mutex::new(VigilanteConfig::default()));
 
             let config_path = app.path().app_data_dir().expect("Failed to get app_data_dir").join("extensions.json");
             
@@ -944,7 +1038,6 @@ pub fn run() {
             ejecutar,
             validate_code,
             cargar_modelo,
-            chat_soberano,
             chat_orquestado,
             autocomplete_soberano,
             cancel_inference,
@@ -969,6 +1062,7 @@ pub fn run() {
             search_workspace,
             git_status,
             git_auto_sync,
+            configurar_vigilante,
         ])
         .run(tauri::generate_context!())
         .expect("Error iniciando Moset IDE");

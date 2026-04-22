@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 
 export type AgentMode = "planear" | "actuar";
 export type ContextMode = "none" | "selected" | "project";
-export type AIProviderName = "soberano" | "cloud" | "ollama" | "lmstudio" | "anthropic";
+export type AIProviderName = "soberano" | "nube";
 
 export interface IdeConfigState {
   agentMode: AgentMode;
@@ -20,73 +20,54 @@ export interface IdeConfigState {
   contextTokens: number;
   setContextTokens: (tokens: number) => void;
   
+  turboMode: boolean;
+  setTurboMode: (t: boolean) => void;
+  
   activeProvider: AIProviderName;
   setActiveProvider: (provider: AIProviderName) => void;
-  
-  cloudApi: string;
-  setCloudApi: (api: string) => void;
   
   customModelId: string;
   setCustomModelId: (id: string) => void;
   
-  openAiKey: string;
-  setOpenAiKey: (key: string) => void;
-  
-  anthropicKey: string;
-  setAnthropicKey: (key: string) => void;
-  
-  googleKey: string;
-  setGoogleKey: (key: string) => void;
+  openRouterKey: string;
+  setOpenRouterKey: (key: string) => void;
   
   modelPath: string;
   setModelPath: (path: string) => void;
   
   tokenizerPath: string;
   setTokenizerPath: (path: string) => void;
-  
-  groqKey: string;
-  setGroqKey: (key: string) => void;
-  
-  mistralKey: string;
-  setMistralKey: (key: string) => void;
 }
 
 export function useIdeConfig(): IdeConfigState {
-  const [agentMode, setAgentMode] = useState<AgentMode>("planear");
+  const [agentMode, setAgentMode] = useState<AgentMode>(
+    () => (localStorage.getItem("moset_agent_mode") as AgentMode) || "planear"
+  );
   const [includeContext, setIncludeContext] = useState(
     () => localStorage.getItem("moset_include_context") === "true"
   );
   const [contextMode, setContextMode] = useState<ContextMode>(
     () => (localStorage.getItem("moset_context_mode") as ContextMode) || "selected"
   );
-  const [maxTokens, setMaxTokens] = useState(2048);
-  const [contextTokens, setContextTokens] = useState(4096);
+  const [maxTokens, setMaxTokens] = useState(() => 
+    parseInt(localStorage.getItem("moset_max_tokens") || "2048", 10)
+  );
+  const [contextTokens, setContextTokens] = useState(() => 
+    parseInt(localStorage.getItem("moset_context_tokens") || "4096", 10)
+  );
+  const [turboMode, setTurboMode] = useState(
+    () => localStorage.getItem("moset_turbo_mode") === "true"
+  );
   
   const [activeProvider, setActiveProvider] = useState<AIProviderName>(
     () => (localStorage.getItem("moset_ai_provider") as AIProviderName) || "soberano"
   );
-  const [cloudApi, setCloudApi] = useState(
-    () => localStorage.getItem("moset_cloud_provider") || "openai"
-  );
   const [customModelId, setCustomModelId] = useState(
-    () => localStorage.getItem("moset_custom_model_id") || ""
+    () => localStorage.getItem("moset_custom_model_id") || "anthropic/claude-3.5-sonnet"
   );
-  const [openAiKey, setOpenAiKey] = useState(
-    () => localStorage.getItem("moset_openai_api_key") || ""
+  const [openRouterKey, setOpenRouterKey] = useState(
+    () => localStorage.getItem("moset_openrouter_api_key") || ""
   );
-  const [anthropicKey, setAnthropicKey] = useState(
-    () => localStorage.getItem("moset_anthropic_api_key") || ""
-  );
-  const [googleKey, setGoogleKey] = useState(
-    () => localStorage.getItem("moset_google_api_key") || ""
-  );
-  const [groqKey, setGroqKey] = useState(
-    () => localStorage.getItem("moset_groq_api_key") || ""
-  );
-  const [mistralKey, setMistralKey] = useState(
-    () => localStorage.getItem("moset_mistral_api_key") || ""
-  );
-  
   const [modelPath, setModelPath] = useState(
     () => localStorage.getItem("moset_model_path") || ""
   );
@@ -94,39 +75,60 @@ export function useIdeConfig(): IdeConfigState {
     () => localStorage.getItem("moset_tokenizer_path") || ""
   );
 
+  // Sync states globally when another instance changes localStorage
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      setAgentMode((localStorage.getItem("moset_agent_mode") as AgentMode) || "planear");
+      setIncludeContext(localStorage.getItem("moset_include_context") === "true");
+      setContextMode((localStorage.getItem("moset_context_mode") as ContextMode) || "selected");
+      setMaxTokens(parseInt(localStorage.getItem("moset_max_tokens") || "2048", 10));
+      setContextTokens(parseInt(localStorage.getItem("moset_context_tokens") || "4096", 10));
+      setTurboMode(localStorage.getItem("moset_turbo_mode") === "true");
+      setActiveProvider((localStorage.getItem("moset_ai_provider") as AIProviderName) || "soberano");
+      setCustomModelId(localStorage.getItem("moset_custom_model_id") || "anthropic/claude-3.5-sonnet");
+      setOpenRouterKey(localStorage.getItem("moset_openrouter_api_key") || "");
+      setModelPath(localStorage.getItem("moset_model_path") || "");
+      setTokenizerPath(localStorage.getItem("moset_tokenizer_path") || "");
+    };
+
+    window.addEventListener("storage", handleSettingsUpdate);
+    window.addEventListener("moset-settings-updated", handleSettingsUpdate);
+
+    return () => {
+      window.removeEventListener("storage", handleSettingsUpdate);
+      window.removeEventListener("moset-settings-updated", handleSettingsUpdate);
+    };
+  }, []);
+
+
   // Sincronizar con LocalStorage
   useEffect(() => {
+    localStorage.setItem("moset_agent_mode", agentMode);
     localStorage.setItem("moset_include_context", String(includeContext));
     localStorage.setItem("moset_context_mode", contextMode);
+    localStorage.setItem("moset_turbo_mode", String(turboMode));
     localStorage.setItem("moset_ai_provider", activeProvider);
-    localStorage.setItem("moset_cloud_provider", cloudApi);
     localStorage.setItem("moset_custom_model_id", customModelId);
-    localStorage.setItem("moset_openai_api_key", openAiKey);
-    localStorage.setItem("moset_anthropic_api_key", anthropicKey);
-    localStorage.setItem("moset_google_api_key", googleKey);
-    localStorage.setItem("moset_groq_api_key", groqKey);
-    localStorage.setItem("moset_mistral_api_key", mistralKey);
+    localStorage.setItem("moset_max_tokens", String(maxTokens));
+    localStorage.setItem("moset_context_tokens", String(contextTokens));
+    localStorage.setItem("moset_openrouter_api_key", openRouterKey);
     localStorage.setItem("moset_model_path", modelPath);
     localStorage.setItem("moset_tokenizer_path", tokenizerPath);
   }, [
-    includeContext, contextMode, activeProvider, cloudApi, customModelId, 
-    openAiKey, anthropicKey, googleKey, groqKey, mistralKey, modelPath, tokenizerPath
+    agentMode, includeContext, contextMode, turboMode, activeProvider, customModelId,
+    maxTokens, contextTokens, openRouterKey, modelPath, tokenizerPath
   ]);
 
   return {
     agentMode, setAgentMode,
     includeContext, setIncludeContext,
     contextMode, setContextMode,
+    turboMode, setTurboMode,
     maxTokens, setMaxTokens,
     contextTokens, setContextTokens,
     activeProvider, setActiveProvider,
-    cloudApi, setCloudApi,
     customModelId, setCustomModelId,
-    openAiKey, setOpenAiKey,
-    anthropicKey, setAnthropicKey,
-    googleKey, setGoogleKey,
-    groqKey, setGroqKey,
-    mistralKey, setMistralKey,
+    openRouterKey, setOpenRouterKey,
     modelPath, setModelPath,
     tokenizerPath, setTokenizerPath,
   };

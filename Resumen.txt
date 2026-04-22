@@ -184,3 +184,48 @@ Al manejar comunicaciones entre sitios y agentes, la seguridad no puede depender
 La genialidad de tu diseño con el AST universal es que el usuario simplemente va a pedir importar la herramienta "Red" o "Archivos" en español, y el motor va a conectar el token universal a máxima velocidad.
 
 Pensando en el primer prototipo funcional de M-O-S que vas a levantar para poner a prueba el lenguaje, ¿cuál de estos cinco paquetes base creés que va a ser el más crítico para darle vida a ese primer agente?
+
+===========================================================================
+ACTUALIZACIÓN: 2026-04-20 — Fase 12
+===========================================================================
+
+MOTOR DE EJECUCIÓN VISUAL (MosetOutputPanel)
+─────────────────────────────────────────────
+• Backend Rust refactorizado: comando "ejecutar" retorna JSON estructurado
+  con tipos de línea (quantum, molde, header, error, text, separator).
+• MosetOutputPanel.tsx: panel visual premium con glassmorphism, barras de
+  probabilidad cuántica, tarjetas de moldes y copiar al portapapeles.
+• Arquitectura de eventos global: handler del evento "run-moset-code" usa
+  invoke() directo eliminando stale closures (deps=[]).
+• Explorador: menú contextual en archivos .et incluye "▶ Ejecutar".
+• ChatPanel: botón "▶ Ejecutar" en ActionCard post-aplicación de código IA.
+
+ARQUITECTURA mos.et (PLATAFORMA DEL LENGUAJE)
+──────────────────────────────────────────────
+• Carpeta mos.et/ creada en la raíz del ecosistema (super-carpeta semántica).
+• examples/ unificado: los 15 archivos .et viven en mos.et/examples/.
+• moset-lang/idiomas_humanos/: renombrado desde "diccionarios/".
+  Contiene es.toml y en.toml (mapeo palabra humana → TOKEN U-AST).
+• moset-lang/idiomas_computadora/: nueva carpeta para futuros conectores
+  de lenguajes externos (python.toml, js.toml, etc.).
+• orquestadores/: nueva carpeta para puentes web (Vercel, Node, Python).
+
+ESTRUCTURA FINAL DEL ECOSISTEMA
+────────────────────────────────
+moset-ecosystem/
+├── core-engine/      → Motor Rust puro (Lexer, Parser, VM, Compiler, AI)
+├── naraka-ide/       → IDE Tauri+React (MosetOutputPanel, Chat, Explorer)
+├── mos.et/           → Plataforma del Lenguaje
+│   ├── examples/         → 15 scripts .et de demostración
+│   ├── moset-lang/
+│   │   ├── idiomas_humanos/     → es.toml, en.toml
+│   │   └── idiomas_computadora/ → [futuro] conectores externos
+│   └── orquestadores/   → [futuro] puentes web
+└── scripts/          → Fine-tuning, corpus, CLI installer
+
+VISIÓN ESTRATÉGICA REGISTRADA
+──────────────────────────────
+• Moset como Orquestador Políglota: bloques @python{}, @node{} para
+  gobernar otros lenguajes desde un único archivo .et.
+• Ruta web: WASM (browser-native) / Vercel Serverless / CLI bare-metal.
+• Arquitectura de 3 capas de diccionarios totalmente definida.

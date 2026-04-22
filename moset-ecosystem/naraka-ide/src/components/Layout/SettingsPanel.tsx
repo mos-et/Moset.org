@@ -18,17 +18,12 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
     return saved !== null && saved !== "" ? saved : defaultPrePrompt;
   });
 
-  // IA Providers config
-  const [aiProvider, setAiProvider] = useState(() => localStorage.getItem("moset_ai_provider") || "soberano");
-  const [cloudProvider, setCloudProvider] = useState(() => localStorage.getItem("moset_cloud_provider") || "openai");
   const [googleApiKey, setGoogleApiKey] = useState(() => localStorage.getItem("moset_google_api_key") || "");
   const [anthropicApiKey, setAnthropicApiKey] = useState(() => localStorage.getItem("moset_anthropic_api_key") || "");
   const [openaiApiKey, setOpenaiApiKey] = useState(() => localStorage.getItem("moset_openai_api_key") || "");
   const [openaiBaseUrl, setOpenaiBaseUrl] = useState(() => localStorage.getItem("moset_openai_base_url") || "");
-  const [customModelId, setCustomModelId] = useState(() => localStorage.getItem("moset_custom_model_id") || "");
   const [mistralApiKey, setMistralApiKey] = useState(() => localStorage.getItem("moset_mistral_api_key") || "");
-  const [localMaxTokens, setLocalMaxTokens] = useState(() => localStorage.getItem("moset_local_max_tokens") || "2048");
-  const [cloudMaxTokens, setCloudMaxTokens] = useState(() => localStorage.getItem("moset_cloud_max_tokens") || "4096");
+  const [groqApiKey, setGroqApiKey] = useState(() => localStorage.getItem("moset_groq_api_key") || "");
 
   // Orquestador
   const [orqLocalIp, setorqLocalIp] = useState(() => localStorage.getItem("moset_orq_local_ip") || "");
@@ -47,6 +42,7 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
   const [qCollapseMethod, setQCollapseMethod] = useState(() => localStorage.getItem("moset_q_collapse") || "probabilistic");
   const [qDefaultAlpha, setQDefaultAlpha] = useState(() => localStorage.getItem("moset_q_alpha") || "0.7071");
   const [qEntanglementEnabled, setQEntanglementEnabled] = useState(() => localStorage.getItem("moset_q_entanglement") === "true");
+  // Check === null ensures the feature is ON by default for new users who haven't saved settings yet
   const [qPensarEnabled, setQPensarEnabled] = useState(() => localStorage.getItem("moset_q_pensar") === "true" || localStorage.getItem("moset_q_pensar") === null);
 
   // Controles de Limpieza
@@ -61,16 +57,12 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
     localStorage.setItem("moset_pre_prompt", prePrompt);
     document.documentElement.style.setProperty('--glass', glassEnabled ? "blur(20px) saturate(180%)" : "none");
 
-    localStorage.setItem("moset_ai_provider", aiProvider);
-    localStorage.setItem("moset_cloud_provider", cloudProvider);
     localStorage.setItem("moset_google_api_key", googleApiKey);
     localStorage.setItem("moset_anthropic_api_key", anthropicApiKey);
     localStorage.setItem("moset_openai_api_key", openaiApiKey);
     localStorage.setItem("moset_openai_base_url", openaiBaseUrl);
-    localStorage.setItem("moset_custom_model_id", customModelId);
     localStorage.setItem("moset_mistral_api_key", mistralApiKey);
-    localStorage.setItem("moset_local_max_tokens", localMaxTokens);
-    localStorage.setItem("moset_cloud_max_tokens", cloudMaxTokens);
+    localStorage.setItem("moset_groq_api_key", groqApiKey);
 
     localStorage.setItem("moset_orq_local_ip", orqLocalIp);
     localStorage.setItem("moset_orq_remote_ip", orqRemoteIp);
@@ -89,13 +81,21 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
     localStorage.setItem("moset_q_pensar", qPensarEnabled ? "true" : "false");
 
     localStorage.setItem("moset_cuda_autoclean", cudaCacheAutoClean ? "true" : "false");
-    
+
+    // D4f: Sincronizan los ajustes del Vigilante con el backend Rust
+    invoke("configurar_vigilante", {
+      prohibidos: vigProhibidos,
+      peligrosos: vigPeligrosos,
+      cautelosos: vigCautelosos,
+      sandboxPaths: vigSandboxPaths,
+    }).catch((e: any) => console.error("Error sincronizando Vigilante:", e));
+
     // Fix: Connect the orphaned rust endpoint
     invoke("set_clean_cuda_on_exit", { enabled: cudaCacheAutoClean }).catch((e: any) => console.error("Error enviando estado CUDA:", e));
 
     // Trigger update dispatch correctly
-    window.dispatchEvent(new Event("settings-updated"));
-    onUpdate(); 
+    window.dispatchEvent(new Event("moset-settings-updated"));
+    onUpdate();
   };
 
   const applySecurityPreset = (field: 'prohibidos' | 'peligrosos' | 'cautelosos' | 'sandbox', level: string) => {
@@ -244,95 +244,43 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
 
             {activeTab === "ai_providers" && (
               <div className="anim-fade-in">
-                <h3 className="settings-section-title">Proveedores de Inteligencia y APIs</h3>
-                <div className="form-group">
-                  <label className="settings-label">Proveedor de Inteligencia Principal</label>
-                  <select 
-                    value={aiProvider} 
-                    onChange={e => setAiProvider(e.target.value)} 
-                    className="settings-input" 
-                  >
-                    <option value="soberano">Motor Soberano (Local GGUF - Offline Segura)</option>
-                    <option value="nube">Nube Estricta (APIs Externas solas)</option>
-                    <option value="mixto">Mixto (Combina Nube y Local para delegar tareas)</option>
-                  </select>
-                </div>
-
-                {(aiProvider === "nube" || aiProvider === "mixto") && (
-                  <div className="form-group">
-                    <label className="settings-label">Servicios en la Nube y Agentes</label>
-                    <select 
-                      value={cloudProvider} 
-                      onChange={e => setCloudProvider(e.target.value)} 
-                      className="settings-input" 
-                    >
-                      <option value="openai">Ecosistema OpenAI (GPT / API Compatible / LM Studio / OpenRouter)</option>
-                      <option value="google">Ecosistema Google (Gemini, Vertex)</option>
-                      <option value="anthropic">Ecosistema Anthropic (Claube 3.5)</option>
-                      <option value="mistral">Ecosistema Mistral (Mistral AI)</option>
-                    </select>
-                  </div>
-                )}
-
-                <div className="form-group">
-                  <label className="settings-label">ID de Modelo Personalizado (Ej: claude-3-5-sonnet-20241022, gemini-1.5-pro, gpt-4o)</label>
-                  <input type="text" value={customModelId} onChange={e => setCustomModelId(e.target.value)} placeholder="Dejar en blanco para usar el model predeterminado" className="settings-input" />
-                </div>
+                <h3 className="settings-section-title">Llaves de APIs (Globales)</h3>
 
                 <div className="settings-card">
-                  <h4 style={{ margin: "0 0 16px 0", fontSize: "13px", color: "var(--text-1)" }}>Autenticación para API {cloudProvider.toUpperCase()}</h4>
-                  {(aiProvider === "nube" || aiProvider === "mixto") && cloudProvider === "google" && (
-                    <div className="form-group">
-                      <label className="settings-label">Google API Key</label>
-                      <input type="password" value={googleApiKey} onChange={e => setGoogleApiKey(e.target.value)} placeholder="AIzaSy..." className="settings-input" />
-                    </div>
-                  )}
-
-                  {(aiProvider === "nube" || aiProvider === "mixto") && cloudProvider === "anthropic" && (
-                    <div className="form-group">
-                      <label className="settings-label">Anthropic API Key</label>
-                      <input type="password" value={anthropicApiKey} onChange={e => setAnthropicApiKey(e.target.value)} placeholder="sk-ant-api03-..." className="settings-input" />
-                    </div>
-                  )}
-
-                  {(aiProvider === "nube" || aiProvider === "mixto") && cloudProvider === "mistral" && (
-                    <div className="form-group">
-                      <label className="settings-label">Mistral API Key</label>
-                      <input type="password" value={mistralApiKey} onChange={e => setMistralApiKey(e.target.value)} placeholder="EjLW2eQ0..." className="settings-input" />
-                    </div>
-                  )}
-
-                  {(aiProvider === "nube" || aiProvider === "mixto") && cloudProvider === "openai" && (
-                    <>
-                      <div className="form-group" style={{ marginBottom: "16px" }}>
-                        <label className="settings-label">OpenAI API Key (O tu token para APIs Compatibles)</label>
-                        <input type="password" value={openaiApiKey} onChange={e => setOpenaiApiKey(e.target.value)} placeholder="sk-..." className="settings-input" />
-                      </div>
-                      <div className="form-group">
-                        <label className="settings-label">Base URL Endpoint (Ideal para usar con Ollama remoto o LM Studio)</label>
-                        <input type="text" value={openaiBaseUrl} onChange={e => setOpenaiBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" className="settings-input" />
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <div className="settings-card">
-                  <h4 style={{ margin: "0 0 16px 0", fontSize: "13px", color: "var(--text-1)" }}>Límites de Tokens Máximos</h4>
+                  <h4 style={{ margin: "0 0 16px 0", fontSize: "13px", color: "var(--text-1)" }}>Configuración de Autenticación a Nube</h4>
                   
-                  {(aiProvider === "soberano" || aiProvider === "mixto") && (
-                    <div className="form-group" style={{ marginBottom: aiProvider === "mixto" ? "16px" : "0" }}>
-                      <label className="settings-label">Modelo Local (Soberano): {localMaxTokens} tokens</label>
-                      <input type="range" min="512" max="8192" step="512" value={localMaxTokens} onChange={e => setLocalMaxTokens(e.target.value)} style={{ width: '100%' }} />
-                    </div>
-                  )}
+                  <div className="form-group">
+                    <label className="settings-label">Google API Key</label>
+                    <input type="password" value={googleApiKey} onChange={e => setGoogleApiKey(e.target.value)} placeholder="AIzaSy..." className="settings-input" />
+                  </div>
 
-                  {(aiProvider === "nube" || aiProvider === "mixto") && (
-                    <div className="form-group">
-                      <label className="settings-label">Modelo en la Nube (API): {cloudMaxTokens} tokens</label>
-                      <input type="range" min="1024" max="128000" step="1024" value={cloudMaxTokens} onChange={e => setCloudMaxTokens(e.target.value)} style={{ width: '100%' }} />
-                    </div>
-                  )}
+                  <div className="form-group">
+                    <label className="settings-label">Anthropic API Key</label>
+                    <input type="password" value={anthropicApiKey} onChange={e => setAnthropicApiKey(e.target.value)} placeholder="sk-ant-api03-..." className="settings-input" />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="settings-label">Mistral API Key</label>
+                    <input type="password" value={mistralApiKey} onChange={e => setMistralApiKey(e.target.value)} placeholder="EjLW2eQ0..." className="settings-input" />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="settings-label">Groq API Key</label>
+                    <input type="password" value={groqApiKey} onChange={e => setGroqApiKey(e.target.value)} placeholder="gsk_..." className="settings-input" />
+                    <span className="form-hint">ℹ️ Para usar modelos de Groq Cloud (Llama 3, Mixtral y otros en inferencia ultrarrápida).</span>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: "16px" }}>
+                    <label className="settings-label">OpenAI API Key (O tu token para APIs Compatibles)</label>
+                    <input type="password" value={openaiApiKey} onChange={e => setOpenaiApiKey(e.target.value)} placeholder="sk-..." className="settings-input" />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="settings-label">Base URL Endpoint (Ideal para usar con Ollama remoto o LM Studio)</label>
+                    <input type="text" value={openaiBaseUrl} onChange={e => setOpenaiBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" className="settings-input" />
+                  </div>
                 </div>
+
               </div>
             )}
 

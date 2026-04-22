@@ -7,7 +7,6 @@ interface ChatHeaderProps {
   isFloating?: boolean;
   onDragStart?: (e: React.MouseEvent) => void;
   lastMetrics: {prompt_eval_count: number, eval_count: number} | null;
-  config: { model: string; arch: string; };
   modelLoading: boolean;
   showInlineSettings: boolean;
   setShowInlineSettings: (show: boolean) => void;
@@ -23,7 +22,6 @@ export function ChatHeader({
   isFloating,
   onDragStart,
   lastMetrics,
-  config,
   modelLoading,
   showInlineSettings,
   setShowInlineSettings,
@@ -49,9 +47,6 @@ export function ChatHeader({
             CTX: {lastMetrics.prompt_eval_count} • GEN: {lastMetrics.eval_count}
           </span>
         ) : null}
-        {config.arch && config.arch !== "" && (
-          <span className="chat-arch-badge">{config.arch}</span>
-        )}
         {modelLoading && (
           <div className="chat-loading-dots">
             <span/><span/><span/>

@@ -943,3 +943,28 @@ Además de los endpoints del lenguaje Moset, el IDE incluye un **agente autónom
 **Dueño del ecosistema:** Tomás Segura
 **Base de Operaciones:** `S:\Naraka Studio\Moset\`
 **Licencia:** BUSL-1.1
+
+---
+
+## Last Update
+
+**2026-04-20 — Phase 12: Visual Execution Engine + mos.et Architecture**
+
+### Visual Execution Engine (MosetOutputPanel)
+- [x] **Rust backend refactored**: ejecutar command now returns structured JSON with typed lines (quantum, molde, header, error, 	ext, separator) via classify_output_line.
+- [x] **MosetOutputPanel.tsx**: Premium visual panel with *glassmorphism*, quantum probability bars, mold cards, copy-to-clipboard support and local fonts (no Google Fonts dependency).
+- [x] **Global Event Architecture**: unMosetCode listens to the un-moset-code event via window.addEventListener. The event handler uses invoke() directly to avoid stale closures with deps=[].
+- [x] **Explorer Integration**: .et file context menu includes "▶ Run Moset" option that fires the CustomEvent with file content.
+- [x] **ChatPanel Integration**: "▶ Run" button in the ActionCard post-code-application, allowing immediate testing of AI-generated code.
+
+### mos.et Architecture (Language Platform)
+- [x] **Examples unified**: Two examples/ folders (root and core-engine/) merged into a single moset-ecosystem/mos.et/examples/ with 15 .et files.
+- [x] **mos.et/ folder created**: Semantic super-folder (analogous to .github) grouping all language theory and platform, separate from the hard Rust engine (core-engine).
+- [x] **moset-lang/idiomas_humanos/**: Renamed from diccionarios/. Contains es.toml and en.toml (human word → U-AST TOKEN mapping).
+- [x] **moset-lang/idiomas_computadora/**: New folder created. Reserved for future connectors (python.toml, js.toml) enabling Moset to act as a Polyglot Orchestrator.
+- [x] **orquestadores/**: New folder inside mos.et/. Reserved for web bridges (Vercel Serverless, Node Express, Python Bridge) that will expose the Moset Engine to the web without requiring the IDE.
+
+### Architectural Vision Registered
+- **Moset as Universal Orchestrator**: The language can act as a "sovereign bubble" governing Python, Java, Node.js or other languages via @python {} blocks or automatic external syntax detection. End users write only .et; connectors do the invisible plumbing.
+- **Web Route without IDE**: Three future paths: (1) WASM for browser-native execution, (2) Serverless API via Vercel + Firebase, (3) CLI moset file.et without the graphical interface.
+- **3-Layer Dictionary Architecture**: Human words (idiomas_humanos/), domain templates (examples/), and external language grammars (idiomas_computadora/) — all under mos.et/.

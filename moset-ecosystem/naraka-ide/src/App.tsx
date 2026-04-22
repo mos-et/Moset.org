@@ -8,6 +8,7 @@ import { CodeEditor } from "./components/Editor/CodeEditor";
 import { ActivityBar } from "./components/Layout/ActivityBar";
 
 import ChatPanel from "./ChatPanel";
+import { MosetOutputPanel, type MosetOutput } from "./components/MosetOutputPanel";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { SoberanaTerminal } from "./components/Terminal/SoberanaTerminal";
@@ -50,6 +51,10 @@ export default function App() {
     return saved !== null ? saved === "true" : true;
   });
   const [chatOpen, setChatOpen] = useState(false);
+  const [mosetPanelOpen, setMosetPanelOpen] = useState(false);
+  const [mosetOutput, setMosetOutput] = useState<MosetOutput | null>(null);
+  const [mosetError, setMosetError] = useState<string | null>(null);
+  const [mosetRunning, setMosetRunning] = useState(false);
   const [chatWidth, setChatWidth] = useState<number>(() => {
     return parseInt(localStorage.getItem("moset_ide_chat_width") || "380", 10);
   });
@@ -82,6 +87,16 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('chatIsFloating', JSON.stringify(chatIsFloating));
   }, [chatIsFloating]);
+
+  // D4g: Sincronizar config del Vigilante con el backend Rust al arrancar el IDE
+  useEffect(() => {
+    invoke("configurar_vigilante", {
+      prohibidos: localStorage.getItem("moset_vig_prohibidos") || "",
+      peligrosos: localStorage.getItem("moset_vig_peligrosos") || "",
+      cautelosos: localStorage.getItem("moset_vig_cautelosos") || "",
+      sandboxPaths: localStorage.getItem("moset_vig_sandbox") || "",
+    }).catch((e: any) => console.warn("Vigilante config startup sync failed:", e));
+  }, []);
 
   useFileDrop((paths) => {
     console.log("Archivos recibidos globalmente:", paths);
@@ -351,25 +366,63 @@ export default function App() {
   }, [activeFile?.content, activeFile?.language]);
 
   // ������ Ejecutar código ������������������������������������������������������������������������������������������������������������
-  const runMosetCode = async () => {
-    if (!activeFile) return;
-    setShowTerminal(true);
+  const runMosetCode = async (explicitCode?: string, explicitName?: string, explicitLanguage?: string) => {
+    const code = explicitCode ?? activeFile?.content;
+    const name = explicitName ?? activeFile?.name;
+    const language = explicitLanguage ?? activeFile?.language;
+    
+    if (!code) return;
+
+    // Solo archivos .et abren el panel visual; otros van al terminal
+    if (language !== "moset" && !name?.endsWith(".et")) {
+      setShowTerminal(true);
+      return;
+    }
+
+    setMosetOutput(null);
+    setMosetError(null);
+    setMosetRunning(true);
+    setMosetPanelOpen(true);
+
     try {
-      const { emit } = await import("@tauri-apps/api/event");
-      // Animación de inicio
-      await emit("pty-read", "\r\n\x1b[1;36m[MOS-MOTOR] Iniciando secuencia de ejecución...\x1b[0m\r\n");
-      await emit("pty-read", "\x1b[35m[SISTEMA] Cargando entorno Soberano...\x1b[0m\r\n");
-      
-      const result: string = await invoke("ejecutar", { codigo: activeFile.content });
-      
-      await emit("pty-read", `\r\n\x1b[1;32mOUTPUT:\x1b[0m\r\n${result}\r\n`);
-      await emit("pty-read", "\x1b[36m[EXIT] Proceso finalizado con éxito.\x1b[0m\r\n");
+      const result: string = await invoke("ejecutar", { codigo: code });
+      const parsed: MosetOutput = JSON.parse(result);
+      setMosetOutput(parsed);
     } catch (e: any) {
-      console.error("Error ejecutando:", e);
-      const { emit } = await import("@tauri-apps/api/event");
-      await emit("pty-read", `\r\n\x1b[1;31m[ERROR] Fallo en la matriz:\x1b[0m\r\n\x1b[31m${e}\x1b[0m\r\n`);
+      const msg = typeof e === "string" ? e : (e?.message ?? String(e));
+      setMosetError(msg);
+    } finally {
+      setMosetRunning(false);
     }
   };
+
+  // Listener para ejecución externa (Explorer context menu, Chat "Ejecutar")
+  // Los callers siempre pasan params explícitos en detail, así que no hay closure stale.
+  useEffect(() => {
+    const handleRunEvent = async (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.codigo) return;
+
+      // Ejecutar directamente sin depender de closure — todo viene del event
+      setMosetOutput(null);
+      setMosetError(null);
+      setMosetRunning(true);
+      setMosetPanelOpen(true);
+
+      try {
+        const result: string = await invoke("ejecutar", { codigo: detail.codigo });
+        const parsed: MosetOutput = JSON.parse(result);
+        setMosetOutput(parsed);
+      } catch (err: any) {
+        const msg = typeof err === "string" ? err : (err?.message ?? String(err));
+        setMosetError(msg);
+      } finally {
+        setMosetRunning(false);
+      }
+    };
+    window.addEventListener("run-moset-code", handleRunEvent);
+    return () => window.removeEventListener("run-moset-code", handleRunEvent);
+  }, []);
 
   const activeFileLang = activeFile?.language === "moset" ? "moset" : (activeFile?.language ?? "");
 
@@ -571,6 +624,16 @@ export default function App() {
             }}
           />
         </div>
+      )}
+
+      {mosetPanelOpen && (
+        <MosetOutputPanel
+          output={mosetOutput}
+          error={mosetError}
+          fileName={activeFile?.name ?? ""}
+          isRunning={mosetRunning}
+          onClose={() => setMosetPanelOpen(false)}
+        />
       )}
     </div>
   );
