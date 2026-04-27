@@ -1465,6 +1465,8 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
   display: flex;
   flex-direction: column;
   gap: 8px;
+  position: relative;
+  z-index: 10;
 }
 
 .chat-controls-top {
@@ -2082,8 +2084,8 @@ input[type=range]::-moz-range-thumb {
 .context-menu {
   position: absolute;
   bottom: 100%; /* pop up above the button */
-  left: 0;
-  right: auto;
+  right: 0;
+  left: auto;
   margin-bottom: 8px;
   min-width: 240px;
   background: #0f1419; /* Solid deep dark */

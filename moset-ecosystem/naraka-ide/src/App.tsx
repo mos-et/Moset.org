@@ -4,6 +4,7 @@ import * as monaco from "monaco-editor";
 import { Explorador } from "./components/Layout/Explorador";
 import { useIdeConfig } from "./hooks/useIdeConfig";
 import { useFileDrop } from "./hooks/useFileDrop";
+import { useFloatingWindow } from "./hooks/useFloatingWindow";
 import { CodeEditor } from "./components/Editor/CodeEditor";
 import { ActivityBar } from "./components/Layout/ActivityBar";
 
@@ -55,18 +56,22 @@ export default function App() {
   const [mosetOutput, setMosetOutput] = useState<MosetOutput | null>(null);
   const [mosetError, setMosetError] = useState<string | null>(null);
   const [mosetRunning, setMosetRunning] = useState(false);
-  const [chatWidth, setChatWidth] = useState<number>(() => {
-    return parseInt(localStorage.getItem("moset_ide_chat_width") || "380", 10);
-  });
-  const [chatIsFloating, setChatIsFloating] = useState<boolean>(() => {
-    return localStorage.getItem("moset_ide_chat_floating") === "true";
-  });
-  const [chatPos, setChatPos] = useState<{x: number, y: number}>(() => {
-    const saved = localStorage.getItem("moset_ide_chat_pos");
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
-    }
-    return { x: window.innerWidth - 420, y: 60 };
+  const {
+    width: chatWidth,
+    height: chatHeight,
+    pos: chatPos,
+    isFloating: chatIsFloating,
+    setWidth: setChatWidth,
+    setIsFloating: setChatIsFloating,
+    onDragStart: onChatDragStart,
+    startResizing: startChatResizing,
+    startResizingFloating: startChatResizingFloating,
+  } = useFloatingWindow({
+    storagePrefix: "moset_ide_chat",
+    defaultWidth: 380,
+    defaultHeight: 600,
+    defaultPosX: window.innerWidth - 420,
+    defaultPosY: 60,
   });
   const [cursorPos, setCursorPos] = useState({ lineNumber: 1, column: 1 });
   const [contextPaths, setContextPaths] = useState<string[]>(() => {
@@ -82,11 +87,6 @@ export default function App() {
   const [gitStatus, setGitStatus] = useState<Record<string, string>>({});
 
   const { contextMode, setContextMode } = useIdeConfig();
-
-  // Persistencia de estados generales se maneja al final de los efectos
-  useEffect(() => {
-    localStorage.setItem('chatIsFloating', JSON.stringify(chatIsFloating));
-  }, [chatIsFloating]);
 
   // D4g: Sincronizar config del Vigilante con el backend Rust al arrancar el IDE
   useEffect(() => {
@@ -137,53 +137,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem("moset_ide_sidebar_panel", sidebarPanel); }, [sidebarPanel]);
   useEffect(() => { localStorage.setItem("moset_ide_show_terminal", showTerminal.toString()); }, [showTerminal]);
   useEffect(() => { localStorage.setItem("moset_ide_context_paths", JSON.stringify(contextPaths)); }, [contextPaths]);
-  useEffect(() => { localStorage.setItem("moset_ide_chat_width", chatWidth.toString()); }, [chatWidth]);
-  useEffect(() => { localStorage.setItem("moset_ide_chat_floating", chatIsFloating.toString()); }, [chatIsFloating]);
-  useEffect(() => {
-    localStorage.setItem("moset_ide_chat_pos", JSON.stringify(chatPos));
-  }, [chatPos]);
 
-
-  const isResizingRef = useRef(false);
-  const isDraggingChatRef = useRef(false);
-  const dragOffsetRef = useRef({ x: 0, y: 0 });
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isResizingRef.current) {
-        // En modo flotante o acoplado, modificamos width
-        // Si está acoplado a la derecha, e.movementX negativo aumenta el ancho, pero
-        // vamos a mantener el comportamiento antiguo.
-        setChatWidth(prev => {
-          let newWidth = prev + e.movementX;
-          if (newWidth < 300) newWidth = 300;
-          if (newWidth > 1200) newWidth = 1200;
-          return newWidth;
-        });
-      } else if (isDraggingChatRef.current) {
-        setChatPos({
-          x: e.clientX - dragOffsetRef.current.x,
-          y: e.clientY - dragOffsetRef.current.y
-        });
-      }
-    };
-    const handleMouseUp = () => {
-      if (isResizingRef.current) {
-        isResizingRef.current = false;
-        document.body.style.cursor = "default";
-      }
-      if (isDraggingChatRef.current) {
-        isDraggingChatRef.current = false;
-        document.body.style.cursor = "default";
-      }
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, []);
 
   const refreshTree = useCallback(async () => {
     if (projectRoot) {
@@ -513,6 +467,13 @@ export default function App() {
           />
           <button
             className="terminal-toggle"
+            onClick={() => setChatIsFloating(v => !v)}
+            title={chatIsFloating ? "Acoplar panel lateral" : "Extraer ventana flotante"}
+          >
+            &#x1F5D7;&#xFE0F;
+          </button>
+          <button
+            className="terminal-toggle"
             onClick={() => setShowTerminal(v => !v)}
             title="Abrir/cerrar terminal"
           >
@@ -586,30 +547,51 @@ export default function App() {
           className={`chat-overlay ${chatIsFloating ? 'floating' : 'docked'}`} 
           style={chatIsFloating ? { 
             width: chatWidth,
-            height: '75vh',
+            height: chatHeight,
             left: chatPos.x,
             top: chatPos.y,
             position: 'absolute',
-            zIndex: 100
+            zIndex: 100,
+            overflow: 'hidden'
           } : {
-            width: chatWidth
+            width: chatWidth,
+            height: '100%'
           }}
         >
-          <div 
-            className="chat-resizer" 
-            style={{ right: -5, left: undefined }}
-            onMouseDown={(e) => {
-              isResizingRef.current = true;
-              document.body.style.cursor = "ew-resize";
-              e.preventDefault();
-            }}
-          />
+          {chatIsFloating && (
+            <div 
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                right: 0,
+                width: 15,
+                height: 15,
+                cursor: 'nwse-resize',
+                zIndex: 1000
+              }}
+              onMouseDown={startChatResizingFloating}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2" style={{width: '100%', height: '100%'}}>
+                <path d="M21 15l-6 6" />
+                <path d="M21 8l-13 13" />
+              </svg>
+            </div>
+          )}
+          {!chatIsFloating && (
+            <div 
+              className="chat-resizer" 
+              style={{ left: -5, right: undefined }}
+              onMouseDown={startChatResizing}
+            />
+          )}
           <ChatPanel
             projectRoot={projectRoot}
             contextPaths={contextPaths}
             setContextPaths={setContextPaths}
             onClose={() => setChatOpen(false)}
-            isFloating={false} // Siempre anclado
+            isFloating={chatIsFloating}
+            onToggleFloating={() => setChatIsFloating(!chatIsFloating)}
+            onDragStart={onChatDragStart}
             onOpenArtifact={(name: string, content: string) => {
               const tabId = `artifact-${Date.now()}`;
               setTabs(prev => [...prev, {

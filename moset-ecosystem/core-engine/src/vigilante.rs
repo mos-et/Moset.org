@@ -29,6 +29,8 @@ pub enum Veredicto {
 }
 
 /// El Vigilante: middleware de seguridad para comandos shell
+// Fase-3: Integración real con VM pendiente (PRE-W01). Métodos reservados.
+#[allow(dead_code)]
 pub struct Vigilante {
     /// Comandos que NUNCA se ejecutan, sin importar la confianza
     prohibidos: Vec<String>,
@@ -40,6 +42,7 @@ pub struct Vigilante {
     sandbox_paths: Vec<String>,
 }
 
+#[allow(dead_code)]
 impl Vigilante {
     /// Crear un Vigilante con las listas de seguridad por defecto
     pub fn nuevo() -> Self {

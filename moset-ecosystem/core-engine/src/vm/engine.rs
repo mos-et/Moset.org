@@ -20,9 +20,13 @@ struct CallFrame {
     base_pila: usize,
     /// IP de retorno (a dónde volver en el chunk del caller)
     ip_retorno: usize,
-    /// Chunk de la función siendo ejecutada
+    /// Chunk de la función llamadora
     chunk: Chunk,
+    /// Entorno de capturas del caller
+    capturas: Vec<Valor>,
 }
+
+pub type PrintCallback = Box<dyn FnMut(&str) + Send + Sync>;
 
 pub struct VM {
     chunk: Chunk,
@@ -30,7 +34,10 @@ pub struct VM {
     pila: Vec<Valor>,
     globales: HashMap<String, Valor>,
     frames: Vec<CallFrame>,
-    pub on_print: Option<Box<dyn FnMut(&str) + Send + Sync>>,
+    pub on_print: Option<PrintCallback>,
+    pub vigilante: std::rc::Rc<crate::vigilante::Vigilante>,
+    pub capturas: Vec<Valor>,
+    base_pila: usize,
 }
 
 impl VM {
@@ -42,6 +49,9 @@ impl VM {
             globales: HashMap::new(),
             frames: Vec::with_capacity(MAX_FRAMES),
             on_print: None,
+            vigilante: std::rc::Rc::new(crate::vigilante::Vigilante::nuevo()),
+            capturas: Vec::new(),
+            base_pila: 0,
         }
     }
 
@@ -90,7 +100,7 @@ impl VM {
             match op {
                 // ─── CONSTANTES ─────────────────────────────────────
                 OpCode::Constante => {
-                    let indice = self.leer_byte() as usize;
+                    let indice = self.leer_u16() as usize;
                     if indice >= self.chunk.constantes.len() {
                         return Err(format!("Índice de constante fuera de rango: {}", indice));
                     }
@@ -299,7 +309,7 @@ impl VM {
 
                 // ─── VARIABLES GLOBALES ─────────────────────────────
                 OpCode::DefinirGlobal => {
-                    let idx = self.leer_byte() as usize;
+                    let idx = self.leer_u16() as usize;
                     let nombre = match &self.chunk.constantes[idx] {
                         Valor::Texto(s) => s.clone(),
                         _ => return Err("Nombre de variable global no es texto".into()),
@@ -308,7 +318,7 @@ impl VM {
                     self.globales.insert(nombre, valor);
                 },
                 OpCode::ObtenerGlobal => {
-                    let idx = self.leer_byte() as usize;
+                    let idx = self.leer_u16() as usize;
                     let nombre = match &self.chunk.constantes[idx] {
                         Valor::Texto(s) => s.clone(),
                         _ => return Err("Nombre de variable global no es texto".into()),
@@ -319,7 +329,7 @@ impl VM {
                     }
                 },
                 OpCode::AsignarGlobal => {
-                    let idx = self.leer_byte() as usize;
+                    let idx = self.leer_u16() as usize;
                     let nombre = match &self.chunk.constantes[idx] {
                         Valor::Texto(s) => s.clone(),
                         _ => return Err("Nombre de variable global no es texto".into()),
@@ -335,41 +345,37 @@ impl VM {
                 // ─── VARIABLES LOCALES ──────────────────────────────
                 OpCode::ObtenerLocal => {
                     let slot = self.leer_byte() as usize;
-                    if slot >= self.pila.len() {
-                        return Err(format!("Slot local fuera de rango: {}", slot));
+                    let idx = self.base_pila + slot;
+                    if idx >= self.pila.len() {
+                        return Err(format!("Slot local fuera de rango: {}", idx));
                     }
-                    let valor = self.pila[slot].clone();
+                    let valor = self.pila[idx].clone();
                     self.push(valor);
                 },
                 OpCode::AsignarLocal => {
                     let slot = self.leer_byte() as usize;
+                    let idx = self.base_pila + slot;
                     let valor = self.peek(0)?.clone();
-                    if slot >= self.pila.len() {
-                        return Err(format!("Slot local fuera de rango: {}", slot));
+                    if idx >= self.pila.len() {
+                        return Err(format!("Slot local fuera de rango: {}", idx));
                     }
-                    self.pila[slot] = valor;
+                    self.pila[idx] = valor;
                 },
 
                 // ─── SALTOS ─────────────────────────────────────────
                 OpCode::Salto => {
-                    let hi = self.leer_byte() as usize;
-                    let lo = self.leer_byte() as usize;
-                    let offset = (hi << 8) | lo;
+                    let offset = self.leer_u16() as usize;
                     self.ip += offset;
                 },
                 OpCode::SaltoSiFalso => {
-                    let hi = self.leer_byte() as usize;
-                    let lo = self.leer_byte() as usize;
-                    let offset = (hi << 8) | lo;
+                    let offset = self.leer_u16() as usize;
                     let condicion = self.peek(0)?;
                     if Self::es_falso(condicion) {
                         self.ip += offset;
                     }
                 },
                 OpCode::Bucle => {
-                    let hi = self.leer_byte() as usize;
-                    let lo = self.leer_byte() as usize;
-                    let offset = (hi << 8) | lo;
+                    let offset = self.leer_u16() as usize;
                     self.ip -= offset;
                 },
 
@@ -380,63 +386,88 @@ impl VM {
                     let func = self.pila[func_slot].clone();
 
                     match func {
-                        Valor::Funcion { params, cuerpo, .. } => {
-                            if params.len() != arg_count {
-                                return Err(format!(
-                                    "Función esperaba {} argumentos, recibió {}",
-                                    params.len(), arg_count
-                                ));
+                        Valor::Funcion { arity, chunk, .. } => {
+                            if arity != arg_count {
+                                return Err(format!("Función esperaba {} argumentos, recibió {}", arity, arg_count));
                             }
-
-                            // Compilar la función en un chunk separado
-                            let mut sub_compilador = crate::compiler::Compilador::nuevo();
-                            // Definimos los parámetros como locales
-                            for (i, _param) in params.iter().enumerate() {
-                                // El argumento ya está en la pila
-                                let valor = self.pila[func_slot + 1 + i].clone();
-                                sub_compilador.chunk.añadir_constante(valor.clone());
+                            if self.frames.len() >= MAX_FRAMES {
+                                return Err("Stack Overflow".into());
                             }
-                            
-                            // Compilar el cuerpo de la función
-                            let programa_func = crate::ast::Programa { sentencias: cuerpo };
-                            sub_compilador.compilar_programa(&programa_func)
-                                .map_err(|e| format!("Error compilando función: {}", e))?;
-
-                            // Ejecutar en una sub-VM
-                            let mut sub_vm = VM::nueva(sub_compilador.chunk);
-                            // Pasar los argumentos como globales (simplificación)
-                            for (i, param) in params.iter().enumerate() {
-                                let valor = self.pila[func_slot + 1 + i].clone();
-                                sub_vm.globales.insert(param.clone(), valor);
-                            }
-                            // Heredar globales del padre
-                            for (k, v) in &self.globales {
-                                if !sub_vm.globales.contains_key(k) {
-                                    sub_vm.globales.insert(k.clone(), v.clone());
-                                }
-                            }
-                            // Heredar on_print (si hay)
-                            // No podemos mover on_print, así que la sub-VM imprime directo
-                            
-                            let resultado = sub_vm.ejecutar()?;
-
-                            // Limpiar: pop función + argumentos, push resultado
-                            for _ in 0..=arg_count {
-                                self.pop()?;
-                            }
-                            self.push(resultado);
+                            let frame = CallFrame {
+                                base_pila: self.base_pila,
+                                ip_retorno: self.ip,
+                                chunk: self.chunk.clone(),
+                                capturas: self.capturas.clone(),
+                            };
+                            self.frames.push(frame);
+                            self.chunk = (*chunk).clone();
+                            self.ip = 0;
+                            self.base_pila = self.pila.len() - arg_count;
+                            self.capturas = Vec::new();
                         },
-                        _ => return Err(format!("No se puede llamar a un valor que no es función: {:?}", func)),
+                        Valor::Closure { arity, chunk, capturas } => {
+                            if arity != arg_count {
+                                return Err(format!("Closure esperaba {} argumentos, recibió {}", arity, arg_count));
+                            }
+                            if self.frames.len() >= MAX_FRAMES {
+                                return Err("Stack Overflow".into());
+                            }
+                            let frame = CallFrame {
+                                base_pila: self.base_pila,
+                                ip_retorno: self.ip,
+                                chunk: self.chunk.clone(),
+                                capturas: self.capturas.clone(),
+                            };
+                            self.frames.push(frame);
+                            self.chunk = (*chunk).clone();
+                            self.ip = 0;
+                            self.base_pila = self.pila.len() - arg_count;
+                            self.capturas = capturas;
+                        },
+                        _ => return Err(format!("No se puede llamar a un valor que no es función/closure: {:?}", func)),
                     }
                 },
 
                 // ─── RETORNO ────────────────────────────────────────
                 OpCode::Retorno => {
-                    if let Ok(res) = self.pop() {
-                        return Ok(res);
+                    let res = self.pop().unwrap_or(Valor::Nulo);
+                    if let Some(frame) = self.frames.pop() {
+                        // Limpiar locales y argumentos de la pila, incluida la propia funcion (base_pila - 1)
+                        if self.base_pila > 0 {
+                            self.pila.truncate(self.base_pila - 1);
+                        } else {
+                            self.pila.clear();
+                        }
+                        self.push(res);
+                        
+                        // Restaurar caller
+                        self.ip = frame.ip_retorno;
+                        self.chunk = frame.chunk;
+                        self.base_pila = frame.base_pila;
+                        self.capturas = frame.capturas;
                     } else {
-                        return Ok(Valor::Nulo);
+                        return Ok(res);
                     }
+                },
+
+                // ─── SUPERPOSICIÓN CUÁNTICA ────────────────────────
+                OpCode::CrearQubit => {
+                    let beta_val = self.pop()?;
+                    let alpha_val = self.pop()?;
+                    
+                    let beta = match beta_val {
+                        Valor::Decimal(b) => b,
+                        Valor::Entero(b) => b as f64,
+                        _ => return Err("El valor beta del Qubit no es numérico".into()),
+                    };
+                    
+                    let alpha = match alpha_val {
+                        Valor::Decimal(a) => a,
+                        Valor::Entero(a) => a as f64,
+                        _ => return Err("El valor alpha del Qubit no es numérico".into()),
+                    };
+                    
+                    self.push(Valor::Superposicion { alpha, beta });
                 },
 
                 // ─── COLAPSO CUÁNTICO ──────────────────────────────
@@ -463,31 +494,120 @@ impl VM {
                     }
                 },
 
+                // ─── CONSTRUIR CLOSURE Y MOLDE ───────────────────────────
+                OpCode::ConstruirClosure => {
+                    let idx = self.leer_u16() as usize;
+                    let funcion_base = match &self.chunk.constantes[idx] {
+                        Valor::Funcion { nombre, arity, chunk } => Valor::Funcion {
+                            nombre: nombre.clone(),
+                            arity: *arity,
+                            chunk: chunk.clone(),
+                        },
+                        _ => return Err("El operando de ConstruirClosure no es una Función".into()),
+                    };
+                    
+                    if let Valor::Funcion { arity, chunk, .. } = funcion_base {
+                        let closure = Valor::Closure {
+                            arity,
+                            chunk,
+                            capturas: Vec::new(), // TODO: Capturar entorno
+                        };
+                        self.push(closure);
+                    }
+                },
+                OpCode::ConstruirMolde => {
+                    let idx = self.leer_u16() as usize;
+                    let nombre = match &self.chunk.constantes[idx] {
+                        Valor::Texto(t) => t.clone(),
+                        _ => return Err("Nombre de molde no es texto".into()),
+                    };
+                    
+                    let instancia = Valor::Molde(std::rc::Rc::new(std::cell::RefCell::new(crate::valor::InstanciaMolde {
+                        nombre,
+                        campos: std::collections::HashMap::new(),
+                        extra: std::collections::HashMap::new(),
+                    })));
+                    self.push(instancia);
+                },
+
                 // ─── CONSTRUIR LISTA ───────────────────────────────
                 OpCode::ConstruirLista => {
-                    let count = self.leer_byte() as usize;
+                    let count = self.leer_u16() as usize;
                     let mut items = Vec::with_capacity(count);
                     // Los elementos están en la pila en orden: primero el [0], último el [n-1]
                     for _ in 0..count {
                         items.push(self.pop()?);
                     }
                     items.reverse();
-                    self.push(Valor::Lista(items));
+                    self.push(Valor::Lista(std::rc::Rc::new(std::cell::RefCell::new(items))));
+                },
+
+                // ─── COLECCIONES ──────────────────────────────────────────
+                OpCode::ObtenerIndice => {
+                    let indice = self.pop()?;
+                    let coleccion = self.pop()?;
+                    
+                    match (&coleccion, &indice) {
+                        (Valor::Lista(lista), Valor::Entero(idx)) => {
+                            let lista_ref = lista.borrow();
+                            let i = *idx as usize;
+                            if i < lista_ref.len() {
+                                self.push(lista_ref[i].clone());
+                            } else {
+                                return Err(format!("Índice de lista fuera de rango: {}", i));
+                            }
+                        },
+                        _ => return Err(format!("ObtenerIndice no soportado para {:?} y {:?}", coleccion, indice)),
+                    }
+                },
+                OpCode::ObtenerLongitud => {
+                    let coleccion = self.pop()?;
+                    match &coleccion {
+                        Valor::Lista(lista) => {
+                            let len = lista.borrow().len() as i64;
+                            self.push(Valor::Entero(len));
+                        },
+                        Valor::Texto(t) => {
+                            let len = t.len() as i64;
+                            self.push(Valor::Entero(len));
+                        },
+                        _ => return Err(format!("ObtenerLongitud no soportado para {:?}", coleccion)),
+                    }
+                },
+                OpCode::AsignarIndice => {
+                    let valor = self.pop()?;
+                    let indice = self.pop()?;
+                    let coleccion = self.pop()?;
+                    
+                    match (&coleccion, &indice) {
+                        (Valor::Lista(lista), Valor::Entero(idx)) => {
+                            let mut lista_ref = lista.borrow_mut();
+                            let i = *idx as usize;
+                            if i < lista_ref.len() {
+                                lista_ref[i] = valor.clone();
+                                self.push(valor);
+                            } else {
+                                return Err(format!("Índice de lista fuera de rango: {}", i));
+                            }
+                        },
+                        _ => return Err(format!("AsignarIndice no soportado para {:?} y {:?}", coleccion, indice)),
+                    }
                 },
 
                 // ─── OBTENER CAMPO ─────────────────────────────────
                 OpCode::ObtenerCampo => {
-                    let idx = self.leer_byte() as usize;
+                    let idx = self.leer_u16() as usize;
                     let campo = match &self.chunk.constantes[idx] {
                         Valor::Texto(s) => s.clone(),
                         _ => return Err("Nombre de campo no es texto".into()),
                     };
                     let objeto = self.pop()?;
                     match objeto {
-                        Valor::Molde { campos, extra, .. } => {
-                            if let Some(v) = campos.get(&campo) {
+                        Valor::Molde(instancia_rc) => {
+                            let instancia = instancia_rc.borrow();
+                            if let Some(v) = instancia.campos.get(&campo) {
                                 self.push(v.clone());
-                            } else if let Some(v) = extra.get(&campo) {
+                            } else if let Some(v) = instancia.extra.get(&campo) {
                                 self.push(v.clone());
                             } else {
                                 return Err(format!("Campo '{}' no encontrado en el molde", campo));
@@ -499,20 +619,21 @@ impl VM {
 
                 // ─── ASIGNAR CAMPO ─────────────────────────────────
                 OpCode::AsignarCampo => {
-                    let idx = self.leer_byte() as usize;
+                    let idx = self.leer_u16() as usize;
                     let campo = match &self.chunk.constantes[idx] {
                         Valor::Texto(s) => s.clone(),
                         _ => return Err("Nombre de campo no es texto".into()),
                     };
                     let valor = self.pop()?;
-                    let mut objeto = self.pop()?;
-                    match &mut objeto {
-                        Valor::Molde { campos, extra, .. } => {
-                            if campos.contains_key(&campo) {
-                                campos.insert(campo, valor);
+                    let objeto = self.pop()?;
+                    match &objeto {
+                        Valor::Molde(instancia_rc) => {
+                            let mut instancia = instancia_rc.borrow_mut();
+                            if let std::collections::hash_map::Entry::Occupied(mut e) = instancia.campos.entry(campo.clone()) {
+                                e.insert(valor);
                             } else {
                                 // Espacio latente (elástico)
-                                extra.insert(campo, valor);
+                                instancia.extra.insert(campo, valor);
                             }
                         },
                         _ => return Err(format!("No se puede asignar al campo '{}' de un valor que no es molde", campo)),
@@ -522,7 +643,7 @@ impl VM {
 
                 // ─── LLAMAR BUILTIN ────────────────────────────────
                 OpCode::LlamarBuiltin => {
-                    let name_idx = self.leer_byte() as usize;
+                    let name_idx = self.leer_u16() as usize;
                     let arg_count = self.leer_byte() as usize;
                     let nombre = match &self.chunk.constantes[name_idx] {
                         Valor::Texto(s) => s.clone(),
@@ -539,7 +660,7 @@ impl VM {
                         "shell" => {
                             if args.len() != 1 { return Err("shell() requiere 1 argumento".into()); }
                             let cmd = format!("{}", args[0]);
-                            match crate::stdlib::shell(&cmd) {
+                            match crate::stdlib::shell(&cmd, &self.vigilante) {
                                 Ok(out) => Valor::Texto(out),
                                 Err(e) => return Err(e),
                             }
@@ -586,6 +707,7 @@ impl VM {
                     };
                     self.push(resultado);
                 },
+                _ => return Err(format!("OpCode no implementado en la VM: {:?}", op)),
             }
         }
     }
@@ -595,6 +717,13 @@ impl VM {
         let byte = self.chunk.codigo[self.ip];
         self.ip += 1;
         byte
+    }
+
+    #[inline(always)]
+    fn leer_u16(&mut self) -> u16 {
+        let lo = self.leer_byte() as u16;
+        let hi = self.leer_byte() as u16;
+        (hi << 8) | lo
     }
 }
 
@@ -624,8 +753,11 @@ mod tests {
 
         let mut compilador = Compilador::nuevo();
         assert!(compilador.compilar(&eq).is_ok());
+        println!("CODIGO: {:?}", compilador.chunk.codigo);
+        println!("CONSTANTES: {:?}", compilador.chunk.constantes);
         let mut vm = VM::nueva(compilador.chunk);
         let resultado = vm.ejecutar();
+        println!("RESULTADO: {:?}", resultado);
         assert!(resultado.is_ok());
         if let Ok(Valor::Entero(res)) = resultado {
             assert_eq!(res, 7);
@@ -715,5 +847,32 @@ mod tests {
         assert!(compilador.compilar_programa(&programa).is_ok());
         let mut vm = VM::nueva(compilador.chunk);
         assert!(vm.ejecutar().is_ok());
+    }
+
+    #[test]
+    fn test_colapsar_quantum() {
+        let programa = Programa {
+            sentencias: vec![
+                Nodo::Asignacion {
+                    nombre: "q".to_string(),
+                    valor: Box::new(Nodo::SuperposicionLit { alpha: 0.0, beta: 1.0 }), // 100% true
+                },
+                Nodo::Asignacion {
+                    nombre: "res".to_string(),
+                    valor: Box::new(Nodo::Colapsar(Box::new(Nodo::Identificador("q".to_string())))),
+                },
+                Nodo::Mostrar(Box::new(Nodo::Identificador("res".to_string()))),
+            ],
+        };
+
+        let mut compilador = Compilador::nuevo();
+        assert!(compilador.compilar_programa(&programa).is_ok());
+
+        let mut output = Vec::new();
+        let mut vm = VM::nueva(compilador.chunk);
+        vm.on_print = Some(Box::new(move |s| output.push(s.to_string())));
+        let res = vm.ejecutar();
+        
+        assert!(res.is_ok());
     }
 }

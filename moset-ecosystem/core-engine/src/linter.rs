@@ -1,3 +1,6 @@
+// Código de Fase Futura: Análisis semántico estático (Linter). Aún no integrado.
+#![allow(dead_code)]
+
 use crate::ast::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -53,6 +56,11 @@ impl Linter {
     pub fn analizar(&mut self, programa: &Programa) -> Vec<Diagnostic> {
         self.diagnosticos.clear();
         self.entorno = vec![HashMap::new()]; // Limpiar entorno
+        // Resetear posición — Nodo::Metadata actualizará linea/columna
+        // antes de cada visita, así los diagnósticos tendrán la posición
+        // del nodo más cercano envuelto en Metadata.
+        self.linea_actual = 1;
+        self.columna_actual = 1;
 
         for sentencia in &programa.sentencias {
             self.visitar(sentencia);
@@ -211,7 +219,86 @@ impl Linter {
                 }
                 self.pop_scope();
             }
-            _ => {} // Literales y declaraciones no arrojan semánticas solas
+            Nodo::Closure { params, cuerpo } => {
+                self.push_scope();
+                for param in params {
+                    self.registrar_tipo(param, TipoInferido::Desconocido);
+                }
+                for expr in cuerpo {
+                    self.visitar(expr);
+                }
+                self.pop_scope();
+            }
+            Nodo::LlamadaMetodo { objeto, args, .. } => {
+                self.visitar(objeto);
+                for arg in args {
+                    self.visitar(arg);
+                }
+            }
+            Nodo::MoldeInstancia { valores, .. } => {
+                for (_, valor) in valores {
+                    self.visitar(valor);
+                }
+            }
+            Nodo::ListaLit(elementos) => {
+                for elem in elementos {
+                    self.visitar(elem);
+                }
+            }
+            Nodo::AsignacionCampo { valor, .. } => {
+                self.visitar(valor);
+            }
+            Nodo::AsignacionIndice { lista, indice, valor } => {
+                self.visitar(lista);
+                self.visitar(indice);
+                self.visitar(valor);
+            }
+            Nodo::Retornar(expr) => self.visitar(expr),
+            _ => {} // Literales, comentarios, imports y declaraciones (MoldeDefinicion) no arrojan semánticas solas
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_linter_nuevo() {
+        let linter = Linter::nuevo();
+        assert_eq!(linter.diagnosticos.len(), 0);
+        assert_eq!(linter.entorno.len(), 1);
+    }
+
+    #[test]
+    fn test_linter_asignacion() {
+        let programa = Programa {
+            sentencias: vec![
+                Nodo::Metadata {
+                    linea: 1,
+                    columna: 1,
+                    nodo: Box::new(Nodo::Asignacion {
+                        nombre: "x".to_string(),
+                        valor: Box::new(Nodo::EnteroLit(10)),
+                    }),
+                },
+                Nodo::Metadata {
+                    linea: 2,
+                    columna: 1,
+                    nodo: Box::new(Nodo::Asignacion {
+                        nombre: "x".to_string(),
+                        valor: Box::new(Nodo::TextoLit("hola".to_string())),
+                    }),
+                },
+            ],
+        };
+
+        let mut linter = Linter::nuevo();
+        let diags = linter.analizar(&programa);
+
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].linea, 2);
+        assert_eq!(diags[0].severidad, Severidad::Error);
+        assert!(diags[0].mensaje.contains("TypeError"));
     }
 }

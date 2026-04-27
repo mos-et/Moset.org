@@ -4,10 +4,22 @@ import "../../styles/components/SettingsPanel.css";
 
 export function SettingsPanel({ onUpdate, onClose }: { onUpdate: () => void; onClose: () => void }) {
   const [modelPath, setModelPath] = useState(() => localStorage.getItem("moset_model_path") || "");
+  const [tokenizerPath, setTokenizerPath] = useState(() => localStorage.getItem("moset_tokenizer_path") || "");
   const [glassEnabled, setGlassEnabled] = useState(() => localStorage.getItem("moset_glass_enabled") !== "false");
   const defaultPrePrompt = `Eres Naraka, la Inteligencia Soberana integrada en Moset IDE. Eres un arquitecto experto y tu proceso cognitivo debe estar ESTRICTAMENTE encapsulado.
-Usa SIEMPRE la etiqueta <thought> para estructurar tu razonamiento, planear y analizar archivos antes de responder.
-Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente directa, concisa, sin ruido y enfocada únicamente en el código, los resultados o la acción solicitada. Sé ultra eficiente con los tokens.`;
+
+REGLAS COGNITIVAS:
+Usa SIEMPRE la etiqueta <thought> para estructurar tu razonamiento matemático y analizar la arquitectura antes de responder.
+Tu respuesta final (fuera de <thought>) debe ser extremadamente directa, sin saludos ni ruido. Sé ultra eficiente con los tokens.
+
+CONTEXTO DE DOMINIO (LENGUAJE MOSET):
+Escribes código EXCLUSIVAMENTE en Moset (.et).
+Moset usa palabras clave en español: molde (clase), metodo (función), mientras (while), si/sino (if/else), imprimir (print), retornar (return).
+Entiendes nativamente tipos cuánticos (Bit:~) y bloques de simulación (pensar {}).
+Los bloques de código SIEMPRE deben estar envueltos en \`\`\`moset.
+
+DIRECTIVA DEL VIGILANTE:
+Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que intente evadir el aislamiento del sistema de archivos local ni ejecutar procesos huérfanos sin cierres limpios.`;
 
   const [prePrompt, setPrePrompt] = useState(() => {
     const saved = localStorage.getItem("moset_pre_prompt");
@@ -24,6 +36,7 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
   const [openaiBaseUrl, setOpenaiBaseUrl] = useState(() => localStorage.getItem("moset_openai_base_url") || "");
   const [mistralApiKey, setMistralApiKey] = useState(() => localStorage.getItem("moset_mistral_api_key") || "");
   const [groqApiKey, setGroqApiKey] = useState(() => localStorage.getItem("moset_groq_api_key") || "");
+  const [hfToken, setHfToken] = useState(() => localStorage.getItem("moset_hf_token") || "");
 
   // Orquestador
   const [orqLocalIp, setorqLocalIp] = useState(() => localStorage.getItem("moset_orq_local_ip") || "");
@@ -45,14 +58,17 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
   // Check === null ensures the feature is ON by default for new users who haven't saved settings yet
   const [qPensarEnabled, setQPensarEnabled] = useState(() => localStorage.getItem("moset_q_pensar") === "true" || localStorage.getItem("moset_q_pensar") === null);
 
-  // Controles de Limpieza
+  // Controles de Memoria y Limpieza
   const [cudaCacheAutoClean, setCudaCacheAutoClean] = useState(() => localStorage.getItem("moset_cuda_autoclean") === "true");
+  const [maxTokens, setMaxTokens] = useState(() => localStorage.getItem("moset_max_tokens") || "2048");
+  const [contextTokens, setContextTokens] = useState(() => localStorage.getItem("moset_context_tokens") || "4096");
 
   // Pestañas de configuración
   const [activeTab, setActiveTab] = useState<string>("ide");
 
   const save = () => {
     localStorage.setItem("moset_model_path", modelPath);
+    localStorage.setItem("moset_tokenizer_path", tokenizerPath);
     localStorage.setItem("moset_glass_enabled", glassEnabled ? "true" : "false");
     localStorage.setItem("moset_pre_prompt", prePrompt);
     document.documentElement.style.setProperty('--glass', glassEnabled ? "blur(20px) saturate(180%)" : "none");
@@ -63,6 +79,7 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
     localStorage.setItem("moset_openai_base_url", openaiBaseUrl);
     localStorage.setItem("moset_mistral_api_key", mistralApiKey);
     localStorage.setItem("moset_groq_api_key", groqApiKey);
+    localStorage.setItem("moset_hf_token", hfToken);
 
     localStorage.setItem("moset_orq_local_ip", orqLocalIp);
     localStorage.setItem("moset_orq_remote_ip", orqRemoteIp);
@@ -81,6 +98,8 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
     localStorage.setItem("moset_q_pensar", qPensarEnabled ? "true" : "false");
 
     localStorage.setItem("moset_cuda_autoclean", cudaCacheAutoClean ? "true" : "false");
+    localStorage.setItem("moset_max_tokens", maxTokens);
+    localStorage.setItem("moset_context_tokens", contextTokens);
 
     // D4f: Sincronizan los ajustes del Vigilante con el backend Rust
     invoke("configurar_vigilante", {
@@ -95,6 +114,12 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
 
     // Trigger update dispatch correctly
     window.dispatchEvent(new Event("moset-settings-updated"));
+    
+    // Auto-load model if path is provided
+    if (modelPath && tokenizerPath) {
+      invoke("cargar_modelo", { modeloPath: modelPath, tokenizerPath: tokenizerPath }).catch(e => console.error("Error cargando modelo:", e));
+    }
+    
     onUpdate();
   };
 
@@ -141,9 +166,73 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
     }
   };
 
+  const HF_MAPPING: Record<string, string> = {
+    "GLM-4.6V-Flash": "THUDM/glm-4-9b-chat",
+    "GLM-4.7-Flash": "THUDM/glm-4-9b-chat",
+    "Granite-3.0-2B-Instruct": "ibm-granite/granite-3.0-2b-instruct",
+    "OpenAI-20B-NEO-CodePlus": "EleutherAI/gpt-neox-20b",
+    "Qwen-3.5-4B-Uncensored-Aggressive": "Qwen/Qwen2.5-7B-Instruct",
+    "DeepSeek-R1-Qwen3-8B": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+    "Ministral-3-3B-Instruct": "mistralai/Mistral-Nemo-Instruct-2407",
+    "Nemotron-3-Nano-4B": "nvidia/Nemotron-Mini-4B-Instruct",
+    "Qwen3-4B-Thinking": "Qwen/Qwen2.5-3B-Instruct",
+    "Qwen3.5-9B": "Qwen/Qwen2.5-7B",
+    "Granite-Guardian-3.0-2B": "ibm-granite/granite-guardian-3.0-2b",
+    "Phi-3-Mini-4K": "microsoft/Phi-3-mini-4k-instruct",
+    "Codestral-22B": "mistralai/Codestral-22B-v0.1",
+    "Devstral-Small-2-24B-Instruct": "mistralai/Mistral-Small-24B-Base-2501",
+    "Gemma-2-9B-IT": "google/gemma-2-9b-it",
+    "Qwen-2.5-3B-Instruct": "Qwen/Qwen2.5-3B-Instruct"
+  };
+
+  const [downloadingTokenizer, setDownloadingTokenizer] = useState(false);
+
+  const autoDownloadTokenizer = async () => {
+    if (!modelPath) {
+      alert("Primero selecciona la Ruta del Modelo GGUF para saber qué carpeta leer.");
+      return;
+    }
+    
+    const normalizedPath = modelPath.replace(/\\/g, "/");
+    const pathParts = normalizedPath.split("/");
+    const folderName = pathParts[pathParts.length - 2];
+    const targetDir = pathParts.slice(0, -1).join("/");
+    
+    let repoId = HF_MAPPING[folderName];
+    if (!repoId) {
+      const manualRepo = prompt(`No hay un mapeo predefinido para la carpeta "${folderName}".\nPor favor, ingresa el ID del repositorio en HuggingFace (ej. "Qwen/Qwen2.5-3B-Instruct"):`);
+      if (!manualRepo) return;
+      repoId = manualRepo.trim();
+    }
+    
+    setDownloadingTokenizer(true);
+    try {
+      const url = `https://huggingface.co/${repoId}/resolve/main/tokenizer.json`;
+      const headers: Record<string, string> = {};
+      if (hfToken) {
+        headers["Authorization"] = `Bearer ${hfToken}`;
+      }
+      
+      const res = await fetch(url, { headers });
+      if (!res.ok) throw new Error(`HTTP Error ${res.status}: ${res.statusText}`);
+      
+      const text = await res.text();
+      const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+      const targetPath = `${targetDir}/tokenizer.json`;
+      
+      await writeTextFile(targetPath, text);
+      setTokenizerPath(targetPath);
+      alert(`✅ Tokenizer descargado exitosamente desde ${repoId}`);
+    } catch (e: any) {
+      console.error(e);
+      alert("❌ Error descargando tokenizer: " + e.message);
+    } finally {
+      setDownloadingTokenizer(false);
+    }
+  };
+
   const menuItems = [
     { id: "ide", label: "General & Modelos", icon: "⚙️" },
-    { id: "ai_providers", label: "Inteligencia Artificial", icon: "🧠" },
     { id: "orquestador", label: "Orquestador", icon: "🔗" },
     { id: "vigilante", label: "Vigilante (Seguridad)", icon: "🛡️" },
     { id: "quantum", label: "Computación GPU & Quantum", icon: "⚛️" }
@@ -157,7 +246,12 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
       <div className="settings-modal" onClick={e => e.stopPropagation()}>
         <div className="settings-header">
           <h2 className="settings-title">Parámetros y Preferencias</h2>
-          <button className="settings-close-btn" onClick={() => { save(); onClose(); }}>✕</button>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <button className="btn-primary" onClick={() => { save(); onClose(); }} style={{ padding: "4px 12px", fontSize: "12px", height: "28px" }}>
+              Guardar y Cerrar
+            </button>
+            <button className="settings-close-btn" onClick={() => { save(); onClose(); }}>✕</button>
+          </div>
         </div>
 
         {/* ── Tabs Layout ─────────────────────────────────── */}
@@ -209,6 +303,33 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
                   </span>
                 </div>
 
+                <div className="form-group">
+                  <label className="settings-label">Token de Hugging Face (Opcional)</label>
+                  <input type="password" value={hfToken} onChange={e => setHfToken(e.target.value)} placeholder="hf_..." className="settings-input" />
+                  <span className="form-hint">Sirve para descargar archivos protegidos de HuggingFace Hub.</span>
+                </div>
+
+                <div className="form-group">
+                  <label className="settings-label">Ruta del Tokenizer (tokenizer.json)</label>
+                  <div className="form-input-row" style={{ display: "flex", gap: "10px" }}>
+                    <input type="text" value={tokenizerPath} onChange={e => setTokenizerPath(e.target.value)} placeholder="C:/ruta/a/mi/tokenizer.json" className="settings-input" />
+                    <button className="btn-secondary" style={{ width: "auto" }} onClick={() => openFileSelectorWrapper(setTokenizerPath)}>
+                      Examinar
+                    </button>
+                    <button 
+                      className="btn-primary" 
+                      style={{ width: "auto", background: "linear-gradient(90deg, #ff9900, #ff5500)", border: "none" }} 
+                      onClick={autoDownloadTokenizer}
+                      disabled={downloadingTokenizer}
+                    >
+                      {downloadingTokenizer ? "⏳ Descargando..." : "⬇ HF Auto-Download"}
+                    </button>
+                  </div>
+                  <span className="form-hint">
+                    ℹ️ Requerido por el Motor Soberano para procesar texto (HuggingFace tokenizer format).
+                  </span>
+                </div>
+
                 <div className="settings-card">
                   <label className="settings-checkbox-container">
                     <input type="checkbox" checked={glassEnabled} onChange={e => setGlassEnabled(e.target.checked)} className="settings-checkbox" />
@@ -216,6 +337,26 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
                   </label>
                   <div className="form-hint" style={{ marginLeft: "25px" }}>
                     Desactívalo en PCs con bajos recursos y sin GPU dedicada. Mejora el rendimiento en reposo.
+                  </div>
+                </div>
+
+                <div className="settings-section-divider"></div>
+                <h4 style={{ color: "var(--accent-primary)", marginBottom: "12px", marginTop: "24px" }}>Memoria y Contexto (Límites)</h4>
+
+                <div className="form-group" style={{ display: "flex", gap: "20px" }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="settings-label">Límite de Contexto (Context Tokens)</label>
+                    <input type="number" value={contextTokens} onChange={e => setContextTokens(e.target.value)} className="settings-input" />
+                    <span className="form-hint">
+                      ℹ️ Tamaño máximo del historial + archivos antes de usar /compact. Mayor tamaño = mayor uso de VRAM/RAM y más tiempo de procesamiento. (Recomendado: 4096 - 8192)
+                    </span>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="settings-label">Máximo de Respuesta (Max Tokens)</label>
+                    <input type="number" value={maxTokens} onChange={e => setMaxTokens(e.target.value)} className="settings-input" />
+                    <span className="form-hint">
+                      ℹ️ Límite de tokens que la IA puede generar por respuesta. (Recomendado: 2048 - 4096)
+                    </span>
                   </div>
                 </div>
 
@@ -242,47 +383,7 @@ Tu respuesta final al usuario (fuera de <thought>) debe ser extremadamente direc
               </div>
             )}
 
-            {activeTab === "ai_providers" && (
-              <div className="anim-fade-in">
-                <h3 className="settings-section-title">Llaves de APIs (Globales)</h3>
 
-                <div className="settings-card">
-                  <h4 style={{ margin: "0 0 16px 0", fontSize: "13px", color: "var(--text-1)" }}>Configuración de Autenticación a Nube</h4>
-                  
-                  <div className="form-group">
-                    <label className="settings-label">Google API Key</label>
-                    <input type="password" value={googleApiKey} onChange={e => setGoogleApiKey(e.target.value)} placeholder="AIzaSy..." className="settings-input" />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="settings-label">Anthropic API Key</label>
-                    <input type="password" value={anthropicApiKey} onChange={e => setAnthropicApiKey(e.target.value)} placeholder="sk-ant-api03-..." className="settings-input" />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="settings-label">Mistral API Key</label>
-                    <input type="password" value={mistralApiKey} onChange={e => setMistralApiKey(e.target.value)} placeholder="EjLW2eQ0..." className="settings-input" />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="settings-label">Groq API Key</label>
-                    <input type="password" value={groqApiKey} onChange={e => setGroqApiKey(e.target.value)} placeholder="gsk_..." className="settings-input" />
-                    <span className="form-hint">ℹ️ Para usar modelos de Groq Cloud (Llama 3, Mixtral y otros en inferencia ultrarrápida).</span>
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: "16px" }}>
-                    <label className="settings-label">OpenAI API Key (O tu token para APIs Compatibles)</label>
-                    <input type="password" value={openaiApiKey} onChange={e => setOpenaiApiKey(e.target.value)} placeholder="sk-..." className="settings-input" />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="settings-label">Base URL Endpoint (Ideal para usar con Ollama remoto o LM Studio)</label>
-                    <input type="text" value={openaiBaseUrl} onChange={e => setOpenaiBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" className="settings-input" />
-                  </div>
-                </div>
-
-              </div>
-            )}
 
             {activeTab === "orquestador" && (
               <div className="anim-fade-in">

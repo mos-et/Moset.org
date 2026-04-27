@@ -24,8 +24,10 @@ tauri-plugin-updater = "2"
 # ── Motor Soberano ──
 moset_core = { path = "../../core-engine", package = "moset" }
 portable-pty = "0.9.0"
+tauri-plugin-http = "2.0.0"
 
 [features]
-default = ["ai"]
+default = ["ai", "cuda"]
 ai = ["moset_core/ai"]
 cuda = ["moset_core/cuda"]
+metal = ["moset_core/metal"]

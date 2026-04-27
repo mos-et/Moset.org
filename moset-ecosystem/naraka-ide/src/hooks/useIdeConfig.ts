@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 
 export type AgentMode = "planear" | "actuar";
 export type ContextMode = "none" | "selected" | "project";
-export type AIProviderName = "soberano" | "nube";
+export type AIProviderName = "soberano" | "nube" | "custom";
 
 export interface IdeConfigState {
   agentMode: AgentMode;
@@ -37,6 +37,9 @@ export interface IdeConfigState {
   
   tokenizerPath: string;
   setTokenizerPath: (path: string) => void;
+  
+  isModelLoading: boolean;
+  setIsModelLoading: (loading: boolean) => void;
 }
 
 export function useIdeConfig(): IdeConfigState {
@@ -74,6 +77,7 @@ export function useIdeConfig(): IdeConfigState {
   const [tokenizerPath, setTokenizerPath] = useState(
     () => localStorage.getItem("moset_tokenizer_path") || ""
   );
+  const [isModelLoading, setIsModelLoading] = useState(false);
 
   // Sync states globally when another instance changes localStorage
   useEffect(() => {
@@ -131,5 +135,6 @@ export function useIdeConfig(): IdeConfigState {
     openRouterKey, setOpenRouterKey,
     modelPath, setModelPath,
     tokenizerPath, setTokenizerPath,
+    isModelLoading, setIsModelLoading,
   };
 }

@@ -53,7 +53,7 @@ mostrar("2 + 2 = " + sumar(2, 2))
                     try {
                         const t0 = performance.now();
                         // Ejecuta en Español por defecto en esta demo
-                        const result = run_moset_wasm(code, "español");
+                        const result = run_moset_wasm(code, "es");
                         const t1 = performance.now();
                         out.innerText = result + `\n\n[Ejecutado en ${(t1 - t0).toFixed(2)} ms]`;
                         out.style.color = '#0f0'; // Success

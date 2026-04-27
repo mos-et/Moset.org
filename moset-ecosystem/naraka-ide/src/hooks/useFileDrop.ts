@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 
 export function useFileDrop(onDrop: (paths: string[]) => void) {
   const [isDragging, setIsDragging] = useState(false);
+  const onDropRef = useRef(onDrop);
+  onDropRef.current = onDrop;
 
   useEffect(() => {
     let unlistenDrop: (() => void) | undefined;
@@ -12,7 +14,7 @@ export function useFileDrop(onDrop: (paths: string[]) => void) {
     async function setup() {
       unlistenDrop = await listen<string[]>("global-file-drop", (event) => {
         setIsDragging(false);
-        onDrop(event.payload);
+        onDropRef.current(event.payload);
       });
 
       // También podemos escuchar eventos nativos de dragging para feedback visual
@@ -27,7 +29,7 @@ export function useFileDrop(onDrop: (paths: string[]) => void) {
       if (unlistenEnter) unlistenEnter();
       if (unlistenLeave) unlistenLeave();
     };
-  }, [onDrop]);
+  }, []); // Empty deps — listeners are stable, ref captures latest callback
 
   return { isDragging };
 }

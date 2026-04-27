@@ -15,9 +15,17 @@
 //   entorno(Txt)            → Lee una variable de entorno
 // ============================================================================
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::process::Command;
+#[cfg(not(target_arch = "wasm32"))]
 use std::fs;
+#[cfg(not(target_arch = "wasm32"))]
 use std::env;
+
+#[cfg(not(target_arch = "wasm32"))]
+use crate::vigilante::{Vigilante, Veredicto};
+#[cfg(target_arch = "wasm32")]
+use crate::vigilante::Vigilante;
 
 /// Ejecutar un comando de shell y capturar la salida.
 /// Cross-platform: usa `cmd /C` en Windows, `sh -c` en Unix.
@@ -27,7 +35,18 @@ use std::env;
 /// resultado = shell("whoami")
 /// mostrar resultado
 /// ```
-pub fn shell(comando: &str) -> Result<String, String> {
+#[cfg(not(target_arch = "wasm32"))]
+pub fn shell(comando: &str, vigilante: &Vigilante) -> Result<String, String> {
+    match vigilante.auditar(comando) {
+        Veredicto::Permitido => {}
+        Veredicto::RequiereConfianza { nivel_minimo, categoria } => {
+            return Err(format!("Vigilante Bloqueado: '{}' requiere nivel de confianza {} (Categoría: {})", comando, nivel_minimo, categoria));
+        }
+        Veredicto::Prohibido { razon } => {
+            return Err(format!("Vigilante PROHIBIDO: {}", razon));
+        }
+    }
+
     let output = if cfg!(target_os = "windows") {
         Command::new("cmd")
             .args(["/C", comando])
@@ -57,6 +76,11 @@ pub fn shell(comando: &str) -> Result<String, String> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn shell(_comando: &str, _vigilante: &Vigilante) -> Result<String, String> {
+    Err("La función 'shell' no está disponible en WebAssembly (WASM).".to_string())
+}
+
 /// Leer el contenido completo de un archivo como texto.
 ///
 /// # Ejemplo Moset
@@ -64,9 +88,15 @@ pub fn shell(comando: &str) -> Result<String, String> {
 /// config = leer("/etc/hostname")
 /// mostrar config
 /// ```
+#[cfg(not(target_arch = "wasm32"))]
 pub fn leer(ruta: &str) -> Result<String, String> {
     fs::read_to_string(ruta)
         .map_err(|e| format!("Error leyendo '{}': {}", ruta, e))
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn leer(_ruta: &str) -> Result<String, String> {
+    Err("La función 'leer' no está disponible en WebAssembly (WASM).".to_string())
 }
 
 /// Escribir contenido a un archivo. Crea directorios padres si no existen.
@@ -76,6 +106,7 @@ pub fn leer(ruta: &str) -> Result<String, String> {
 /// ```moset
 /// escribir("salida.txt", "Hola desde Moset")
 /// ```
+#[cfg(not(target_arch = "wasm32"))]
 pub fn escribir(ruta: &str, contenido: &str) -> Result<(), String> {
     // Crear directorios padres si son necesarios
     if let Some(padre) = std::path::Path::new(ruta).parent() {
@@ -88,6 +119,11 @@ pub fn escribir(ruta: &str, contenido: &str) -> Result<(), String> {
         .map_err(|e| format!("Error escribiendo '{}': {}", ruta, e))
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn escribir(_ruta: &str, _contenido: &str) -> Result<(), String> {
+    Err("La función 'escribir' no está disponible en WebAssembly (WASM).".to_string())
+}
+
 /// Verificar si un archivo o directorio existe.
 ///
 /// # Ejemplo Moset
@@ -95,8 +131,14 @@ pub fn escribir(ruta: &str, contenido: &str) -> Result<(), String> {
 /// si existe("/etc/passwd"):
 ///     mostrar "Sistema Unix detectado"
 /// ```
+#[cfg(not(target_arch = "wasm32"))]
 pub fn existe(ruta: &str) -> bool {
     std::path::Path::new(ruta).exists()
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn existe(_ruta: &str) -> bool {
+    false
 }
 
 /// Leer una variable de entorno del sistema operativo.
@@ -106,9 +148,15 @@ pub fn existe(ruta: &str) -> bool {
 /// home = entorno("HOME")
 /// mostrar home
 /// ```
+#[cfg(not(target_arch = "wasm32"))]
 pub fn entorno(nombre: &str) -> Result<String, String> {
     env::var(nombre)
         .map_err(|_| format!("Variable de entorno '{}' no definida", nombre))
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn entorno(nombre: &str) -> Result<String, String> {
+    Err(format!("Variable de entorno '{}' no definida en WebAssembly", nombre))
 }
 
 /// Realizar una petición HTTP GET.
@@ -119,7 +167,7 @@ pub fn entorno(nombre: &str) -> Result<String, String> {
 /// respuesta = peticion_get("https://api.github.com")
 /// mostrar respuesta
 /// ```
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "cloud"))]
 pub fn peticion_get(url: &str) -> Result<String, String> {
     let client = reqwest::blocking::Client::builder()
         .user_agent("Moset/1.0 (Naraka Studio)")
@@ -133,31 +181,33 @@ pub fn peticion_get(url: &str) -> Result<String, String> {
         .map_err(|e| format!("Falló extraer cuerpo: {}", e))
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(any(target_arch = "wasm32", not(feature = "cloud")))]
 pub fn peticion_get(_url: &str) -> Result<String, String> {
-    Err("Peticiones HTTP síncronas no están disponibles en la web (WASM)".into())
+    Err("Peticiones HTTP no disponibles (requiere feature 'cloud')".into())
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-#[cfg(test)]
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::*;
 
     #[test]
     fn test_shell_whoami() {
+        let vigilante = Vigilante::nuevo();
         let resultado = shell(if cfg!(target_os = "windows") {
             "whoami"
         } else {
             "echo test"
-        });
+        }, &vigilante);
         assert!(resultado.is_ok(), "shell debe ejecutar: {:?}", resultado);
         assert!(!resultado.unwrap().is_empty());
     }
 
     #[test]
     fn test_shell_comando_invalido() {
-        let resultado = shell("comando_que_no_existe_xyz_12345");
+        let vigilante = Vigilante::nuevo();
+        let resultado = shell("comando_que_no_existe_xyz_12345", &vigilante);
         assert!(resultado.is_err());
     }
 

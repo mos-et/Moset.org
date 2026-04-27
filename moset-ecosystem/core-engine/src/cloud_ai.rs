@@ -29,7 +29,7 @@ impl MotorCloud {
         F: FnMut(String) -> bool,
     {
         match self.provider.as_str() {
-            "openai" | "mistral" => self.inferir_openai(system_prompt, msgs, max_tokens, on_partial),
+            "openai" | "mistral" | "nube" | "custom" => self.inferir_openai(system_prompt, msgs, max_tokens, on_partial),
             "anthropic" => self.inferir_anthropic(system_prompt, msgs, max_tokens, on_partial),
             "google" => self.inferir_google(system_prompt, msgs, max_tokens, on_partial),
             _ => Err(format!("Proveedor desconocido: {}", self.provider)),
@@ -87,6 +87,9 @@ impl MotorCloud {
         let base = self.base_url.as_deref().unwrap_or(default_base);
         let url = format!("{}/chat/completions", base.trim_end_matches('/'));
 
+        // NOTE: lib.rs already pre-filters system messages from the array before calling inferir().
+        // This merge logic is kept as defense-in-depth in case inferir() is called from other paths
+        // (e.g., WASM, CLI, or future direct consumers of core-engine).
         let mut merged_system = system_prompt.to_string();
         for m in msgs {
             if m.role == "system" {

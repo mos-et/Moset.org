@@ -60,6 +60,7 @@ pub enum Nodo {
 
     // === Identificadores ===
     Identificador(String),
+    Este, // Referencia a la instancia actual (OOP)
 
     // === Operaciones ===
     Binario {
@@ -85,9 +86,22 @@ pub enum Nodo {
         cuerpo: Vec<Nodo>,
     },
 
+    // === Closure (Función anónima) ===
+    Closure {
+        params: Vec<String>,
+        cuerpo: Vec<Nodo>,
+    },
+
     // === Llamada a función ===
     Llamada {
         funcion: Box<Nodo>,
+        args: Vec<Nodo>,
+    },
+
+    // === Llamada a método (OOP) ===
+    LlamadaMetodo {
+        objeto: Box<Nodo>,
+        metodo: String,
         args: Vec<Nodo>,
     },
 
@@ -142,6 +156,12 @@ pub enum Nodo {
     AsignacionCampo {
         objeto: String,
         campo: String,
+        valor: Box<Nodo>,
+    },
+    // === Asignación de índice: lista[indice] = valor ===
+    AsignacionIndice {
+        lista: Box<Nodo>,
+        indice: Box<Nodo>,
         valor: Box<Nodo>,
     },
 

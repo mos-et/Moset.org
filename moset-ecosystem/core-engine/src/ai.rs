@@ -103,10 +103,19 @@ mod engine {
         }
 
         fn detectar_device() -> (Device, String) {
-            match Device::new_cuda(0) {
-                Ok(dev) => (dev, "CUDA:0 (GPU)".to_string()),
-                Err(e) => (Device::Cpu, format!("CPU (Error: {})", e)),
+            #[cfg(feature = "cuda")]
+            if let Ok(dev) = Device::new_cuda(0) {
+                return (dev, "CUDA:0 (NVIDIA GPU)".to_string());
             }
+
+            #[cfg(feature = "metal")]
+            if let Ok(dev) = Device::new_metal(0) {
+                return (dev, "Metal (Apple GPU)".to_string());
+            }
+
+            // Candle does not have a native Device::new_vulkan equivalent in this version without deeper setup
+            // so if neither cuda nor metal work, we gracefully fallback to CPU.
+            (Device::Cpu, "CPU (RAM)".to_string())
         }
 
         pub fn estado(&self) -> EstadoMotor {
@@ -530,14 +539,16 @@ mod engine {
         }
         pub fn descargar(&mut self) {}
         pub fn set_temperatura(&mut self, _temp: f64) {}
+        pub fn set_temperature(&mut self, _temp: f32) {}
         pub fn set_top_k(&mut self, _k: Option<usize>) {}
         pub fn set_repeat_penalty(&mut self, _penalty: f32, _last_n: usize) {}
     }
 }
 
 // === API Publica ===
+#[allow(unused_imports)]
+pub use engine::*;
 
-pub use engine::MotorNaraka;
 
 #[cfg(test)]
 mod tests {

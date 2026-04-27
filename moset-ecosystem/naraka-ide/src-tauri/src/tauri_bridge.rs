@@ -44,15 +44,28 @@ pub fn kill_pty(state: State<'_, PtyState>) -> Result<String, String> {
     if let Ok(mut writer_guard) = state.writer.lock() {
         *writer_guard = None;
     }
+    
+    let mut success = false;
+    
     // 2. Matar el proceso child
     if let Ok(mut child_guard) = state.child.lock() {
         if let Some(mut child) = child_guard.take() {
             let _ = child.kill();
             let _ = child.wait();
-            return Ok("PTY terminada correctamente.".into());
+            success = true;
         }
     }
-    Ok("No había PTY activa.".into())
+    
+    // 3. Destruir el master PTY (fundamental para cerrar el pipe de ConPTY en Windows)
+    if let Ok(mut master_guard) = state.master.lock() {
+        *master_guard = None;
+    }
+    
+    if success {
+        Ok("PTY terminada correctamente.".into())
+    } else {
+        Ok("No había PTY activa.".into())
+    }
 }
 
 #[tauri::command]

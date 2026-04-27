@@ -968,3 +968,11 @@ Además de los endpoints del lenguaje Moset, el IDE incluye un **agente autónom
 - **Moset as Universal Orchestrator**: The language can act as a "sovereign bubble" governing Python, Java, Node.js or other languages via @python {} blocks or automatic external syntax detection. End users write only .et; connectors do the invisible plumbing.
 - **Web Route without IDE**: Three future paths: (1) WASM for browser-native execution, (2) Serverless API via Vercel + Firebase, (3) CLI moset file.et without the graphical interface.
 - **3-Layer Dictionary Architecture**: Human words (idiomas_humanos/), domain templates (examples/), and external language grammars (idiomas_computadora/) — all under mos.et/.
+
+**Phase G � Zero Bugs Definitive Audit (Completed):**
+- [x] **PTY Zombies (BUG-019/BUG-020) Eradicated**: Surgical destruction of orphaned PowerShell processes in Windows was implemented. In the \CloseRequested\ event (\lib.rs\) and in \kill_pty\ (\	auri_bridge.rs\), the writer is now explicitly dropped, a \.take()\ is performed on the child process to ensure \wait()\, and most importantly, a forced \drop\ is performed on the ConPTY \master\ handle. This collapses the tunnel from its root and removes all traces of orphaned processes in memory.
+- [x] **Silencing of Warnings**: Eliminated multiple unreachable code warnings (\unreachable_patterns\) due to duplicate brackets in \lexer.rs\.
+- [x] **AST Cleanup**: Standardized the structural instantiation of \MoldeSchema\ (\compiler.rs\) by protecting unused variables with padding (\_\).
+- [x] **Logic Evaluation Refinement**: The deprecated \	ry_eval_literal\ function has been cleanly silenced (\_try_eval_literal\) to reserve its structural signature without triggering the Rust compiler linter.
+- [x] **Test Consolidation**: Finalized test suite with +62 unit tests (including closures) running at 100% solidity.
+- [x] **Documentary Ecosystem Generation**: Generation of the global HUB Documentacion_Moset (in Premium / Glassmorphism mode) that bifurcates \rchitecture\, \language\, \ide\, \ia\ and \ugs\.

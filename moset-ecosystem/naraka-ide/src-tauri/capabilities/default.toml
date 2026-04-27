@@ -14,3 +14,6 @@ identifier = "opener:default"
 
 [[permissions]]
 identifier = "fs:default"
+
+[[permissions]]
+identifier = "http:default"

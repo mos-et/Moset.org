@@ -1,7 +1,6 @@
 use wasm_bindgen::prelude::*;
 use crate::{lexer::Lexer, parser::Parser, compiler::Compilador, vm::VM};
 use std::sync::{Arc, Mutex};
-use std::cell::RefCell;
 
 #[wasm_bindgen]
 pub fn run_moset_wasm(codigo: &str, idioma_opcional: Option<String>) -> String {

@@ -32,14 +32,19 @@ export function ChatHeader({
   onClose
 }: ChatHeaderProps) {
   return (
-    <div 
-      className={`chat-header ${onDragStart || isFloating ? 'chat-header-drag' : ''}`}
-      onMouseDown={onDragStart}
-    >
+      <div 
+        className={`chat-header ${onDragStart || isFloating ? 'chat-header-drag' : ''}`}
+        onMouseDown={(e) => {
+          if ((e.target as HTMLElement).closest('button')) return;
+          if (onDragStart) {
+            e.preventDefault();
+            onDragStart(e);
+          }
+        }}
+      >
       <div className="header-left">
         <span className="header-icon">{Icons.moset}</span>
-        <span className="header-title">Moset Studio</span>
-        <span className="header-subline">/ Motor Soberano</span>
+        <span className="header-title">Moset</span>
       </div>
       <div className="chat-header-right">
         {lastMetrics ? (

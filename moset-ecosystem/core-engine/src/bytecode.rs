@@ -69,9 +69,12 @@ pub enum OpCode {
     // ─── Quantum ────────────────────────────────────────────────────────
     /// Colapsa un Valor::Superposicion en Valor::Booleano
     ColapsarQuantum = 30,
+    /// Crea un Qubit en superposición. Operand: ninguno (los valores alpha y beta van embebidos o los cargamos de la pila, pero como es f64 no cabe en u8).
+    /// Espera en la pila: alpha (Decimal), beta (Decimal)
+    CrearQubit = 47,
 
     // ─── Listas ─────────────────────────────────────────────────────────
-    /// Construye una lista. Operando: u8 cantidad de elementos en la pila
+    /// Construye una lista. Operando: u16 cantidad de elementos en la pila
     ConstruirLista = 31,
 
     // ─── Campos (Moldes) ────────────────────────────────────────────────
@@ -83,6 +86,40 @@ pub enum OpCode {
     // ─── Builtins ───────────────────────────────────────────────────────
     /// Llama una función builtin de la stdlib. Operando: u8 nombre_idx, u8 arg_count
     LlamarBuiltin = 34,
+
+    // ─── Colecciones y Diccionarios ─────────────────────────────────────
+    ObtenerIndice = 35,
+    ObtenerLongitud = 36,
+
+    // ─── Control de Errores ─────────────────────────────────────────────
+    ConfigurarCatch = 37,
+    LimpiarCatch = 38,
+    LanzarError = 39,
+
+    // ─── Asincronía ─────────────────────────────────────────────────────
+    Esperar = 40,
+
+    // ─── Closures ───────────────────────────────────────────────────────
+    ConstruirClosure = 41,
+    ObtenerCaptura = 42,
+
+    // ─── Phase G (Memory & Objects) ─────────────────────────────────────
+    AsignarIndice = 43,
+    ConstruirMolde = 44,
+
+    // ─── Phase H (Methods & OOP) ────────────────────────────────────────
+    /// Invoca un método sobre un objeto. Operando: u8 arg_count
+    /// Asume objeto luego metodo en forma de closure u objeto callable
+    InvocacionMetodo = 45,
+    /// Obtiene la referencia `este` del CallFrame actual
+    ObtenerEste = 46,
+
+    // ─── Phase J (Shadow Environments) ──────────────────────────────────
+    EntrarPensar = 48,
+    SalirPensar = 49,
+
+    // ─── Control de errores internos ────────────────────────────────────
+    Invalido = 255,
 }
 
 impl From<u8> for OpCode {
@@ -123,7 +160,22 @@ impl From<u8> for OpCode {
             32 => OpCode::ObtenerCampo,
             33 => OpCode::AsignarCampo,
             34 => OpCode::LlamarBuiltin,
-            _ => panic!("OpCode desconocido: {}", byte),
+            35 => OpCode::ObtenerIndice,
+            36 => OpCode::ObtenerLongitud,
+            37 => OpCode::ConfigurarCatch,
+            38 => OpCode::LimpiarCatch,
+            39 => OpCode::LanzarError,
+            40 => OpCode::Esperar,
+            41 => OpCode::ConstruirClosure,
+            42 => OpCode::ObtenerCaptura,
+            43 => OpCode::AsignarIndice,
+            44 => OpCode::ConstruirMolde,
+            45 => OpCode::InvocacionMetodo,
+            46 => OpCode::ObtenerEste,
+            47 => OpCode::CrearQubit,
+            48 => OpCode::EntrarPensar,
+            49 => OpCode::SalirPensar,
+            _ => OpCode::Invalido,
         }
     }
 }
@@ -158,9 +210,12 @@ impl Chunk {
     }
 
     /// Añade una constante al pool y devuelve su índice
-    pub fn añadir_constante(&mut self, valor: Valor) -> usize {
+    pub fn añadir_constante(&mut self, valor: Valor) -> Result<usize, String> {
+        if self.constantes.len() >= u16::MAX as usize {
+            return Err("Demasiadas constantes en un mismo bloque (límite: 65535)".to_string());
+        }
         self.constantes.push(valor);
-        self.constantes.len() - 1
+        Ok(self.constantes.len() - 1)
     }
 
     /// Escribe un salto placeholder y retorna el offset para backpatching
@@ -173,24 +228,26 @@ impl Chunk {
     }
 
     /// Parchea un salto previo con el offset real
-    pub fn parchear_salto(&mut self, offset: usize) {
+    pub fn parchear_salto(&mut self, offset: usize) -> Result<(), String> {
         let salto = self.codigo.len() - offset - 2;
         if salto > u16::MAX as usize {
-            panic!("Salto demasiado grande para u16");
+            return Err("Salto demasiado grande para u16".to_string());
         }
-        self.codigo[offset] = ((salto >> 8) & 0xFF) as u8;
-        self.codigo[offset + 1] = (salto & 0xFF) as u8;
+        self.codigo[offset] = (salto & 0xFF) as u8;
+        self.codigo[offset + 1] = ((salto >> 8) & 0xFF) as u8;
+        Ok(())
     }
 
     /// Emite un bucle (salto hacia atrás)
-    pub fn emitir_bucle(&mut self, inicio_loop: usize, linea: usize) {
+    pub fn emitir_bucle(&mut self, inicio_loop: usize, linea: usize) -> Result<(), String> {
         self.escribir(OpCode::Bucle as u8, linea);
         // +2 por los bytes del operando que vamos a escribir
         let offset = self.codigo.len() - inicio_loop + 2;
         if offset > u16::MAX as usize {
-            panic!("Bucle demasiado grande para u16");
+            return Err("Bucle demasiado grande para u16".to_string());
         }
-        self.escribir(((offset >> 8) & 0xFF) as u8, linea);
         self.escribir((offset & 0xFF) as u8, linea);
+        self.escribir(((offset >> 8) & 0xFF) as u8, linea);
+        Ok(())
     }
 }

@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
   <img src="moset-ecosystem/naraka-ide/src/assets/moset-logo.png" alt="Moset Logo" width="200" />
   
   # Moset Ecosystem
@@ -23,20 +23,6 @@
 
 ---
 
-## 📸 Screenshots
-*(Replace IMAGEN1, IMAGEN2, etc. with the link to your screenshot when uploading to GitHub)*
-
-### Welcome Screen & Config
-![Welcome Screen](IMAGEN1)
-
-### Moset Main IDE & Customization
-![IDE General Interface](IMAGEN2)
-
-### MosetOutputPanel — Visual Execution
-![MosetOutputPanel](IMAGEN3)
-
----
-
 ## 🌐 Vision and Architecture
 
 To fully dive into the philosophy, technical foundations, and the "Lore" behind this project, we invite you to read our central documentation:
@@ -49,15 +35,14 @@ To fully dive into the philosophy, technical foundations, and the "Lore" behind 
 - **Absolute Privacy**: AI models run directly on your hardware, offline.
 - **Native Performance**: core-engine backend completely written in pure Rust.
 - **Cross-Platform**: Proven compatibility on Windows, macOS, and Linux. Optional CUDA support.
-- **Glassmorphism Frontend**: Immersive and cutting-edge IDE under 
-araka-ide.
+- **Glassmorphism Frontend**: Immersive and cutting-edge IDE under Naraka IDE.
 - **Moset-Lang (.et)**: A custom programming language with U-AST, omnilingual keywords (Spanish, English, and more), quantum variables, and elastic molds.
 - **MosetOutputPanel**: Premium visual panel for .et script execution results (quantum bars, mold cards, glassmorphism).
 - **Universal Orchestrator (Roadmap)**: Moset is designed to become a polyglot orchestrator — executing Python, Node.js, Java and more from within a single .et file.
 
 ## 📁 Repository Structure
 
-`	ext
+```text
 /moset-ecosystem
  ├── core-engine/         # Pure Rust backend: Lexer, Parser, Compiler, VM, AI
  ├── naraka-ide/          # Tauri + React IDE (MosetOutputPanel, ChatPanel, Explorer)
@@ -70,7 +55,7 @@ araka-ide.
  ├── scripts/             # Fine-tuning, corpus generation, CLI installer
  └── ai-corpus/           # Training data for Moset-specific models
 /logos moset/             # Visual Identity and branding
-`
+```
 
 ## ⚙️ Installation & Basic Build
 
@@ -80,17 +65,17 @@ araka-ide.
 
 ### Running the Development Environment (IDE)
 
-`ash
+```bash
 cd moset-ecosystem/naraka-ide
 npm install
 npm run tauri dev
-`
+```
 
 ### Running a .et script (CLI)
 
-`ash
+```bash
 moset run archivo.et
-`
+```
 
 > **Note:** The heavy model downloads (.safetensors, .gguf) are configured using the integrated scripts, which are ignored by native version control due to their large file size.
 

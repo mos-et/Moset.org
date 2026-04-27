@@ -1,0 +1,153 @@
+.macro-dialog-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+
+.macro-dialog-content {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  animation: modal-pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes modal-pop {
+  0% { transform: scale(0.95); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.macro-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.macro-dialog-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  color: var(--text-2);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.btn-close:hover {
+  color: var(--accent);
+}
+
+.macro-dialog-search {
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.macro-dialog-search input {
+  width: 100%;
+  padding: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.macro-dialog-search input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.macro-dialog-list {
+  overflow-y: auto;
+  max-height: 300px;
+  padding: 10px;
+}
+
+.macro-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.macro-item:hover {
+  background: var(--bg-hover);
+}
+
+.macro-name {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.macro-id {
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.macro-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.macro-variables-form {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.macro-variable-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.macro-variable-row label {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.macro-variable-row input {
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.macro-variable-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.macro-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}

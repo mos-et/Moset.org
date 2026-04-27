@@ -38,3 +38,15 @@ export function sanitizeStreamChunk(accumulated: string, newChunk: string): { te
   
   return { text: combined, blocked: false };
 }
+
+import { AIProviderName } from "../hooks/useIdeConfig";
+
+export function toBackendProvider(provider: AIProviderName): "local_gguf" | "nube" | "custom" {
+  // Frontend uses "soberano" as the user-facing name, but the Rust enum only has LocalGguf
+  switch (provider) {
+    case "soberano": return "local_gguf";
+    case "nube":     return "nube";
+    case "custom":   return "custom";
+    default:         return "nube";
+  }
+}

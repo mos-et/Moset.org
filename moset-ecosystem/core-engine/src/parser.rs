@@ -73,12 +73,16 @@ impl Parser {
             _ => self.parsear_asignacion_o_expresion(),
         }?;
 
-        // Envolver en Metadata
-        Ok(Nodo::Metadata {
-            linea: lin,
-            columna: col,
-            nodo: Box::new(nodo),
-        })
+        // BUG-051: Envolver en Metadata solo si no está ya envuelto para evitar anidamientos redundantes
+        if let Nodo::Metadata { .. } = nodo {
+            Ok(nodo)
+        } else {
+            Ok(Nodo::Metadata {
+                linea: lin,
+                columna: col,
+                nodo: Box::new(nodo),
+            })
+        }
     }
 
     fn parsear_comentario(&mut self) -> Result<Nodo, String> {
@@ -314,27 +318,45 @@ impl Parser {
         Ok(Nodo::Retornar(Box::new(expr)))
     }
 
-    /// pensar { cuerpo } — Shadow Environment (simulación)
+    /// pensar:
+    ///     cuerpo
     fn parsear_pensar(&mut self) -> Result<Nodo, String> {
         self.consumir_kw(Token::Pensar)?;
-        self.consumir(Token::LlaveIzq)?;
-        self.saltar_nuevas_lineas();
-
-        let mut cuerpo = Vec::new();
-        while !self.verificar(&Token::LlaveDer) && !self.es_fin() {
+        
+        let cuerpo = if self.verificar(&Token::DosPuntos) {
+            self.consumir(Token::DosPuntos)?;
             self.saltar_nuevas_lineas();
-            if self.verificar(&Token::LlaveDer) || self.es_fin() {
-                break;
+            if self.verificar(&Token::Indent) {
+                self.parsear_bloque()?
+            } else {
+                vec![self.parsear_sentencia()?]
             }
-            cuerpo.push(self.parsear_sentencia()?);
+        } else {
+            // Support legacy { }
+            self.consumir(Token::LlaveIzq)?;
             self.saltar_nuevas_lineas();
-        }
-        self.consumir(Token::LlaveDer)?;
+
+            let mut c = Vec::new();
+            while !self.verificar(&Token::LlaveDer) && !self.es_fin() {
+                self.saltar_nuevas_lineas();
+                // Skip Indent/Dedent if any get mixed inside {}
+                while self.verificar(&Token::Indent) || self.verificar(&Token::Dedent) {
+                    self.avanzar();
+                }
+                if self.verificar(&Token::LlaveDer) || self.es_fin() {
+                    break;
+                }
+                c.push(self.parsear_sentencia()?);
+                self.saltar_nuevas_lineas();
+            }
+            self.consumir(Token::LlaveDer)?;
+            c
+        };
 
         Ok(Nodo::Pensar { cuerpo })
     }
 
-    /// nombre = expresion  |  obj.campo = expresion  |  expresion
+    /// nombre = expresion  |  obj.campo = expresion  |  lista[indice] = expresion | expresion
     fn parsear_asignacion_o_expresion(&mut self) -> Result<Nodo, String> {
         if let Token::Ident(nombre) = self.actual_token() {
             // ── obj.campo = valor (asignación de campo) ──
@@ -356,6 +378,16 @@ impl Parser {
                 }
             }
 
+            // ── lista[indice] = valor (asignación de índice) ──
+            if self.peek_token(1) == Some(&Token::CorcheteIzq) {
+                // Necesitamos verificar si después del corchete derecho hay un =
+                // Pero el índice puede ser una expresión compleja, así que no podemos 
+                // solo mirar peek_token.
+                // En lugar de pre-escanear, podemos probar a parsear el índice
+                // O mejor aún, parsear la expresión izquierda completa y ver si le sigue un '='.
+                // Ya que `parsear_expresion` maneja `AccesoIndice`.
+            }
+
             // ── ident = expr (asignación simple) ──
             if self.peek_token(1) == Some(&Token::Igual) {
                 let nombre = nombre.clone();
@@ -369,8 +401,30 @@ impl Parser {
             }
         }
 
-        // Si no es asignación, es una expresión standalone
-        self.parsear_expresion()
+        // Si no es asignación simple ni de campo, parseamos como expresión.
+        // PERO puede ser una asignación a índice: `lista[1] = expr`
+        let expr = self.parsear_expresion()?;
+        
+        if self.verificar(&Token::Igual) {
+            self.avanzar(); // =
+            let valor = self.parsear_expresion()?;
+            let mut base_expr = expr;
+            if let Nodo::Metadata { nodo: inner, .. } = base_expr {
+                base_expr = *inner;
+            }
+            if let Nodo::AccesoIndice { lista, indice } = base_expr {
+                // BUG-052: Permitir expresiones en AsignacionIndice en lugar de solo identificador
+                return Ok(Nodo::AsignacionIndice {
+                    lista,
+                    indice,
+                    valor: Box::new(valor),
+                });
+            } else {
+                return Err(self.error(&format!("Asignación no válida a una expresión: {:?}", base_expr)));
+            }
+        }
+        
+        Ok(expr)
     }
 
     // ─── Bloques (indentación) ───────────────────────────────────────────────
@@ -407,6 +461,16 @@ impl Parser {
 
     /// o (or)
     fn parsear_o_logico(&mut self) -> Result<Nodo, String> {
+        let (lin, col) = if let Some(tc) = self.actual_token_full() {
+            (tc.linea, tc.columna)
+        } else {
+            (1, 1)
+        };
+        let nodo = self.parsear_o_logico_inner()?;
+        Ok(self.envolver_meta(lin, col, nodo))
+    }
+
+    fn parsear_o_logico_inner(&mut self) -> Result<Nodo, String> {
         let mut izq = self.parsear_y_logico()?;
         while self.verificar(&Token::O) {
             self.avanzar();
@@ -422,6 +486,16 @@ impl Parser {
 
     /// y (and)
     fn parsear_y_logico(&mut self) -> Result<Nodo, String> {
+        let (lin, col) = if let Some(tc) = self.actual_token_full() {
+            (tc.linea, tc.columna)
+        } else {
+            (1, 1)
+        };
+        let nodo = self.parsear_y_logico_inner()?;
+        Ok(self.envolver_meta(lin, col, nodo))
+    }
+
+    fn parsear_y_logico_inner(&mut self) -> Result<Nodo, String> {
         let mut izq = self.parsear_igualdad()?;
         while self.verificar(&Token::Y) {
             self.avanzar();
@@ -437,6 +511,16 @@ impl Parser {
 
     /// == !=
     fn parsear_igualdad(&mut self) -> Result<Nodo, String> {
+        let (lin, col) = if let Some(tc) = self.actual_token_full() {
+            (tc.linea, tc.columna)
+        } else {
+            (1, 1)
+        };
+        let nodo = self.parsear_igualdad_inner()?;
+        Ok(self.envolver_meta(lin, col, nodo))
+    }
+
+    fn parsear_igualdad_inner(&mut self) -> Result<Nodo, String> {
         let mut izq = self.parsear_comparacion()?;
         loop {
             let op = match self.actual_token() {
@@ -457,6 +541,16 @@ impl Parser {
 
     /// > < >= <=
     fn parsear_comparacion(&mut self) -> Result<Nodo, String> {
+        let (lin, col) = if let Some(tc) = self.actual_token_full() {
+            (tc.linea, tc.columna)
+        } else {
+            (1, 1)
+        };
+        let nodo = self.parsear_comparacion_inner()?;
+        Ok(self.envolver_meta(lin, col, nodo))
+    }
+
+    fn parsear_comparacion_inner(&mut self) -> Result<Nodo, String> {
         let mut izq = self.parsear_suma()?;
         loop {
             let op = match self.actual_token() {
@@ -479,6 +573,16 @@ impl Parser {
 
     /// + -
     fn parsear_suma(&mut self) -> Result<Nodo, String> {
+        let (lin, col) = if let Some(tc) = self.actual_token_full() {
+            (tc.linea, tc.columna)
+        } else {
+            (1, 1)
+        };
+        let nodo = self.parsear_suma_inner()?;
+        Ok(self.envolver_meta(lin, col, nodo))
+    }
+
+    fn parsear_suma_inner(&mut self) -> Result<Nodo, String> {
         let mut izq = self.parsear_factor()?;
         loop {
             let op = match self.actual_token() {
@@ -499,6 +603,16 @@ impl Parser {
 
     /// * / %
     fn parsear_factor(&mut self) -> Result<Nodo, String> {
+        let (lin, col) = if let Some(tc) = self.actual_token_full() {
+            (tc.linea, tc.columna)
+        } else {
+            (1, 1)
+        };
+        let nodo = self.parsear_factor_inner()?;
+        Ok(self.envolver_meta(lin, col, nodo))
+    }
+
+    fn parsear_factor_inner(&mut self) -> Result<Nodo, String> {
         let mut izq = self.parsear_unario()?;
         loop {
             let op = match self.actual_token() {
@@ -520,6 +634,16 @@ impl Parser {
 
     /// -expr  |  no expr  |  !expr (colapso cuántico)
     fn parsear_unario(&mut self) -> Result<Nodo, String> {
+        let (lin, col) = if let Some(tc) = self.actual_token_full() {
+            (tc.linea, tc.columna)
+        } else {
+            (1, 1)
+        };
+        let nodo = self.parsear_unario_inner()?;
+        Ok(self.envolver_meta(lin, col, nodo))
+    }
+
+    fn parsear_unario_inner(&mut self) -> Result<Nodo, String> {
         match self.actual_token() {
             Token::Menos => {
                 self.avanzar();
@@ -549,6 +673,16 @@ impl Parser {
 
     /// Llamadas, acceso a campos, índices, catch inline
     fn parsear_postfix(&mut self) -> Result<Nodo, String> {
+        let (lin, col) = if let Some(tc) = self.actual_token_full() {
+            (tc.linea, tc.columna)
+        } else {
+            (1, 1)
+        };
+        let nodo = self.parsear_postfix_inner()?;
+        Ok(self.envolver_meta(lin, col, nodo))
+    }
+
+    fn parsear_postfix_inner(&mut self) -> Result<Nodo, String> {
         let mut expr = self.parsear_primario()?;
 
         loop {
@@ -565,10 +699,28 @@ impl Parser {
                         }
                     }
                     self.consumir(Token::ParenDer)?;
-                    expr = Nodo::Llamada {
-                        funcion: Box::new(expr),
-                        args,
-                    };
+                    let mut es_metodo = false;
+                    let mut obj = None;
+                    let mut metodo = String::new();
+
+                    if let Nodo::AccesoCampo { objeto, campo } = expr.clone() {
+                        es_metodo = true;
+                        obj = Some(objeto);
+                        metodo = campo;
+                    }
+
+                    if es_metodo {
+                        expr = Nodo::LlamadaMetodo {
+                            objeto: obj.unwrap(),
+                            metodo,
+                            args,
+                        };
+                    } else {
+                        expr = Nodo::Llamada {
+                            funcion: Box::new(expr),
+                            args,
+                        };
+                    }
                 }
                 // Acceso a campo: obj.campo
                 Token::Punto => {
@@ -605,8 +757,19 @@ impl Parser {
         Ok(expr)
     }
 
-    /// Valores primarios
+    /// Valores primarios (con metadata de posición real)
     fn parsear_primario(&mut self) -> Result<Nodo, String> {
+        let (lin, col) = if let Some(tc) = self.actual_token_full() {
+            (tc.linea, tc.columna)
+        } else {
+            (1, 1)
+        };
+        let nodo = self.parsear_primario_inner()?;
+        Ok(self.envolver_meta(lin, col, nodo))
+    }
+
+    /// Implementación interna de los valores primarios
+    fn parsear_primario_inner(&mut self) -> Result<Nodo, String> {
         let tok = self.actual_token();
         match tok {
             Token::Entero(n) => {
@@ -635,6 +798,10 @@ impl Parser {
             Token::Nulo => {
                 self.avanzar();
                 Ok(Nodo::NuloLit)
+            }
+            Token::Este => {
+                self.avanzar();
+                Ok(Nodo::Este)
             }
             Token::Ident(nombre) => {
                 let n = nombre.clone();
@@ -715,6 +882,50 @@ impl Parser {
             Token::Pensar => {
                 self.parsear_pensar()
             }
+            // Closure (función anónima): :,) (arg1, arg2): cuerpo
+            Token::ClosureDef => {
+                self.avanzar(); // Consumir :,)
+                
+                let mut params = Vec::new();
+                
+                // Los parámetros pueden o no tener paréntesis.
+                // Si hay paréntesis, los consumimos.
+                let tiene_paren = self.verificar(&Token::ParenIzq);
+                if tiene_paren {
+                    self.avanzar(); // Consumir (
+                }
+                
+                if !self.verificar(&Token::ParenDer) && !self.verificar(&Token::DosPuntos) && !self.verificar(&Token::Indent) {
+                    params.push(self.consumir_ident()?);
+                    while self.verificar(&Token::Coma) {
+                        self.avanzar(); // Consumir ,
+                        params.push(self.consumir_ident()?);
+                    }
+                }
+                
+                if tiene_paren {
+                    self.consumir(Token::ParenDer)?; // Consumir )
+                }
+                
+                self.saltar_nuevas_lineas();
+                
+                if self.verificar(&Token::DosPuntos) {
+                    self.avanzar(); // Consumir : opcional
+                }
+                
+                let cuerpo = if self.verificar(&Token::NuevaLinea) || self.verificar(&Token::Indent) {
+                    self.saltar_nuevas_lineas();
+                    self.parsear_bloque()?
+                } else {
+                    let expr = self.parsear_asignacion_o_expresion()?;
+                    vec![Nodo::Retornar(Box::new(expr))]
+                };
+                
+                Ok(Nodo::Closure {
+                    params,
+                    cuerpo,
+                })
+            }
             _ => Err(self.error(&format!(
                 "Expresión inesperada: {:?}",
                 self.actual_token()
@@ -723,6 +934,19 @@ impl Parser {
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    /// Envuelve cualquier nodo en un Nodo::Metadata usando una posición específica
+    fn envolver_meta(&self, linea: usize, columna: usize, nodo: Nodo) -> Nodo {
+        // BUG-051: Evitar el anidamiento recursivo de Metadata
+        if let Nodo::Metadata { .. } = nodo {
+            return nodo; // Si ya es Metadata, no lo envolvemos de nuevo
+        }
+        Nodo::Metadata {
+            linea,
+            columna,
+            nodo: Box::new(nodo),
+        }
+    }
 
     fn actual_token(&self) -> &Token {
         if self.pos < self.tokens.len() {
@@ -837,10 +1061,10 @@ mod tests {
         parser.parsear().unwrap()
     }
 
-    /// Desenvuelve el Nodo::Metadata wrapper que el parser agrega a toda sentencia.
+    /// Desenvuelve el Nodo::Metadata wrapper que el parser agrega a toda sentencia o subexpresión.
     fn unwrap_meta(nodo: &Nodo) -> &Nodo {
         match nodo {
-            Nodo::Metadata { nodo, .. } => nodo,
+            Nodo::Metadata { nodo, .. } => unwrap_meta(nodo),
             other => other,
         }
     }
@@ -866,7 +1090,7 @@ mod tests {
         let prog = parsear_codigo("x = 2 + 3 * 4");
         // Debe respetar precedencia: 2 + (3 * 4)
         if let Nodo::Asignacion { valor, .. } = unwrap_meta(&prog.sentencias[0]) {
-            assert!(matches!(valor.as_ref(), Nodo::Binario { op: OpBinario::Sumar, .. }));
+            assert!(matches!(unwrap_meta(valor.as_ref()), Nodo::Binario { op: OpBinario::Sumar, .. }));
         }
     }
 
@@ -875,7 +1099,7 @@ mod tests {
         let prog = parsear_codigo("q = Bit:~");
         if let Nodo::Asignacion { nombre, valor } = unwrap_meta(&prog.sentencias[0]) {
             assert_eq!(nombre, "q");
-            assert!(matches!(valor.as_ref(), Nodo::SuperposicionLit { .. }));
+            assert!(matches!(unwrap_meta(valor.as_ref()), Nodo::SuperposicionLit { .. }));
         } else {
             panic!("Se esperaba asignación");
         }
@@ -885,7 +1109,7 @@ mod tests {
     fn test_colapso_cuantico() {
         let prog = parsear_codigo("x = !q");
         if let Nodo::Asignacion { valor, .. } = unwrap_meta(&prog.sentencias[0]) {
-            assert!(matches!(valor.as_ref(), Nodo::Colapsar(_)));
+            assert!(matches!(unwrap_meta(valor.as_ref()), Nodo::Colapsar(_)));
         } else {
             panic!("Se esperaba colapso");
         }
@@ -896,7 +1120,7 @@ mod tests {
         let prog = parsear_codigo("q = Bit:[0.85]");
         if let Nodo::Asignacion { nombre, valor } = unwrap_meta(&prog.sentencias[0]) {
             assert_eq!(nombre, "q");
-            if let Nodo::SuperposicionLit { alpha, beta } = valor.as_ref() {
+            if let Nodo::SuperposicionLit { alpha, beta } = unwrap_meta(valor.as_ref()) {
                 // β = √0.85 ≈ 0.9220, α = √0.15 ≈ 0.3873
                 assert!((beta * beta - 0.85).abs() < 0.001,
                     "β² debería ser ~0.85, es {}", beta * beta);
@@ -952,7 +1176,7 @@ mod tests {
         if let Nodo::AsignacionCampo { objeto, campo, valor } = unwrap_meta(&prog.sentencias[0]) {
             assert_eq!(objeto, "obj");
             assert_eq!(campo, "campo");
-            assert!(matches!(valor.as_ref(), Nodo::EnteroLit(42)));
+            assert!(matches!(unwrap_meta(valor.as_ref()), Nodo::EnteroLit(42)));
         } else {
             panic!("Se esperaba AsignacionCampo, got {:?}", unwrap_meta(&prog.sentencias[0]));
         }

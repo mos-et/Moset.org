@@ -21,6 +21,7 @@ pub enum Token {
     FuncDef,            // :,]   carita función
     CatchDef,           // :,[   carita catch
     Esperar,            // :,\   carita await
+    ClosureDef,         // :,)   carita closure (función anónima)
     Comentario(String), // :@    silenciamiento
     BitCuantico,        // Bit:~ superposición cuántica (50/50)
     BitSesgado(f64),    // Bit:[0.85] superposición con probabilidad custom
@@ -49,6 +50,7 @@ pub enum Token {
     No,         // no / not
     Devolver,   // devolver / return
     Pensar,     // pensar / think (shadow env)
+    Este,       // este / this / self (OOP)
 
     // === Identificadores ===
     Ident(String),
@@ -79,6 +81,13 @@ pub enum Token {
     Punto,       // .
     Elipsis,     // ... (molde elástico)
 
+    // === Interpolación de String (Fase futura: AST nativo) ===
+    // Actualmente la interpolación se resuelve expandiendo a Texto+Mas en el lexer.
+    #[allow(dead_code)]
+    InterpolIni,        // inicio de expresión interpolada dentro de string
+    #[allow(dead_code)]
+    InterpolFin,        // fin de expresión interpolada dentro de string
+
     // === Estructura ===
     NuevaLinea,
     Indent,
@@ -103,15 +112,14 @@ pub struct Lexer {
     col: usize,
     palabras_clave: HashMap<String, Token>,
     indent_stack: Vec<usize>,
+    idioma: Option<String>,
 }
 
 impl Lexer {
     /// Crear un nuevo Lexer con diccionario opcional de idioma
-    pub fn nuevo(fuente: &str, _idioma: Option<&str>) -> Self {
+    pub fn nuevo(fuente: &str, idioma: Option<&str>) -> Self {
         let mut kw = HashMap::new();
 
-        // === Cargar Diccionario Bilingüe (Español + Inglés) simultáneamente ===
-        
         // === Cargar Diccionario Omníglota (12 idiomas simultáneos) ===
         // Español, Inglés, Portugués, Italiano, Francés, Alemán, Chino, Japonés, Coreano, Ruso, Hindi, Árabe
         let mappings = vec![
@@ -132,6 +140,7 @@ impl Lexer {
             (Token::No, vec!["no", "not", "nao", "não", "non", "nicht", "不", "ない", "아니", "нет", "नहीं", "لا"]),
             (Token::Devolver, vec!["devolver", "return", "retornar", "ritorna", "retourner", "zurueckgeben", "zurückgeben", "返回", "戻る", "반환", "вернуть", "वापसी", "عودة"]),
             (Token::Pensar, vec!["pensar", "think", "pensa", "penser", "denken", "思考", "考える", "생각하다", "думать", "सोच", "يفكر"]),
+            (Token::Este, vec!["este", "this", "self", "esse", "questo", "ce", "dies", "这", "これ", "이것", "это", "यह", "هذا"]),
         ];
 
         for (token_type, words) in mappings {
@@ -147,6 +156,7 @@ impl Lexer {
             col: 1,
             palabras_clave: kw,
             indent_stack: vec![0],
+            idioma: idioma.map(|s| s.to_string()),
         }
     }
 
@@ -195,6 +205,14 @@ impl Lexer {
                             Some(']') => {
                                 tokens.push(TokenConPos {
                                     token: Token::FuncDef,
+                                    linea: lin,
+                                    columna: col,
+                                });
+                                self.avanzar_n(3);
+                            }
+                            Some(')') => {
+                                tokens.push(TokenConPos {
+                                    token: Token::ClosureDef,
                                     linea: lin,
                                     columna: col,
                                 });
@@ -252,13 +270,92 @@ impl Lexer {
                     }
                 }
 
-                // ── Cadenas de texto ──
+                // ── Cadenas de texto (con soporte para interpolación {expr}) ──
                 '"' => {
                     let lin = self.linea;
                     let col = self.col;
                     self.avanzar(); // consumir "
                     let mut texto = String::new();
+                    let mut tiene_interpolacion = false;
+
                     while self.pos < self.fuente.len() && self.actual() != '"' {
+                        // ── Interpolación: {expr} ──
+                        if self.actual() == '{' {
+                            tiene_interpolacion = true;
+                            // Emitir el texto acumulado (o "" si es la primera interpolación)
+                            // para garantizar que el + siempre tenga lado izquierdo
+                            tokens.push(TokenConPos {
+                                token: Token::Texto(texto.clone()),
+                                linea: lin,
+                                columna: col,
+                            });
+                            texto.clear();
+
+                            // Emitir + para concatenar
+                            tokens.push(TokenConPos {
+                                token: Token::Mas,
+                                linea: self.linea,
+                                columna: self.col,
+                            });
+
+                            self.avanzar(); // consumir {
+
+                            // Tokenizar la expresión interna hasta encontrar }
+                            let mut depth = 1;
+                            let mut expr_chars = Vec::new();
+                            while self.pos < self.fuente.len() && depth > 0 {
+                                match self.actual() {
+                                    '{' => { depth += 1; expr_chars.push(self.actual()); }
+                                    '}' => {
+                                        depth -= 1;
+                                        if depth > 0 { expr_chars.push(self.actual()); }
+                                    }
+                                    c => expr_chars.push(c),
+                                }
+                                self.avanzar();
+                            }
+
+                            if depth != 0 {
+                                return Err(format!(
+                                    "Interpolación sin cerrar '}}' en línea {}, columna {}",
+                                    lin, col
+                                ));
+                            }
+
+                            // Sub-lexear la expresión interna
+                            let expr_str: String = expr_chars.into_iter().collect();
+                            let mut sub_lex = Lexer::nuevo(&expr_str, self.idioma.as_deref());
+                            let sub_tokens = sub_lex.tokenizar()?;
+                            // Agregar los tokens (sin Eof) envueltos en paréntesis
+                            tokens.push(TokenConPos {
+                                token: Token::ParenIzq,
+                                linea: self.linea,
+                                columna: self.col,
+                            });
+                            for st in &sub_tokens {
+                                if st.token != Token::Eof {
+                                    tokens.push(st.clone());
+                                }
+                            }
+                            tokens.push(TokenConPos {
+                                token: Token::ParenDer,
+                                linea: self.linea,
+                                columna: self.col,
+                            });
+
+                            // Si sigue más texto o otra interpolación, emitir +
+                            if self.pos < self.fuente.len() && self.actual() != '"' {
+                                tokens.push(TokenConPos {
+                                    token: Token::Mas,
+                                    linea: self.linea,
+                                    columna: self.col,
+                                });
+                            }
+
+                            continue;
+                        }
+
+                        // ── Escape sequences ──
                         if self.actual() == '\\' && self.pos + 1 < self.fuente.len() {
                             self.avanzar();
                             match self.actual() {
@@ -266,6 +363,7 @@ impl Lexer {
                                 't' => texto.push('\t'),
                                 '\\' => texto.push('\\'),
                                 '"' => texto.push('"'),
+                                '{' => texto.push('{'),  // escape para literal {
                                 other => {
                                     texto.push('\\');
                                     texto.push(other);
@@ -283,11 +381,15 @@ impl Lexer {
                         ));
                     }
                     self.avanzar(); // consumir "
-                    tokens.push(TokenConPos {
-                        token: Token::Texto(texto),
-                        linea: lin,
-                        columna: col,
-                    });
+
+                    // Emitir el texto final (o el texto completo si no hubo interpolación)
+                    if !texto.is_empty() || !tiene_interpolacion {
+                        tokens.push(TokenConPos {
+                            token: Token::Texto(texto),
+                            linea: lin,
+                            columna: col,
+                        });
+                    }
                 }
 
                 // ── Números ──
@@ -361,6 +463,7 @@ impl Lexer {
                 '=' => { tokens.push(self.tok(Token::Igual)); self.avanzar(); }
                 '>' => { tokens.push(self.tok(Token::Mayor)); self.avanzar(); }
                 '<' => { tokens.push(self.tok(Token::Menor)); self.avanzar(); }
+                '!' => { tokens.push(self.tok(Token::Exclamacion)); self.avanzar(); }
 
                 // ── Delimitadores ──
                 '(' => { tokens.push(self.tok(Token::ParenIzq)); self.avanzar(); }
@@ -455,11 +558,6 @@ impl Lexer {
                     });
                 }
 
-                // ── '!' standalone = Colapso cuántico ──
-                '!' => {
-                    tokens.push(self.tok(Token::Exclamacion));
-                    self.avanzar();
-                }
 
                 _ => {
                     return Err(format!(
@@ -703,5 +801,47 @@ mod tests {
         assert_eq!(tokens[0].token, Token::Ident("a".into()));
         assert_eq!(tokens[1].token, Token::Punto);
         assert_eq!(tokens[2].token, Token::Ident("b".into()));
+    }
+
+    // ─── FASE E: STRING INTERPOLATION ───────────────────────────────────
+
+    #[test]
+    fn test_interpolacion_tokens() {
+        // "Hola {nombre}" debe generar: Texto("Hola ") Mas ParenIzq Ident("nombre") ParenDer
+        let mut lexer = Lexer::nuevo("\"Hola {nombre}\"", None);
+        let tokens = lexer.tokenizar().unwrap();
+        // Filter out Eof and NuevaLinea for clarity
+        let filtered: Vec<_> = tokens.iter()
+            .filter(|t| t.token != Token::Eof && t.token != Token::NuevaLinea)
+            .collect();
+        assert_eq!(filtered[0].token, Token::Texto("Hola ".to_string()));
+        assert_eq!(filtered[1].token, Token::Mas);
+        assert_eq!(filtered[2].token, Token::ParenIzq);
+        assert_eq!(filtered[3].token, Token::Ident("nombre".to_string()));
+        assert_eq!(filtered[4].token, Token::ParenDer);
+    }
+
+    #[test]
+    fn test_interpolacion_sin_interpol() {
+        // String sin { } debe seguir funcionando igual
+        let mut lexer = Lexer::nuevo("\"Hola mundo\"", None);
+        let tokens = lexer.tokenizar().unwrap();
+        let filtered: Vec<_> = tokens.iter()
+            .filter(|t| t.token != Token::Eof && t.token != Token::NuevaLinea)
+            .collect();
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].token, Token::Texto("Hola mundo".to_string()));
+    }
+
+    #[test]
+    fn test_interpolacion_escape_llave() {
+        // Escaped \{ should produce literal {
+        let mut lexer = Lexer::nuevo("\"precio: \\{100}\"", None);
+        let tokens = lexer.tokenizar().unwrap();
+        let filtered: Vec<_> = tokens.iter()
+            .filter(|t| t.token != Token::Eof && t.token != Token::NuevaLinea)
+            .collect();
+        // The \{ is escaped, so the whole string is literal
+        assert_eq!(filtered[0].token, Token::Texto("precio: {100}".to_string()));
     }
 }

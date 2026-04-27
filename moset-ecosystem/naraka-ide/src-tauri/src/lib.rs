@@ -142,8 +142,8 @@ struct SearchResult {
 }
 
 #[tauri::command]
-fn search_workspace(path: String, query: String) -> Result<Vec<SearchResult>, String> {
-    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+fn search_workspace(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, path: String, query: String) -> Result<Vec<SearchResult>, String> {
+    let vigilante = make_vigilante(&vig_cfg);
     vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado: {}", e))?;
 
     let mut results = Vec::new();
@@ -153,6 +153,7 @@ fn search_workspace(path: String, query: String) -> Result<Vec<SearchResult>, St
         if results.len() >= 500 { return; }
         if let Ok(entries) = std::fs::read_dir(dir) {
             for entry in entries.flatten() {
+                if results.len() >= 500 { return; }
                 let p = entry.path();
                 if p.is_dir() {
                     let name = entry.file_name().to_string_lossy().to_string();
@@ -162,6 +163,7 @@ fn search_workspace(path: String, query: String) -> Result<Vec<SearchResult>, St
                 } else {
                     if let Ok(content) = std::fs::read_to_string(&p) {
                         for (i, line) in content.lines().enumerate() {
+                            if results.len() >= 500 { return; }
                             if line.to_lowercase().contains(q) {
                                 results.push(SearchResult {
                                     file: p.to_string_lossy().replace("\\", "/"),
@@ -182,8 +184,8 @@ fn search_workspace(path: String, query: String) -> Result<Vec<SearchResult>, St
 
 
 #[tauri::command]
-fn read_directory(path: String, max_depth: Option<u32>) -> Result<Vec<FsTreeNode>, String> {
-    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+fn read_directory(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, path: String, max_depth: Option<u32>) -> Result<Vec<FsTreeNode>, String> {
+    let vigilante = make_vigilante(&vig_cfg);
     vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado: {}", e))?;
     let root = std::path::Path::new(&path);
     if !root.is_dir() {
@@ -239,16 +241,16 @@ fn walk_dir(base: &std::path::Path, dir: &std::path::Path, depth: u32) -> Vec<Fs
 }
 
 #[tauri::command]
-fn read_file_content(path: String) -> Result<String, String> {
-    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+fn read_file_content(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, path: String) -> Result<String, String> {
+    let vigilante = make_vigilante(&vig_cfg);
     vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado: {}", e))?;
     std::fs::read_to_string(&path)
         .map_err(|e| format!("Error leyendo {}: {}", path, e))
 }
 
 #[tauri::command]
-fn create_file(path: String) -> Result<(), String> {
-    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+fn create_file(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, path: String) -> Result<(), String> {
+    let vigilante = make_vigilante(&vig_cfg);
     vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado: {}", e))?;
     std::fs::File::create(&path)
         .map(|_| ())
@@ -256,16 +258,16 @@ fn create_file(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn create_folder(path: String) -> Result<(), String> {
-    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+fn create_folder(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, path: String) -> Result<(), String> {
+    let vigilante = make_vigilante(&vig_cfg);
     vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado: {}", e))?;
     std::fs::create_dir_all(&path)
         .map_err(|e| format!("Error creando carpeta {}: {}", path, e))
 }
 
 #[tauri::command]
-fn delete_item(path: String) -> Result<(), String> {
-    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+fn delete_item(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, path: String) -> Result<(), String> {
+    let vigilante = make_vigilante(&vig_cfg);
     vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado: {}", e))?;
     let p = std::path::Path::new(&path);
     if p.is_dir() {
@@ -278,8 +280,8 @@ fn delete_item(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn rename_item(old_path: String, new_path: String) -> Result<(), String> {
-    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+fn rename_item(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, old_path: String, new_path: String) -> Result<(), String> {
+    let vigilante = make_vigilante(&vig_cfg);
     vigilante.autorizar_ruta(&old_path).map_err(|e| format!("Vigilante: Acceso denegado (origen): {}", e))?;
     vigilante.autorizar_ruta(&new_path).map_err(|e| format!("Vigilante: Acceso denegado (destino): {}", e))?;
     std::fs::rename(&old_path, &new_path)
@@ -287,8 +289,8 @@ fn rename_item(old_path: String, new_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn save_file_content(path: String, content: String) -> Result<(), String> {
-    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+fn save_file_content(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, path: String, content: String) -> Result<(), String> {
+    let vigilante = make_vigilante(&vig_cfg);
     vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado: {}", e))?;
     std::fs::write(&path, &content)
         .map_err(|e| format!("Error guardando {}: {}", path, e))
@@ -335,21 +337,21 @@ fn extract_moset_skeleton(content: &str) -> String {
     }
 }
 
-#[tauri::command]
-fn fetch_full_context(paths: Vec<String>, query: Option<String>) -> Result<String, String> {
-    const MAX_CHARS: usize = 10000;
+fn extract_words(text: &str) -> Vec<String> {
+    text.split(|c: char| !c.is_alphanumeric())
+        .filter(|s| s.len() > 2)
+        .map(|s| s.to_lowercase())
+        .collect()
+}
 
-    let valid_extensions = ["et", "rs", "ts", "tsx", "js", "jsx", "md", "json", "toml", "css", "py", "html", "sh"];
+#[tauri::command]
+fn fetch_full_context(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, paths: Vec<String>, query: Option<String>, max_context_tokens: Option<usize>) -> Result<String, String> {
+    let max_chars = max_context_tokens.unwrap_or(2500) * 4;
+
+    let valid_extensions = ["ce", "et", "rs", "ts", "tsx", "js", "jsx", "md", "json", "toml", "css", "py", "html", "sh"];
     let ignore_dirs = ["node_modules", ".git", "target", "dist", "build"];
 
     let mut all_chunks: Vec<ContextChunk> = Vec::new();
-
-    fn extract_words(text: &str) -> Vec<String> {
-        text.split(|c: char| !c.is_alphanumeric())
-            .filter(|s| s.len() > 2)
-            .map(|s| s.to_lowercase())
-            .collect()
-    }
 
     let query_words = query.as_ref().map(|q| extract_words(q)).unwrap_or_default();
 
@@ -412,7 +414,7 @@ fn fetch_full_context(paths: Vec<String>, query: Option<String>) -> Result<Strin
         }
     }
 
-    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+    let vigilante = make_vigilante(&vig_cfg);
     for p in paths {
         let path = std::path::Path::new(&p);
         let base_path = if path.is_file() { path.parent().unwrap_or(path) } else { path };
@@ -426,11 +428,11 @@ fn fetch_full_context(paths: Vec<String>, query: Option<String>) -> Result<Strin
     let mut output = String::new();
     
     for chunk in all_chunks {
-        if total_chars >= MAX_CHARS { break; }
+        if total_chars >= max_chars { break; }
         
         output.push_str(&format!("\n--- Archivo: {} (Relevancia: {}) ---\n", chunk.file_path, chunk.score));
         
-        let remaining = MAX_CHARS.saturating_sub(total_chars);
+        let remaining = max_chars.saturating_sub(total_chars);
         let content_len = chunk.content.chars().count();
         
         if content_len > remaining {
@@ -445,7 +447,7 @@ fn fetch_full_context(paths: Vec<String>, query: Option<String>) -> Result<Strin
         }
     }
     
-    if total_chars >= MAX_CHARS {
+    if total_chars >= max_chars {
         output.push_str("\n... [Contexto RAG truncado por límite de seguridad global]");
     }
     
@@ -455,23 +457,21 @@ fn fetch_full_context(paths: Vec<String>, query: Option<String>) -> Result<Strin
 // ─── Agente Autónomo ─────────────────────────────────────────────────────────
 
 #[tauri::command]
-async fn execute_agent_tool(call: moset_core::agent::ToolCall) -> Result<String, String> {
-    // ─── Vigilante: middleware de seguridad del Agente ────────────────────────
-    // Todas las operaciones de escritura y ejecución pasan por el Vigilante
-    // antes de ser ejecutadas. Esto cierra el BUG-043.
-    let vigilante = moset_core::vigilante::Vigilante::nuevo();
+async fn execute_agent_tool(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, mcp_state: tauri::State<'_, McpState>, lsp_state: tauri::State<'_, LspState>, call: moset_core::agent::ToolCall) -> Result<String, String> {
+    use moset_core::agent::AgentTool;
+    let vigilante = make_vigilante(&vig_cfg);
 
-    match call.tool.as_str() {
-        "read_directory" => {
+    match call.tool {
+        AgentTool::ReadDirectory => {
             let path = call.args.get("path").and_then(|v| v.as_str()).unwrap_or("./").to_string();
-            let res = read_directory(path, Some(3))?;
+            let res = read_directory(vig_cfg.clone(), path, Some(3))?;
             Ok(serde_json::to_string(&res).unwrap_or_else(|_| "[]".to_string()))
         },
-        "read_file" => {
+        AgentTool::ReadFile => {
             let path = call.args.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            read_file_content(path)
+            read_file_content(vig_cfg.clone(), path)
         },
-        "write_to_file" | "write_file" => {
+        AgentTool::WriteToFile | AgentTool::WriteFile => {
             let path = call.args.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
             let content = call.args.get("content").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
@@ -479,10 +479,10 @@ async fn execute_agent_tool(call: moset_core::agent::ToolCall) -> Result<String,
             vigilante.autorizar_ruta(&path)
                 .map_err(|e| format!("Agente bloqueado por el Vigilante:\n{}", e))?;
 
-            save_file_content(path.clone(), content)?;
+            save_file_content(vig_cfg.clone(), path.clone(), content)?;
             Ok(format!("Archivo {} guardado correctamente.", path))
         },
-        "replace_file_content" => {
+        AgentTool::ReplaceFileContent => {
             let path = call.args.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
             let target = call.args.get("targetContent").and_then(|v| v.as_str()).unwrap_or("");
             let replacement = call.args.get("replacementContent").and_then(|v| v.as_str()).unwrap_or("");
@@ -491,28 +491,26 @@ async fn execute_agent_tool(call: moset_core::agent::ToolCall) -> Result<String,
             vigilante.autorizar_ruta(&path)
                 .map_err(|e| format!("Agente bloqueado por el Vigilante:\n{}", e))?;
 
-            let current_content = read_file_content(path.clone())?;
+            let current_content = read_file_content(vig_cfg.clone(), path.clone())?;
             if !current_content.contains(target) {
                 return Err(format!("No se encontró el texto objetivo en {}. Revisa que el código coincida exactamente (incluyendo los espacios).", path));
             }
             
-            let new_content = current_content.replace(target, replacement);
-            save_file_content(path.clone(), new_content)?;
+            // Reemplaza solo la primera coincidencia para ser seguro (como un diff/patch puntual)
+            let new_content = current_content.replacen(target, replacement, 1);
+            save_file_content(vig_cfg.clone(), path.clone(), new_content)?;
             Ok(format!("Archivo {} modificado correctamente utilizando bloques de reemplazo.", path))
         },
-        "search_workspace" => {
+        AgentTool::SearchWorkspace => {
             let path = call.args.get("path").and_then(|v| v.as_str()).unwrap_or("./").to_string();
             let query = call.args.get("query").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let res = search_workspace(path, query)?;
+            let res = search_workspace(vig_cfg.clone(), path, query)?;
             Ok(serde_json::to_string(&res).unwrap_or_else(|_| "[]".to_string()))
         },
-        "run_command" => {
+        AgentTool::RunCommand => {
             let cmd = call.args.get("command").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
             // 🛡️ Vigilante: auditar el comando antes de ejecutarlo.
-            // El agente autónomo opera sin confianza implícita (None).
-            // Comandos peligrosos/cautelosos son bloqueados a menos que
-            // el código Moset del usuario suministre un Bit explícito.
             vigilante.autorizar(&cmd, None)
                 .map_err(|e| format!("Agente bloqueado por el Vigilante:\n{}", e))?;
 
@@ -541,7 +539,7 @@ async fn execute_agent_tool(call: moset_core::agent::ToolCall) -> Result<String,
                 Err(e) => Err(format!("Error ejecutando comando: {}", e))
             }
         },
-        "git_commit" => {
+        AgentTool::GitCommit => {
             let message = call.args.get("message").and_then(|v| v.as_str()).unwrap_or("Auto-commit por Agente Autónomo").to_string();
             let path = call.args.get("path").and_then(|v| v.as_str()).unwrap_or("./").to_string();
             
@@ -563,7 +561,7 @@ async fn execute_agent_tool(call: moset_core::agent::ToolCall) -> Result<String,
                 Err(e) => Err(format!("Error ejecutando git commit: {}", e))
             }
         },
-        "list_processes" => {
+        AgentTool::ListProcesses => {
             #[cfg(target_os = "windows")]
             let output = std::process::Command::new("tasklist").output();
             
@@ -582,7 +580,41 @@ async fn execute_agent_tool(call: moset_core::agent::ToolCall) -> Result<String,
                 Err(e) => Err(format!("Error listando procesos: {}", e))
             }
         },
-        _ => Err(format!("Herramienta desconocida: {}", call.tool))
+        AgentTool::McpListTools => {
+            let server = call.args.get("server").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let clients = mcp_state.clients.lock().unwrap();
+            if let Some(client) = clients.get(&server) {
+                let tools = client.list_tools()?;
+                Ok(serde_json::to_string(&tools).unwrap_or_else(|_| "[]".to_string()))
+            } else {
+                Err(format!("Servidor MCP '{}' no iniciado.", server))
+            }
+        },
+        AgentTool::McpCallTool => {
+            let server = call.args.get("server").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let tool = call.args.get("tool_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let args = call.args.get("arguments").cloned().unwrap_or(serde_json::json!({}));
+            
+            // 🛡️ Vigilante: Opcional, auditar la herramienta. En este caso asumimos que si el server fue autorizado, la herramienta también.
+            let clients = mcp_state.clients.lock().unwrap();
+            if let Some(client) = clients.get(&server) {
+                let res = client.call_tool(&tool, args)?;
+                Ok(serde_json::to_string(&res).unwrap_or_else(|_| "{}".to_string()))
+            } else {
+                Err(format!("Servidor MCP '{}' no iniciado.", server))
+            }
+        },
+        AgentTool::LspDiagnostics => {
+            let server = call.args.get("server").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let file_uri = call.args.get("uri").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let clients = lsp_state.clients.lock().unwrap();
+            if let Some(client) = clients.get(&server) {
+                let diags = client.get_diagnostics(&file_uri);
+                Ok(serde_json::to_string(&diags).unwrap_or_else(|_| "[]".to_string()))
+            } else {
+                Err(format!("LSP '{}' no iniciado.", server))
+            }
+        },
     }
 }
 
@@ -625,24 +657,37 @@ fn descargar_modelo(state: tauri::State<'_, AiState>) -> Result<String, String> 
     Ok("Modelo descargado. RAM/VRAM liberada.".to_string())
 }
 
+#[derive(serde::Deserialize, PartialEq, Eq, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum AiProvider {
+    LocalGguf,
+    Nube,
+    Custom,
+}
+
+impl AiProvider {
+    pub fn as_cloud_str(&self) -> &'static str {
+        match self {
+            AiProvider::Nube    => "nube",
+            AiProvider::Custom  => "custom",
+            AiProvider::LocalGguf => "nube", // Safety fallback, should never reach cloud path
+        }
+    }
+}
+
 #[tauri::command]
 async fn chat_orquestado(
     state: tauri::State<'_, AiState>,
     window: tauri::Window,
     messages: Vec<moset_core::cloud_ai::Mensaje>,
-    provider: String,
+    provider: AiProvider,
     model: String,
     api_key: String,
     base_url: Option<String>,
-    agent_mode: String,
-    include_context: bool,
-    context_content: String,
-    project_root: String,
     max_tokens: Option<u32>,
     q_collapse_method: Option<String>,
     q_alpha: Option<f32>,
     q_entanglement: Option<bool>,
-    q_pensar: Option<bool>,
 ) -> Result<String, String> {
     let cancel_flag = Arc::clone(&state.cancel_flag);
     cancel_flag.store(false, std::sync::atomic::Ordering::Relaxed);
@@ -654,7 +699,6 @@ async fn chat_orquestado(
     // ai_assisted → temperature = alpha + 0.1 (motor decide con más libertad)
     let collapse = q_collapse_method.as_deref().unwrap_or("probabilistic");
     let alpha = q_alpha.unwrap_or(0.7071_f32).clamp(0.0, 1.0);
-    let pensar_mode = q_pensar.unwrap_or(true);
     let _entanglement = q_entanglement.unwrap_or(false); // reservado para correlación futura entre bits
 
     let temperature: f32 = match collapse {
@@ -663,26 +707,34 @@ async fn chat_orquestado(
         _               => alpha, // probabilistic: T = α
     };
 
-    let ctx = if include_context { Some(context_content.as_str()) } else { None };
-    let mut sys_prompt = moset_core::agent::generar_system_prompt(&agent_mode, &project_root, ctx);
-
-    // Pensar Mode: fuerza razonamiento interno extendido antes de responder
-    if pensar_mode {
-        sys_prompt = format!(
-            "Antes de cada respuesta, razona internamente con <think>...</think>. Sé exhaustivo en tu análisis, luego da la respuesta limpia fuera del bloque think.\n\n{}",
-            sys_prompt
-        );
+    // MEJ-7: The frontend already fully constructs the system prompt based on user settings,
+    // context tokens, agent mode, and think directives. We just extract it from the messages array.
+    let mut sys_prompt = String::new();
+    let mut filtered_messages = Vec::new();
+    
+    for msg in messages {
+        if msg.role == "system" {
+            if !sys_prompt.is_empty() {
+                sys_prompt.push_str("\n\n");
+            }
+            sys_prompt.push_str(&msg.content);
+        } else {
+            filtered_messages.push(msg);
+        }
     }
 
-    if provider == "soberano" {
+    if provider == AiProvider::LocalGguf {
         let motor_clone = Arc::clone(&state.motor);
         let tokens_limit = max_tokens.unwrap_or(2048) as usize;
         
-        let mut full_prompt = sys_prompt.clone();
-        full_prompt.push_str("\n\n");
-        for msg in &messages {
-            full_prompt.push_str(&format!("{}: {}\n", msg.role, msg.content));
+        let mut full_prompt = String::new();
+        if !sys_prompt.is_empty() {
+            full_prompt.push_str(&format!("<|im_start|>system\n{}<|im_end|>\n", sys_prompt));
         }
+        for msg in &filtered_messages {
+            full_prompt.push_str(&format!("<|im_start|>{}\n{}<|im_end|>\n", msg.role, msg.content));
+        }
+        full_prompt.push_str("<|im_start|>assistant\n");
 
         tauri::async_runtime::spawn_blocking(move || {
             let mut motor = motor_clone.lock().map_err(|_| "Deadlock al bloquear Motor Soberano")?;
@@ -698,8 +750,9 @@ async fn chat_orquestado(
     } else {
         let max_tokens_opt = max_tokens;
         tauri::async_runtime::spawn_blocking(move || {
-            let motor_cloud = moset_core::cloud_ai::MotorCloud::nuevo(&provider, &model, &api_key, base_url.as_deref());
-            let res = motor_cloud.inferir(&sys_prompt, &messages, max_tokens_opt, |partial| {
+            let provider_str = provider.as_cloud_str();
+            let motor_cloud = moset_core::cloud_ai::MotorCloud::nuevo(provider_str, &model, &api_key, base_url.as_deref());
+            let res = motor_cloud.inferir(&sys_prompt, &filtered_messages, max_tokens_opt, |partial| {
                 window.emit("soberano-stream", partial).ok();
                 !cancel_flag.load(std::sync::atomic::Ordering::Relaxed)
             }).map_err(|e| format!("Error en Motor Cloud: {}", e))?;
@@ -744,56 +797,8 @@ use std::sync::{Arc, Mutex};
 use tauri_bridge::PtyState;
 use tauri::{Manager, Emitter};
 
-// ─── Vigilante Config Global ───────────────────────────────────────────────────
-// Permite que la configuración de la UI llegue al backend Rust en runtime.
-
-struct VigilanteConfig {
-    prohibidos: String,
-    peligrosos: String,
-    cautelosos: String,
-    sandbox_paths: String,
-}
-
-impl Default for VigilanteConfig {
-    fn default() -> Self {
-        VigilanteConfig {
-            prohibidos: String::new(),
-            peligrosos: String::new(),
-            cautelosos: String::new(),
-            sandbox_paths: String::new(),
-        }
-    }
-}
-
-/// Helper: construye un Vigilante usando la config guardada en el estado global.
-fn make_vigilante(vig_cfg: &tauri::State<'_, Mutex<VigilanteConfig>>) -> moset_core::vigilante::Vigilante {
-    if let Ok(cfg) = vig_cfg.lock() {
-        moset_core::vigilante::Vigilante::nuevo_con_config(
-            &cfg.prohibidos,
-            &cfg.peligrosos,
-            &cfg.cautelosos,
-            &cfg.sandbox_paths,
-        )
-    } else {
-        moset_core::vigilante::Vigilante::nuevo()
-    }
-}
-
-#[tauri::command]
-fn configurar_vigilante(
-    state: tauri::State<'_, Mutex<VigilanteConfig>>,
-    prohibidos: String,
-    peligrosos: String,
-    cautelosos: String,
-    sandbox_paths: String,
-) {
-    if let Ok(mut cfg) = state.lock() {
-        cfg.prohibidos = prohibidos;
-        cfg.peligrosos = peligrosos;
-        cfg.cautelosos = cautelosos;
-        cfg.sandbox_paths = sandbox_paths;
-    }
-}
+pub mod security;
+use security::*;
 
 // ─── Extension Manager ────────────────────────────────────────────────────────
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
@@ -821,13 +826,13 @@ impl ExtensionState {
 }
 
 #[tauri::command]
-fn fetch_extensions(state: tauri::State<'_, ExtensionState>) -> Vec<Extension> {
-    state.extensions.lock().unwrap().clone()
+fn fetch_extensions(state: tauri::State<'_, ExtensionState>) -> Result<Vec<Extension>, String> {
+    Ok(state.extensions.lock().map_err(|_| "Error interno: mutex de extensiones envenenado".to_string())?.clone())
 }
 
 #[tauri::command]
 fn toggle_extension(state: tauri::State<'_, ExtensionState>, id: String, enabled: bool) -> Result<(), String> {
-    let mut exts = state.extensions.lock().unwrap();
+    let mut exts = state.extensions.lock().map_err(|_| "Error interno: mutex de extensiones envenenado".to_string())?;
     if let Some(ext) = exts.iter_mut().find(|e| e.id == id) {
         ext.enabled = enabled;
         drop(exts); // Liberar lock antes de save()
@@ -891,9 +896,59 @@ fn clean_cuda_cache() -> Result<String, String> {
     }
 }
 
+// ─── Macros / Custom Commands ───────────────────────────────────────────────
+
+#[derive(serde::Serialize)]
+struct MacroItem {
+    id: String,
+    name: String,
+    path: String,
+}
+
+#[tauri::command]
+fn list_macros(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, project_root: String) -> Result<Vec<MacroItem>, String> {
+    let vigilante = make_vigilante(&vig_cfg);
+    vigilante.autorizar_ruta(&project_root).map_err(|e| format!("Vigilante: Acceso denegado a project root: {}", e))?;
+
+    let commands_dir = std::path::PathBuf::from(project_root).join(".moset").join("commands");
+    let mut macros = Vec::new();
+    
+    if commands_dir.exists() && commands_dir.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(commands_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("md") {
+                    let name = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+                    let id = format!("project:{}", name);
+                    macros.push(MacroItem {
+                        id,
+                        name,
+                        path: path.to_string_lossy().replace("\\", "/"),
+                    });
+                }
+            }
+        }
+    }
+    
+    // Sort by name
+    macros.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(macros)
+}
+
+#[tauri::command]
+fn read_macro(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, path: String) -> Result<String, String> {
+    let vigilante = make_vigilante(&vig_cfg);
+    vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado a leer macro: {}", e))?;
+    std::fs::read_to_string(&path).map_err(|e| format!("Error leyendo macro {}: {}", path, e))
+}
+
 // ─── Git Integration ────────────────────────────────────────────────────────
 #[tauri::command]
-async fn git_status(workspace_path: String) -> Result<String, String> {
+async fn git_status(workspace_path: String, vig_cfg: tauri::State<'_, std::sync::Mutex<VigilanteConfig>>) -> Result<String, String> {
+    // Validar ruta por Vigilante antes de ejecutar git
+    let vigilante = make_vigilante(&vig_cfg);
+    vigilante.autorizar_ruta(&workspace_path).map_err(|e| format!("Vigilante: {}", e))?;
+
     let output = std::process::Command::new("git")
         .args(["status", "--porcelain"])
         .current_dir(workspace_path)
@@ -909,7 +964,10 @@ async fn git_status(workspace_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn git_auto_sync(workspace_path: String, github_api_key: Option<String>) -> Result<String, String> {
+async fn git_auto_sync(workspace_path: String, github_api_key: Option<String>, vig_cfg: tauri::State<'_, std::sync::Mutex<VigilanteConfig>>) -> Result<String, String> {
+    // Validar ruta por Vigilante antes de ejecutar git
+    let vigilante = make_vigilante(&vig_cfg);
+    vigilante.autorizar_ruta(&workspace_path).map_err(|e| format!("Vigilante: {}", e))?;
     let add_output = std::process::Command::new("git")
         .args(["add", "."])
         .current_dir(&workspace_path)
@@ -949,6 +1007,106 @@ async fn git_auto_sync(workspace_path: String, github_api_key: Option<String>) -
     Ok("Sincronización completada exitosamente".to_string())
 }
 
+// ─── MCP Client Integration ───────────────────────────────────────────────────
+
+pub struct McpState {
+    pub clients: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, moset_core::mcp::McpClient>>>,
+}
+
+#[derive(serde::Deserialize)]
+struct McpServerConfig {
+    command: String,
+    args: Vec<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct McpConfig {
+    #[serde(rename = "mcpServers")]
+    mcp_servers: std::collections::HashMap<String, McpServerConfig>,
+}
+
+#[tauri::command]
+async fn start_mcp_servers(state: tauri::State<'_, McpState>, vig_cfg: tauri::State<'_, std::sync::Mutex<VigilanteConfig>>, project_root: String) -> Result<Vec<String>, String> {
+    // Validar por Vigilante
+    let vigilante = make_vigilante(&vig_cfg);
+    vigilante.autorizar_ruta(&project_root).map_err(|e| format!("Vigilante: Acceso denegado a project root para MCP: {}", e))?;
+
+    let config_path = std::path::PathBuf::from(project_root).join(".moset").join("mcp.json");
+    if !config_path.exists() {
+        return Ok(vec![]);
+    }
+
+    let config_str = std::fs::read_to_string(config_path).map_err(|e| format!("Error leyendo mcp.json: {}", e))?;
+    let config: McpConfig = serde_json::from_str(&config_str).map_err(|e| format!("Error parseando mcp.json: {}", e))?;
+
+    let mut started = Vec::new();
+    let mut clients = state.clients.lock().map_err(|_| "Error interno: mutex MCP envenenado".to_string())?;
+
+    for (name, server_cfg) in config.mcp_servers {
+        if clients.contains_key(&name) {
+            continue; // Already started
+        }
+        
+        match moset_core::mcp::McpClient::new(&server_cfg.command, &server_cfg.args) {
+            Ok(client) => {
+                if let Err(e) = client.initialize() {
+                    return Err(format!("Error inicializando MCP '{}': {}", name, e));
+                }
+                clients.insert(name.clone(), client);
+                started.push(name);
+            },
+            Err(e) => {
+                return Err(format!("Error iniciando MCP '{}': {}", name, e));
+            }
+        }
+    }
+
+    Ok(started)
+}
+
+#[tauri::command]
+async fn mcp_list_tools(state: tauri::State<'_, McpState>, server_name: String) -> Result<serde_json::Value, String> {
+    let clients = state.clients.lock().map_err(|_| "Error interno: mutex MCP envenenado".to_string())?;
+    let client = clients.get(&server_name).ok_or_else(|| format!("MCP '{}' no iniciado", server_name))?;
+    client.list_tools()
+}
+
+#[tauri::command]
+async fn mcp_call_tool(state: tauri::State<'_, McpState>, server_name: String, tool_name: String, args: serde_json::Value) -> Result<serde_json::Value, String> {
+    let clients = state.clients.lock().map_err(|_| "Error interno: mutex MCP envenenado".to_string())?;
+    let client = clients.get(&server_name).ok_or_else(|| format!("MCP '{}' no iniciado", server_name))?;
+    client.call_tool(&tool_name, args)
+}
+
+// ─── LSP Client Integration ───────────────────────────────────────────────────
+
+pub struct LspState {
+    pub clients: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, moset_core::lsp::LspClient>>>,
+}
+
+#[tauri::command]
+async fn start_lsp_server(state: tauri::State<'_, LspState>, server_name: String, command: String, args: Vec<String>, root_uri: String) -> Result<String, String> {
+    let mut clients = state.clients.lock().map_err(|_| "Error interno: mutex LSP envenenado".to_string())?;
+    if clients.contains_key(&server_name) {
+        return Ok(format!("LSP '{}' ya estaba iniciado", server_name));
+    }
+
+    let args_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let client = moset_core::lsp::LspClient::new(&command, &args_refs)?;
+    
+    client.initialize(&root_uri)?;
+    
+    clients.insert(server_name.clone(), client);
+    Ok(format!("LSP '{}' iniciado correctamente", server_name))
+}
+
+#[tauri::command]
+async fn lsp_get_diagnostics(state: tauri::State<'_, LspState>, server_name: String, file_uri: String) -> Result<Vec<moset_core::lsp::Diagnostic>, String> {
+    let clients = state.clients.lock().map_err(|_| "Error interno: mutex LSP envenenado".to_string())?;
+    let client = clients.get(&server_name).ok_or_else(|| format!("LSP '{}' no iniciado", server_name))?;
+    Ok(client.get_diagnostics(&file_uri))
+}
+
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -969,6 +1127,13 @@ pub fn run() {
                 clean_cuda_on_exit: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             });
             app.manage(Mutex::new(VigilanteConfig::default()));
+
+            app.manage(McpState {
+                clients: std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+            });
+            app.manage(LspState {
+                clients: std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+            });
 
             let config_path = app.path().app_data_dir().expect("Failed to get app_data_dir").join("extensions.json");
             
@@ -1008,12 +1173,18 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 // Limpiar PTY
                 let pty_state: tauri::State<'_, PtyState> = window.state();
+                if let Ok(mut writer_guard) = pty_state.writer.lock() {
+                    *writer_guard = None;
+                }
                 if let Ok(mut child_guard) = pty_state.child.lock() {
-                    if let Some(child) = child_guard.as_mut() {
+                    if let Some(mut child) = child_guard.take() {
                         let _ = child.kill();
                         let _ = child.wait();
                     }
                 };
+                if let Ok(mut master_guard) = pty_state.master.lock() {
+                    *master_guard = None;
+                }
                 // Limpiar Motor IA — liberar modelo de RAM/VRAM
                 let ai_state: tauri::State<'_, AiState> = window.state();
                 if let Ok(mut motor) = ai_state.motor.lock() {
@@ -1032,6 +1203,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             version,
@@ -1063,6 +1235,13 @@ pub fn run() {
             git_status,
             git_auto_sync,
             configurar_vigilante,
+            list_macros,
+            read_macro,
+            start_mcp_servers,
+            mcp_list_tools,
+            mcp_call_tool,
+            start_lsp_server,
+            lsp_get_diagnostics,
         ])
         .run(tauri::generate_context!())
         .expect("Error iniciando Moset IDE");

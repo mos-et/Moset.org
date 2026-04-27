@@ -1,7 +1,16 @@
 use std::collections::HashMap;
-use crate::ast::Nodo;
+use std::rc::Rc;
+
+use std::cell::RefCell;
 
 // ─── Valores en Runtime ──────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct InstanciaMolde {
+    pub nombre: String,
+    pub campos: HashMap<String, Valor>,
+    pub extra: HashMap<String, Valor>,
+}
 
 #[derive(Debug, Clone)]
 pub enum Valor {
@@ -9,16 +18,17 @@ pub enum Valor {
     Decimal(f64),
     Texto(String),
     Booleano(bool),
-    Lista(Vec<Valor>),
-    Molde {
-        nombre: String,
-        campos: HashMap<String, Valor>,    // Corteza: campos fijos del molde
-        extra: HashMap<String, Valor>,     // Núcleo: espacio latente (dinámico)
-    },
+    Lista(Rc<RefCell<Vec<Valor>>>),
+    Molde(Rc<RefCell<InstanciaMolde>>),
     Funcion {
         nombre: String,
-        params: Vec<String>,
-        cuerpo: Vec<Nodo>,
+        arity: usize,
+        chunk: Rc<crate::bytecode::Chunk>,
+    },
+    Closure {
+        arity: usize,
+        chunk: Rc<crate::bytecode::Chunk>,
+        capturas: Vec<Valor>,
     },
     /// Bit Cuántico en superposición: α|0⟩ + β|1⟩
     /// La moneda girando. Solo colapsa cuando se observa con !
@@ -36,7 +46,8 @@ impl std::fmt::Display for Valor {
             Valor::Decimal(n) => write!(f, "{}", n),
             Valor::Texto(s) => write!(f, "{}", s),
             Valor::Booleano(b) => write!(f, "{}", if *b { "verdadero" } else { "falso" }),
-            Valor::Lista(items) => {
+            Valor::Lista(rc_items) => {
+                let items = rc_items.borrow();
                 write!(f, "[")?;
                 for (i, item) in items.iter().enumerate() {
                     if i > 0 { write!(f, ", ")?; }
@@ -44,23 +55,25 @@ impl std::fmt::Display for Valor {
                 }
                 write!(f, "]")
             }
-            Valor::Molde { nombre, campos, extra } => {
-                write!(f, "{} {{ ", nombre)?;
+            Valor::Molde(rc_instancia) => {
+                let inst = rc_instancia.borrow();
+                write!(f, "{} {{ ", inst.nombre)?;
                 let mut first = true;
-                for (k, v) in campos.iter() {
+                for (k, v) in inst.campos.iter() {
                     if !first { write!(f, ", ")?; }
                     write!(f, "{}: {}", k, v)?;
                     first = false;
                 }
                 // Mostrar espacio latente con prefijo +
-                for (k, v) in extra.iter() {
+                for (k, v) in inst.extra.iter() {
                     if !first { write!(f, ", ")?; }
                     write!(f, "+{}: {}", k, v)?;
                     first = false;
                 }
                 write!(f, " }}")
             }
-            Valor::Funcion { nombre, .. } => write!(f, "<función {}>", nombre),
+            Valor::Funcion { nombre, arity, .. } => write!(f, "<fun {} ({} params)>", nombre, arity),
+            Valor::Closure { arity, .. } => write!(f, "<closure ({} params)>", arity),
             Valor::Superposicion { alpha, beta } => {
                 let p0 = alpha * alpha;
                 let p1 = beta * beta;

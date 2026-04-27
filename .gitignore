@@ -40,3 +40,11 @@ temp/
 .tauri-keys/  
 # Global Workspace safety
 credenciales_narakakore.txt
+
+# Moset Test/Temp files
+moset-ecosystem/core-engine/debug_out.txt
+moset-ecosystem/core-engine/*.et
+moset-ecosystem/core-engine/update_*.py
+moset-ecosystem/PlayGround/
+scripts/
+.moset/

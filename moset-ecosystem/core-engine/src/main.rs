@@ -7,18 +7,7 @@
 //   moset                 → REPL interactivo
 // ============================================================================
 
-mod ast;
-mod valor;
-mod bytecode;
-mod compiler;
-mod vm;
-mod agent;
-mod lexer;
-mod parser;
-mod stdlib;
-mod vigilante;
-mod ai;
-mod linter;
+use moset_core::{lexer, parser, compiler, vm, valor};
 
 use clap::{Parser as ClapParser, Subcommand};
 use std::io::{self, Write};
@@ -170,6 +159,10 @@ fn repl() -> anyhow::Result<()> {
                 match par.parsear() {
                     Ok(programa) => {
                         let mut compilador = compiler::Compilador::nuevo();
+                        // BUG-058/BUG-026: Configurar ruta_base en el REPL usando CWD
+                        if let Ok(cwd) = std::env::current_dir() {
+                            compilador.ruta_base = Some(cwd);
+                        }
                         if let Err(e) = compilador.compilar_programa(&programa) {
                             eprintln!("  ✗ Error de Compilación: {}", e);
                             buffer.clear();
