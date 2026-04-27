@@ -1,0 +1,6 @@
+// Prueba de Catch en Línea
+x = 10 / 0 :,[ 42
+mostrar("Resultado con error:", x)
+
+y = 10 / 2 :,[ 42
+mostrar("Resultado sin error:", y)

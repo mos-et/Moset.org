@@ -4,15 +4,16 @@
 // Funciones nativas que conectan Moset con el hardware.
 // Estas son las "manos" del Soberano: I/O, shell, y sistema de archivos.
 //
-// Seguridad: En Fase 2 se implementará un sandbox con niveles de permiso.
-// Por ahora, el Soberano tiene acceso total (como root).
+// Seguridad: Todas las llamadas nativas que interactúan con el SO ahora están
+// resguardadas por el middleware `Vigilante`, el cual intercepta y valida las rutas,
+// variables de entorno y comandos según la configuración de sandbox proporcionada.
 //
 // Funciones disponibles:
-//   shell(Txt)              → Ejecuta comando del SO, devuelve stdout
-//   leer(Txt)               → Lee un archivo, devuelve contenido como Txt
-//   escribir(Txt, Txt)      → Escribe contenido a un archivo
-//   existe(Txt)             → Verifica si un archivo/directorio existe
-//   entorno(Txt)            → Lee una variable de entorno
+//   shell(Txt)              → Ejecuta comando del SO, sujeto a permisos del Vigilante
+//   leer(Txt)               → Lee un archivo, restringido a rutas seguras
+//   escribir(Txt, Txt)      → Escribe a un archivo, restringido a rutas seguras
+//   existe(Txt)             → Verifica existencia bajo la jurisdicción del sandbox
+//   entorno(Txt)            → Lee variables (sujeto a allowlist/blocklist)
 // ============================================================================
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -89,13 +90,14 @@ pub fn shell(_comando: &str, _vigilante: &Vigilante) -> Result<String, String> {
 /// mostrar config
 /// ```
 #[cfg(not(target_arch = "wasm32"))]
-pub fn leer(ruta: &str) -> Result<String, String> {
+pub fn leer(ruta: &str, vigilante: &Vigilante) -> Result<String, String> {
+    vigilante.autorizar_ruta(ruta)?;
     fs::read_to_string(ruta)
         .map_err(|e| format!("Error leyendo '{}': {}", ruta, e))
 }
 
 #[cfg(target_arch = "wasm32")]
-pub fn leer(_ruta: &str) -> Result<String, String> {
+pub fn leer(_ruta: &str, _vigilante: &Vigilante) -> Result<String, String> {
     Err("La función 'leer' no está disponible en WebAssembly (WASM).".to_string())
 }
 
@@ -107,7 +109,8 @@ pub fn leer(_ruta: &str) -> Result<String, String> {
 /// escribir("salida.txt", "Hola desde Moset")
 /// ```
 #[cfg(not(target_arch = "wasm32"))]
-pub fn escribir(ruta: &str, contenido: &str) -> Result<(), String> {
+pub fn escribir(ruta: &str, contenido: &str, vigilante: &Vigilante) -> Result<(), String> {
+    vigilante.autorizar_ruta(ruta)?;
     // Crear directorios padres si son necesarios
     if let Some(padre) = std::path::Path::new(ruta).parent() {
         if !padre.as_os_str().is_empty() {
@@ -120,7 +123,7 @@ pub fn escribir(ruta: &str, contenido: &str) -> Result<(), String> {
 }
 
 #[cfg(target_arch = "wasm32")]
-pub fn escribir(_ruta: &str, _contenido: &str) -> Result<(), String> {
+pub fn escribir(_ruta: &str, _contenido: &str, _vigilante: &Vigilante) -> Result<(), String> {
     Err("La función 'escribir' no está disponible en WebAssembly (WASM).".to_string())
 }
 
@@ -132,12 +135,15 @@ pub fn escribir(_ruta: &str, _contenido: &str) -> Result<(), String> {
 ///     mostrar "Sistema Unix detectado"
 /// ```
 #[cfg(not(target_arch = "wasm32"))]
-pub fn existe(ruta: &str) -> bool {
+pub fn existe(ruta: &str, vigilante: &Vigilante) -> bool {
+    if vigilante.autorizar_ruta(ruta).is_err() {
+        return false; // Si está fuera del sandbox, pretendemos que no existe por seguridad
+    }
     std::path::Path::new(ruta).exists()
 }
 
 #[cfg(target_arch = "wasm32")]
-pub fn existe(_ruta: &str) -> bool {
+pub fn existe(_ruta: &str, _vigilante: &Vigilante) -> bool {
     false
 }
 
@@ -149,18 +155,20 @@ pub fn existe(_ruta: &str) -> bool {
 /// mostrar home
 /// ```
 #[cfg(not(target_arch = "wasm32"))]
-pub fn entorno(nombre: &str) -> Result<String, String> {
+pub fn entorno(nombre: &str, vigilante: &Vigilante) -> Result<String, String> {
+    vigilante.auditar_entorno(nombre)?;
     env::var(nombre)
         .map_err(|_| format!("Variable de entorno '{}' no definida", nombre))
 }
 
 #[cfg(target_arch = "wasm32")]
-pub fn entorno(nombre: &str) -> Result<String, String> {
+pub fn entorno(nombre: &str, vigilante: &Vigilante) -> Result<String, String> {
     Err(format!("Variable de entorno '{}' no definida en WebAssembly", nombre))
 }
 
 /// Realizar una petición HTTP GET.
 /// Requiere conexión a internet.
+/// HIGH-002 Fix: Ahora requiere autorización del Vigilante para la URL.
 ///
 /// # Ejemplo Moset
 /// ```moset
@@ -168,7 +176,10 @@ pub fn entorno(nombre: &str) -> Result<String, String> {
 /// mostrar respuesta
 /// ```
 #[cfg(all(not(target_arch = "wasm32"), feature = "cloud"))]
-pub fn peticion_get(url: &str) -> Result<String, String> {
+pub fn peticion_get(url: &str, vigilante: &Vigilante) -> Result<String, String> {
+    // HIGH-002 Fix: Validate URL through Vigilante before making the request
+    vigilante.autorizar_url(url)?;
+    
     let client = reqwest::blocking::Client::builder()
         .user_agent("Moset/1.0 (Naraka Studio)")
         .build()
@@ -182,7 +193,7 @@ pub fn peticion_get(url: &str) -> Result<String, String> {
 }
 
 #[cfg(any(target_arch = "wasm32", not(feature = "cloud")))]
-pub fn peticion_get(_url: &str) -> Result<String, String> {
+pub fn peticion_get(_url: &str, _vigilante: &Vigilante) -> Result<String, String> {
     Err("Peticiones HTTP no disponibles (requiere feature 'cloud')".into())
 }
 
@@ -215,13 +226,14 @@ mod tests {
     fn test_escribir_leer() {
         let ruta = std::env::temp_dir().join("moset_test_brazos.txt");
         let ruta_str = ruta.to_str().unwrap();
+        let vigilante = Vigilante::nuevo();
 
         // Escribir
-        let r = escribir(ruta_str, "Hola Soberano");
+        let r = escribir(ruta_str, "Hola Soberano", &vigilante);
         assert!(r.is_ok(), "escribir falló: {:?}", r);
 
         // Leer
-        let contenido = leer(ruta_str).unwrap();
+        let contenido = leer(ruta_str, &vigilante).unwrap();
         assert_eq!(contenido, "Hola Soberano");
 
         // Cleanup
@@ -230,27 +242,31 @@ mod tests {
 
     #[test]
     fn test_leer_archivo_inexistente() {
-        let resultado = leer("/ruta/que/no/existe/abc123.txt");
+        let vigilante = Vigilante::nuevo();
+        let resultado = leer("/ruta/que/no/existe/abc123.txt", &vigilante);
         assert!(resultado.is_err());
     }
 
     #[test]
     fn test_existe() {
-        assert!(existe("."));          // directorio actual siempre existe
-        assert!(!existe("/ruta_inventada_xyz"));
+        let vigilante = Vigilante::nuevo();
+        assert!(existe(".", &vigilante));          // directorio actual siempre existe
+        assert!(!existe("/ruta_inventada_xyz", &vigilante));
     }
 
     #[test]
     fn test_entorno() {
-        // PATH siempre existe en ambos SO
-        let resultado = entorno("PATH");
-        assert!(resultado.is_ok());
-        assert!(!resultado.unwrap().is_empty());
+        let vigilante = Vigilante::nuevo();
+        // Usamos una que casi seguro existe en cualquier OS (HOME, PATH o OS)
+        let resultado = entorno("PATH", &vigilante);
+        assert!(resultado.is_ok(), "entorno(PATH) falló: {:?}", resultado);
     }
 
     #[test]
     fn test_entorno_inexistente() {
-        let resultado = entorno("MOSET_VARIABLE_QUE_NO_EXISTE_XYZ");
+        let vigilante = Vigilante::nuevo();
+        // Esto fallará ahora no porque no exista, sino porque no está en la allowlist
+        let resultado = entorno("MOSET_VARIABLE_QUE_NO_EXISTE_XYZ", &vigilante);
         assert!(resultado.is_err());
     }
 }

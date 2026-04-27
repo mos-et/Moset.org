@@ -72,3 +72,15 @@ pub fn generar_system_prompt(modo: &str, workspace_root: &str, contexto_extra: O
 
     prompt
 }
+
+pub fn validar_herramienta_fs(tool: &AgentTool, arg_path: &str, vigilante: &crate::vigilante::Vigilante) -> Result<(), String> {
+    match tool {
+        AgentTool::ReadFile | AgentTool::ReadDirectory | AgentTool::WriteToFile | AgentTool::WriteFile | AgentTool::ReplaceFileContent => {
+            if let Err(e) = vigilante.autorizar_ruta(arg_path) {
+                return Err(format!("Vigilante: Acceso denegado a la ruta {} - {}", arg_path, e));
+            }
+            Ok(())
+        },
+        _ => Ok(()) // Otras herramientas no son de filesystem, o se validan en otro nivel
+    }
+}

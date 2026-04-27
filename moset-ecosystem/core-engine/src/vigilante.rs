@@ -125,11 +125,14 @@ impl Vigilante {
     /// Auditar un comando y emitir un veredicto
     pub fn auditar(&self, comando: &str) -> Veredicto {
         let cmd_lower = comando.to_lowercase();
-        let cmd_trimmed = cmd_lower.trim();
+        // Normalizamos espacios para evitar bypass (ej: "rm  -rf  /")
+        let palabras: Vec<&str> = cmd_lower.split_whitespace().collect();
+        let cmd_normalized = palabras.join(" ");
 
         // ⛔ Verificar lista negra absoluta PRIMERO
         for prohibido in &self.prohibidos {
-            if cmd_trimmed.contains(&prohibido.to_lowercase()) {
+            let prohibido_norm = prohibido.to_lowercase().split_whitespace().collect::<Vec<&str>>().join(" ");
+            if cmd_normalized.contains(&prohibido_norm) {
                 return Veredicto::Prohibido {
                     razon: format!(
                         "Comando '{}' está en la lista negra del Vigilante. NUNCA se ejecuta.",
@@ -140,17 +143,13 @@ impl Vigilante {
         }
 
         // 🔴 Verificar comandos peligrosos
-        // Extraemos el primer "word" del comando para comparar
-        let primer_word = cmd_trimmed
-            .split_whitespace()
-            .next()
-            .unwrap_or("");
-
+        // Revisamos si el comando normalizado contiene la palabra, ignorando comillas
+        let sin_comillas = cmd_normalized.replace("\"", "").replace("'", "");
+        let palabras_sin_comillas: Vec<&str> = sin_comillas.split_whitespace().collect();
+        
         for peligroso in &self.peligrosos {
             let pel_lower = peligroso.to_lowercase();
-            if primer_word == pel_lower
-                || cmd_trimmed.starts_with(&format!("{} ", pel_lower))
-            {
+            if palabras_sin_comillas.contains(&pel_lower.as_str()) || sin_comillas.contains(&pel_lower) {
                 return Veredicto::RequiereConfianza {
                     nivel_minimo: 0.95,
                     categoria: format!("🔴 Peligroso ({})", peligroso),
@@ -161,9 +160,7 @@ impl Vigilante {
         // 🟡 Verificar comandos cautelosos
         for cauteloso in &self.cautelosos {
             let cau_lower = cauteloso.to_lowercase();
-            if primer_word == cau_lower
-                || cmd_trimmed.starts_with(&format!("{} ", cau_lower))
-            {
+            if palabras_sin_comillas.contains(&cau_lower.as_str()) || sin_comillas.contains(&cau_lower) {
                 return Veredicto::RequiereConfianza {
                     nivel_minimo: 0.75,
                     categoria: format!("🟡 Cauteloso ({})", cauteloso),
@@ -244,6 +241,91 @@ impl Vigilante {
                 ruta, sandboxes
             ))
         }
+    }
+
+    /// Verificar si una variable de entorno es segura para leer.
+    /// BUG-060 Fix: Se bloquea el acceso a credenciales o tokens por defecto.
+    pub fn auditar_entorno(&self, nombre: &str) -> Result<(), String> {
+        let nombre_upper = nombre.to_uppercase();
+        
+        let allowlist = [
+            "HOME", "PATH", "OS", "USER", "TEMP", "TMP", 
+            "LOGNAME", "USERNAME", "APPDATA", "LOCALAPPDATA"
+        ];
+
+        if allowlist.contains(&nombre_upper.as_str()) {
+            return Ok(());
+        }
+
+        // Bloquear explícitamente palabras clave sensibles
+        let sensibles = ["TOKEN", "KEY", "SECRET", "PASS", "CRED", "AUTH", "AWS", "GCP", "AZURE", "STRIPE"];
+        for sensible in sensibles.iter() {
+            if nombre_upper.contains(sensible) {
+                return Err(format!(
+                    "🛑 Vigilante: INTENTO DE ACCESO A SECRETO BLOQUEADO ('{}').",
+                    nombre
+                ));
+            }
+        }
+
+        Err(format!(
+            "⚠️ Vigilante: Acceso denegado a variable de entorno no estándar ('{}').",
+            nombre
+        ))
+    }
+
+    /// HIGH-002 Fix: Verificar si una URL es segura para peticiones HTTP.
+    /// Bloquea accesos a redes internas, metadata de cloud, y localhost.
+    pub fn autorizar_url(&self, url: &str) -> Result<(), String> {
+        let url_lower = url.to_lowercase();
+
+        // ⛔ Bloquear cloud metadata endpoints (SSRF prevention)
+        let bloqueados = [
+            "169.254.169.254",    // AWS/GCP metadata
+            "metadata.google",     // GCP metadata
+            "metadata.internal",   // GCP metadata
+            "100.100.100.200",    // Alibaba metadata
+        ];
+        for bloqueado in &bloqueados {
+            if url_lower.contains(bloqueado) {
+                return Err(format!(
+                    "🛑 Vigilante: SSRF BLOQUEADO — URL apunta a endpoint de metadata interno ('{}')",
+                    url
+                ));
+            }
+        }
+
+        // ⛔ Bloquear localhost y redes internas
+        let redes_internas = [
+            "localhost", "127.0.0.1", "0.0.0.0",
+            "10.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.",
+            "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
+            "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.",
+            "[::1]", "[::]",
+        ];
+        // Extraer el host de la URL para comparación
+        let host_part = url_lower
+            .trim_start_matches("http://")
+            .trim_start_matches("https://");
+        
+        for red in &redes_internas {
+            if host_part.starts_with(red) {
+                return Err(format!(
+                    "🛑 Vigilante: Petición a red interna bloqueada ('{}'). Solo se permiten URLs públicas.",
+                    url
+                ));
+            }
+        }
+
+        // ⛔ Solo permitir HTTP/HTTPS
+        if !url_lower.starts_with("http://") && !url_lower.starts_with("https://") {
+            return Err(format!(
+                "⚠️ Vigilante: Protocolo no soportado en URL '{}'. Solo HTTP/HTTPS permitidos.",
+                url
+            ));
+        }
+
+        Ok(())
     }
 }
 
@@ -347,5 +429,39 @@ mod tests {
         let result = v.autorizar("netstat -ano", None);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("requiere autorización"));
+    }
+
+    #[test]
+    fn test_autorizar_url_permitidas() {
+        let v = Vigilante::nuevo();
+        assert!(v.autorizar_url("http://google.com").is_ok());
+        assert!(v.autorizar_url("https://api.github.com/v3").is_ok());
+        assert!(v.autorizar_url("https://moset.org").is_ok());
+    }
+
+    #[test]
+    fn test_autorizar_url_bloqueadas_ssrf() {
+        let v = Vigilante::nuevo();
+        assert!(v.autorizar_url("http://169.254.169.254/latest/meta-data/").is_err());
+        assert!(v.autorizar_url("http://metadata.google.internal/").is_err());
+        assert!(v.autorizar_url("http://100.100.100.200/").is_err());
+    }
+
+    #[test]
+    fn test_autorizar_url_bloqueadas_red_interna() {
+        let v = Vigilante::nuevo();
+        assert!(v.autorizar_url("http://localhost:8080").is_err());
+        assert!(v.autorizar_url("https://127.0.0.1").is_err());
+        assert!(v.autorizar_url("http://192.168.1.1").is_err());
+        assert!(v.autorizar_url("http://10.0.0.1").is_err());
+        assert!(v.autorizar_url("http://[::1]").is_err());
+    }
+
+    #[test]
+    fn test_autorizar_url_protocolos_invalidos() {
+        let v = Vigilante::nuevo();
+        assert!(v.autorizar_url("ftp://example.com").is_err());
+        assert!(v.autorizar_url("file:///etc/passwd").is_err());
+        assert!(v.autorizar_url("gopher://server").is_err());
     }
 }

@@ -1,6 +1,7 @@
 use crate::bytecode::{Chunk, OpCode};
 use crate::valor::Valor;
 use crate::ast::{Nodo, OpBinario, OpUnario};
+use crate::vigilante::Vigilante;
 use std::collections::HashMap;
 
 use std::rc::Rc;
@@ -82,6 +83,8 @@ pub struct Compilador {
     moldes: HashMap<String, MoldeSchema>,
     /// Directorio base del archivo fuente en ejecución.
     pub ruta_base: Option<std::path::PathBuf>,
+    /// Vigilante para validar rutas de importación (BUG-059)
+    pub vigilante: Option<std::rc::Rc<Vigilante>>,
 }
 
 #[derive(Clone, Debug)]
@@ -99,6 +102,7 @@ impl Compilador {
             globales: HashMap::new(),
             moldes: HashMap::new(),
             ruta_base: None,
+            vigilante: None,
         }
     }
 
@@ -375,6 +379,7 @@ impl Compilador {
                 // Crear un nuevo compilador para la función
                 let mut comp_hijo = Compilador::nuevo();
                 comp_hijo.ruta_base = self.ruta_base.clone();
+                comp_hijo.vigilante = self.vigilante.clone();
                 comp_hijo.moldes = self.moldes.clone();
                 comp_hijo.scope.borrow_mut().padre = Some(self.scope.clone()); // Permitir resolución de capturas
 
@@ -425,6 +430,7 @@ impl Compilador {
             Nodo::Closure { params, cuerpo } => {
                 let mut comp_hijo = Compilador::nuevo();
                 comp_hijo.ruta_base = self.ruta_base.clone();
+                comp_hijo.vigilante = self.vigilante.clone();
                 comp_hijo.moldes = self.moldes.clone();
                 comp_hijo.scope.borrow_mut().padre = Some(self.scope.clone());
 
@@ -512,6 +518,13 @@ impl Compilador {
                 
                 let final_path = path.unwrap_or_else(|| std::path::PathBuf::from(modulo.clone() + ".et"));
                 let str_path = final_path.to_string_lossy();
+
+                // BUG-059 Fix: Validar la ruta contra el Vigilante antes de leer
+                if let Some(ref vigilante) = self.vigilante {
+                    vigilante.autorizar_ruta(&str_path)
+                        .map_err(|e| format!("Línea {}: Importación bloqueada para '{}': {}", linea, str_path, e))?;
+                }
+
                 let fuente = std::fs::read_to_string(&final_path)
                     .map_err(|e| format!("Línea {}: No se pudo importar '{}': {}", linea, str_path, e))?;
 
@@ -579,27 +592,14 @@ impl Compilador {
 
             // ─── ASIGNACIÓN DE CAMPO (obj.campo = valor) ────────────────────
             Nodo::AsignacionCampo { objeto, campo, valor } => {
-                // Push el objeto
-                if let Some(slot) = self.resolver_local(objeto) {
-                    self.emitir_bytes(OpCode::ObtenerLocal as u8, slot as u8, linea);
-                } else {
-                    let idx = self.identificador_constante(objeto)?;
-                    self.emitir_op_u16(OpCode::ObtenerGlobal as u8, idx as u16, linea);
-                }
-                // Push el valor
+                // Compilar el objeto base
+                self.compilar_nodo(objeto, linea)?;
+
+                // Compilar el valor
                 self.compilar_nodo(valor, linea)?;
-                // Emit set field
+
                 let field_idx = self.identificador_constante(campo)?;
                 self.emitir_op_u16(OpCode::AsignarCampo as u8, field_idx as u16, linea);
-                // Update the variable
-                if let Some(slot) = self.resolver_local(objeto) {
-                    self.emitir_bytes(OpCode::AsignarLocal as u8, slot as u8, linea);
-                } else {
-                    let idx = self.identificador_constante(objeto)?;
-                    self.emitir_op_u16(OpCode::AsignarGlobal as u8, idx as u16, linea);
-                }
-                // Pop the result that AsignarGlobal/AsignarLocal left
-                self.emitir_byte(OpCode::Pop as u8, linea);
             },
 
             // ─── ASIGNACIÓN DE ÍNDICE (lista[indice] = valor) ────────────────

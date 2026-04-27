@@ -1,5 +1,7 @@
 // Código de Fase Futura: Análisis semántico estático (Linter). Aún no integrado.
-#![allow(dead_code)]
+// TODO: Implementación futura del Linter Estático para Naraka IDE.
+// Analiza el AST sin generar bytecode ni ejecutar en la VM.
+// Mantenemos las estructuras para desarrollo posterior.
 
 use crate::ast::*;
 use serde::{Deserialize, Serialize};

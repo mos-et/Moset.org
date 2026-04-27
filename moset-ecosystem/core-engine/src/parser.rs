@@ -359,35 +359,6 @@ impl Parser {
     /// nombre = expresion  |  obj.campo = expresion  |  lista[indice] = expresion | expresion
     fn parsear_asignacion_o_expresion(&mut self) -> Result<Nodo, String> {
         if let Token::Ident(nombre) = self.actual_token() {
-            // ── obj.campo = valor (asignación de campo) ──
-            if self.peek_token(1) == Some(&Token::Punto) {
-                if let Some(Token::Ident(_)) = self.peek_token(2) {
-                    if self.peek_token(3) == Some(&Token::Igual) {
-                        let obj = nombre.clone();
-                        self.avanzar(); // consumir obj
-                        self.avanzar(); // consumir .
-                        let campo = self.consumir_ident()?;
-                        self.avanzar(); // consumir =
-                        let valor = self.parsear_expresion()?;
-                        return Ok(Nodo::AsignacionCampo {
-                            objeto: obj,
-                            campo,
-                            valor: Box::new(valor),
-                        });
-                    }
-                }
-            }
-
-            // ── lista[indice] = valor (asignación de índice) ──
-            if self.peek_token(1) == Some(&Token::CorcheteIzq) {
-                // Necesitamos verificar si después del corchete derecho hay un =
-                // Pero el índice puede ser una expresión compleja, así que no podemos 
-                // solo mirar peek_token.
-                // En lugar de pre-escanear, podemos probar a parsear el índice
-                // O mejor aún, parsear la expresión izquierda completa y ver si le sigue un '='.
-                // Ya que `parsear_expresion` maneja `AccesoIndice`.
-            }
-
             // ── ident = expr (asignación simple) ──
             if self.peek_token(1) == Some(&Token::Igual) {
                 let nombre = nombre.clone();
@@ -412,15 +383,25 @@ impl Parser {
             if let Nodo::Metadata { nodo: inner, .. } = base_expr {
                 base_expr = *inner;
             }
-            if let Nodo::AccesoIndice { lista, indice } = base_expr {
-                // BUG-052: Permitir expresiones en AsignacionIndice en lugar de solo identificador
-                return Ok(Nodo::AsignacionIndice {
-                    lista,
-                    indice,
-                    valor: Box::new(valor),
-                });
-            } else {
-                return Err(self.error(&format!("Asignación no válida a una expresión: {:?}", base_expr)));
+            
+            match base_expr {
+                Nodo::AccesoIndice { lista, indice } => {
+                    return Ok(Nodo::AsignacionIndice {
+                        lista,
+                        indice,
+                        valor: Box::new(valor),
+                    });
+                },
+                Nodo::AccesoCampo { objeto, campo } => {
+                    return Ok(Nodo::AsignacionCampo {
+                        objeto,
+                        campo,
+                        valor: Box::new(valor),
+                    });
+                },
+                _ => {
+                    return Err(self.error(&format!("Asignación no válida a una expresión: {:?}", base_expr)));
+                }
             }
         }
         
@@ -1174,7 +1155,7 @@ mod tests {
     fn test_asignacion_campo() {
         let prog = parsear_codigo("obj.campo = 42");
         if let Nodo::AsignacionCampo { objeto, campo, valor } = unwrap_meta(&prog.sentencias[0]) {
-            assert_eq!(objeto, "obj");
+            assert!(matches!(unwrap_meta(objeto.as_ref()), Nodo::Identificador(ref nombre) if nombre == "obj"));
             assert_eq!(campo, "campo");
             assert!(matches!(unwrap_meta(valor.as_ref()), Nodo::EnteroLit(42)));
         } else {

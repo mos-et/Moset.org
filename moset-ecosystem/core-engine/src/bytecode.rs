@@ -221,7 +221,7 @@ impl Chunk {
     /// Escribe un salto placeholder y retorna el offset para backpatching
     pub fn emitir_salto(&mut self, opcode: OpCode, linea: usize) -> usize {
         self.escribir(opcode as u8, linea);
-        // Placeholder de 2 bytes para el offset (u16 big-endian)
+        // Placeholder de 2 bytes para el offset (u16 little-endian)
         self.escribir(0xFF, linea);
         self.escribir(0xFF, linea);
         self.codigo.len() - 2 // offset del primer byte del placeholder

@@ -20,15 +20,15 @@
         <p>El motor Moset en WebAssembly, ejecutándose nativamente en el navegador sin backend.</p>
         
         <textarea id="codigo">
-// Ejemplo en Moset
-mostrar("¡Hola desde WebAssembly!")
-mostrar("Calculando...")
+:@ Ejemplo en Moset
+mostrar "¡Hola desde WebAssembly!"
 
-fn sumar(a, b) {
-  retornar a + b
-}
+a = 10
+b = 5
+z = a + b
 
-mostrar("2 + 2 = " + sumar(2, 2))
+mostrar "El resultado de la suma es:"
+mostrar z
         </textarea>
         
         <button id="btn-ejecutar">Ejecutar Código</button>

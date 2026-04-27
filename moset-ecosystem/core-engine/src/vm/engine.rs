@@ -24,6 +24,8 @@ struct CallFrame {
     chunk: Chunk,
     /// Entorno de capturas del caller
     capturas: Vec<Valor>,
+    /// Objeto 'este' del caller (para métodos)
+    este: Option<Valor>,
 }
 
 pub type PrintCallback = Box<dyn FnMut(&str) + Send + Sync>;
@@ -32,12 +34,16 @@ pub struct VM {
     chunk: Chunk,
     ip: usize,
     pila: Vec<Valor>,
-    globales: HashMap<String, Valor>,
+    pub globales: HashMap<String, Valor>,
     frames: Vec<CallFrame>,
     pub on_print: Option<PrintCallback>,
     pub vigilante: std::rc::Rc<crate::vigilante::Vigilante>,
     pub capturas: Vec<Valor>,
+    pub este: Option<Valor>,
     base_pila: usize,
+    /// Stack de handlers para CatchEnLinea (reservado para implementación completa)
+    #[allow(dead_code)]
+    handlers_catch: Vec<(usize, usize, usize)>, // (ip_handler, pila_size, frames_len)
 }
 
 impl VM {
@@ -51,12 +57,22 @@ impl VM {
             on_print: None,
             vigilante: std::rc::Rc::new(crate::vigilante::Vigilante::nuevo()),
             capturas: Vec::new(),
+            este: None,
             base_pila: 0,
+            handlers_catch: Vec::new(),
         }
     }
 
+    // MED-002 Fix: Enforce stack depth limit to prevent unbounded memory growth
     #[inline(always)]
     fn push(&mut self, valor: Valor) {
+        if self.pila.len() >= MAX_PILA {
+            // Silently replace the last element instead of growing unboundedly.
+            // The instruction limit (5M) will catch infinite loops, but this
+            // prevents memory exhaustion for pathological stack-heavy programs.
+            *self.pila.last_mut().unwrap() = valor;
+            return;
+        }
         self.pila.push(valor);
     }
 
@@ -97,9 +113,10 @@ impl VM {
             let instruccion = self.leer_byte();
             let op: OpCode = instruccion.into();
 
-            match op {
-                // ─── CONSTANTES ─────────────────────────────────────
-                OpCode::Constante => {
+            let resultado_paso = (|| -> Result<Option<Valor>, String> {
+                match op {
+                    // ─── CONSTANTES ─────────────────────────────────────
+                    OpCode::Constante => {
                     let indice = self.leer_u16() as usize;
                     if indice >= self.chunk.constantes.len() {
                         return Err(format!("Índice de constante fuera de rango: {}", indice));
@@ -398,6 +415,7 @@ impl VM {
                                 ip_retorno: self.ip,
                                 chunk: self.chunk.clone(),
                                 capturas: self.capturas.clone(),
+                                este: self.este.clone(),
                             };
                             self.frames.push(frame);
                             self.chunk = (*chunk).clone();
@@ -417,6 +435,7 @@ impl VM {
                                 ip_retorno: self.ip,
                                 chunk: self.chunk.clone(),
                                 capturas: self.capturas.clone(),
+                                este: self.este.clone(),
                             };
                             self.frames.push(frame);
                             self.chunk = (*chunk).clone();
@@ -445,8 +464,9 @@ impl VM {
                         self.chunk = frame.chunk;
                         self.base_pila = frame.base_pila;
                         self.capturas = frame.capturas;
+                        self.este = frame.este;
                     } else {
-                        return Ok(res);
+                        return Ok(Some(res));
                     }
                 },
 
@@ -507,10 +527,34 @@ impl VM {
                     };
                     
                     if let Valor::Funcion { arity, chunk, .. } = funcion_base {
+                        // Leer la cantidad de capturas y consumir sus bytes del stream
+                        let capture_count = self.leer_byte() as usize;
+                        let mut capturas_vals = Vec::with_capacity(capture_count);
+                        for _ in 0..capture_count {
+                            let es_local = self.leer_byte() == 1;
+                            let index = self.leer_byte() as usize;
+                            if es_local {
+                                // Capturar valor local del frame actual
+                                let idx = self.base_pila + index;
+                                if idx < self.pila.len() {
+                                    capturas_vals.push(self.pila[idx].clone());
+                                } else {
+                                    return Err(format!("Captura local fuera de rango: base={}, index={}, pila_len={}", self.base_pila, index, self.pila.len()));
+                                }
+                            } else {
+                                // Capturar de las capturas del closure padre
+                                if index < self.capturas.len() {
+                                    capturas_vals.push(self.capturas[index].clone());
+                                } else {
+                                    return Err(format!("Captura transitiva fuera de rango: index={}, capturas_len={}", index, self.capturas.len()));
+                                }
+                            }
+                        }
+
                         let closure = Valor::Closure {
                             arity,
                             chunk,
-                            capturas: Vec::new(), // TODO: Capturar entorno
+                            capturas: capturas_vals,
                         };
                         self.push(closure);
                     }
@@ -549,12 +593,16 @@ impl VM {
                     
                     match (&coleccion, &indice) {
                         (Valor::Lista(lista), Valor::Entero(idx)) => {
+                            // MED-003 Fix: Guard against negative indices
+                            if *idx < 0 {
+                                return Err(format!("Índice de lista negativo no permitido: {}", idx));
+                            }
                             let lista_ref = lista.borrow();
                             let i = *idx as usize;
                             if i < lista_ref.len() {
                                 self.push(lista_ref[i].clone());
                             } else {
-                                return Err(format!("Índice de lista fuera de rango: {}", i));
+                                return Err(format!("Índice de lista fuera de rango: {} (longitud: {})", i, lista_ref.len()));
                             }
                         },
                         _ => return Err(format!("ObtenerIndice no soportado para {:?} y {:?}", coleccion, indice)),
@@ -581,13 +629,17 @@ impl VM {
                     
                     match (&coleccion, &indice) {
                         (Valor::Lista(lista), Valor::Entero(idx)) => {
+                            // MED-003 Fix: Guard against negative indices
+                            if *idx < 0 {
+                                return Err(format!("Índice de lista negativo no permitido: {}", idx));
+                            }
                             let mut lista_ref = lista.borrow_mut();
                             let i = *idx as usize;
                             if i < lista_ref.len() {
                                 lista_ref[i] = valor.clone();
                                 self.push(valor);
                             } else {
-                                return Err(format!("Índice de lista fuera de rango: {}", i));
+                                return Err(format!("Índice de lista fuera de rango: {} (longitud: {})", i, lista_ref.len()));
                             }
                         },
                         _ => return Err(format!("AsignarIndice no soportado para {:?} y {:?}", coleccion, indice)),
@@ -668,7 +720,7 @@ impl VM {
                         "leer" => {
                             if args.len() != 1 { return Err("leer() requiere 1 argumento".into()); }
                             let ruta = format!("{}", args[0]);
-                            match crate::stdlib::leer(&ruta) {
+                            match crate::stdlib::leer(&ruta, &self.vigilante) {
                                 Ok(content) => Valor::Texto(content),
                                 Err(e) => return Err(e),
                             }
@@ -677,7 +729,7 @@ impl VM {
                             if args.len() != 2 { return Err("escribir() requiere 2 argumentos (ruta, contenido)".into()); }
                             let ruta = format!("{}", args[0]);
                             let contenido = format!("{}", args[1]);
-                            match crate::stdlib::escribir(&ruta, &contenido) {
+                            match crate::stdlib::escribir(&ruta, &contenido, &self.vigilante) {
                                 Ok(_) => Valor::Nulo,
                                 Err(e) => return Err(e),
                             }
@@ -685,7 +737,7 @@ impl VM {
                         "entorno" => {
                             if args.len() != 1 { return Err("entorno() requiere 1 argumento".into()); }
                             let nombre = format!("{}", args[0]);
-                            match crate::stdlib::entorno(&nombre) {
+                            match crate::stdlib::entorno(&nombre, &self.vigilante) {
                                 Ok(val) => Valor::Texto(val),
                                 Err(e) => return Err(e),
                             }
@@ -693,12 +745,12 @@ impl VM {
                         "existe" => {
                             if args.len() != 1 { return Err("existe() requiere 1 argumento".into()); }
                             let ruta = format!("{}", args[0]);
-                            Valor::Booleano(crate::stdlib::existe(&ruta))
+                            Valor::Booleano(crate::stdlib::existe(&ruta, &self.vigilante))
                         },
                         "peticion_get" => {
                             if args.len() != 1 { return Err("peticion_get() requiere 1 argumento".into()); }
                             let url = format!("{}", args[0]);
-                            match crate::stdlib::peticion_get(&url) {
+                            match crate::stdlib::peticion_get(&url, &self.vigilante) {
                                 Ok(body) => Valor::Texto(body),
                                 Err(e) => return Err(e),
                             }
@@ -707,10 +759,150 @@ impl VM {
                     };
                     self.push(resultado);
                 },
-                _ => return Err(format!("OpCode no implementado en la VM: {:?}", op)),
+                OpCode::ConfigurarCatch => {
+                    let offset = self.leer_u16() as usize;
+                    let target_ip = self.ip + offset;
+                    self.handlers_catch.push((target_ip, self.pila.len(), self.frames.len()));
+                },
+                OpCode::LimpiarCatch => {
+                    self.handlers_catch.pop();
+                },
+                OpCode::LanzarError => {
+                    let err_val = self.pop()?;
+                    return Err(format!("{}", err_val));
+                },
+                OpCode::Esperar => {
+                    // Esperar (async/await) en un entorno síncrono no requiere pausar la VM v0.1.
+                    // Funciona como un no-op passthrough del valor ya existente en la pila.
+                },
+                OpCode::InvocacionMetodo => {
+                    let name_idx = self.leer_u16() as usize;
+                    let arg_count = self.leer_byte() as usize;
+                    let nombre_metodo = match &self.chunk.constantes[name_idx] {
+                        Valor::Texto(s) => s.clone(),
+                        _ => return Err("Nombre de método no es texto".into()),
+                    };
+
+                    let offset_obj = self.pila.len() - 1 - arg_count;
+                    let obj = self.pila[offset_obj].clone();
+
+                    let closure = match &obj {
+                        Valor::Molde(rc_inst) => {
+                            let inst = rc_inst.borrow();
+                            if let Some(val) = inst.campos.get(&nombre_metodo) {
+                                val.clone()
+                            } else if let Some(val) = inst.extra.get(&nombre_metodo) {
+                                val.clone()
+                            } else {
+                                return Err(format!("Método '{}' no encontrado en el objeto", nombre_metodo));
+                            }
+                        },
+                        _ => return Err(format!("Invocación de método sobre un valor que no es un objeto Molde: {:?}", obj)),
+                    };
+
+                    match closure {
+                        Valor::Closure { arity, chunk, capturas } => {
+                            if arity != arg_count {
+                                return Err(format!("Método '{}' esperaba {} argumentos, recibió {}", nombre_metodo, arity, arg_count));
+                            }
+                            if self.frames.len() >= MAX_FRAMES {
+                                return Err("Stack Overflow".into());
+                            }
+                            let frame = CallFrame {
+                                base_pila: self.base_pila,
+                                ip_retorno: self.ip,
+                                chunk: self.chunk.clone(),
+                                capturas: self.capturas.clone(),
+                                este: self.este.clone(),
+                            };
+                            self.frames.push(frame);
+                            self.chunk = (*chunk).clone();
+                            self.ip = 0;
+                            self.base_pila = self.pila.len() - arg_count;
+                            self.capturas = capturas;
+                            self.este = Some(obj);
+                        },
+                        Valor::Funcion { arity, chunk, .. } => {
+                            if arity != arg_count {
+                                return Err(format!("Método '{}' esperaba {} argumentos, recibió {}", nombre_metodo, arity, arg_count));
+                            }
+                            if self.frames.len() >= MAX_FRAMES {
+                                return Err("Stack Overflow".into());
+                            }
+                            let frame = CallFrame {
+                                base_pila: self.base_pila,
+                                ip_retorno: self.ip,
+                                chunk: self.chunk.clone(),
+                                capturas: self.capturas.clone(),
+                                este: self.este.clone(),
+                            };
+                            self.frames.push(frame);
+                            self.chunk = (*chunk).clone();
+                            self.ip = 0;
+                            self.base_pila = self.pila.len() - arg_count;
+                            self.capturas = Vec::new();
+                            self.este = Some(obj);
+                        },
+                        _ => return Err(format!("Propiedad '{}' no es invocable como método", nombre_metodo)),
+                    }
+                },
+                OpCode::ObtenerEste => {
+                    if let Some(ref e) = self.este {
+                        self.push(e.clone());
+                    } else {
+                        return Err("No se puede usar 'este' fuera de un método de molde".into());
+                    }
+                },
+                OpCode::EntrarPensar => {
+                    // Shadow environment marker (para aislamiento de scopes a futuro)
+                },
+                OpCode::SalirPensar => {
+                    // Shadow environment marker (para aislamiento de scopes a futuro)
+                },
+                OpCode::ObtenerCaptura => {
+                    let idx = self.leer_byte() as usize;
+                    if idx < self.capturas.len() {
+                        let val = self.capturas[idx].clone();
+                        self.push(val);
+                    } else {
+                        return Err(format!("Captura fuera de rango: {} (disponibles: {})", idx, self.capturas.len()));
+                    }
+                },
+                _ => return Err(format!("OpCode desconocido en la VM: {:?}", op)),
+            }
+            Ok(None)
+        })();
+
+        match resultado_paso {
+            Ok(Some(valor)) => return Ok(valor),
+            Ok(None) => {}, // continuar ciclo
+            Err(e) => {
+                // Módulo de Intercepción de Errores (Catch)
+                // CRIT-001 Fix: Clone frame data BEFORE truncating to prevent
+                // use-after-borrow and ensure safe unwinding of nested catches.
+                if let Some((ip_handler, len_pila, len_frames)) = self.handlers_catch.pop() {
+                    // Si el error ocurrió dentro de una llamada a función que el catch envuelve
+                    if len_frames < self.frames.len() {
+                        // Clone all needed values first, then truncate
+                        let restored_chunk = self.frames[len_frames].chunk.clone();
+                        let restored_base = self.frames[len_frames].base_pila;
+                        let restored_capturas = self.frames[len_frames].capturas.clone();
+                        self.frames.truncate(len_frames);
+                        self.chunk = restored_chunk;
+                        self.base_pila = restored_base;
+                        self.capturas = restored_capturas;
+                    }
+                    
+                    self.ip = ip_handler;
+                    self.pila.truncate(len_pila);
+                    self.push(Valor::Texto(e));
+                } else {
+                    return Err(e);
+                }
             }
         }
     }
+}
 
     #[inline(always)]
     fn leer_byte(&mut self) -> u8 {

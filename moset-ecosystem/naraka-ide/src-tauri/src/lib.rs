@@ -8,7 +8,7 @@ fn version() -> String {
 }
 
 #[tauri::command]
-async fn ejecutar(_app: tauri::AppHandle, codigo: String, idioma: Option<String>) -> Result<String, String> {
+async fn ejecutar(_app: tauri::AppHandle, vig_cfg: tauri::State<'_, std::sync::Mutex<VigilanteConfig>>, codigo: String, idioma: Option<String>) -> Result<String, String> {
     use moset_core::{lexer::Lexer, parser::Parser, compiler::Compilador, vm::VM};
     use std::sync::{Arc, Mutex};
 
@@ -27,7 +27,9 @@ async fn ejecutar(_app: tauri::AppHandle, codigo: String, idioma: Option<String>
         Err(e) => return Err(format!("Error de sintaxis: {}", e)),
     };
 
+    let vigilante = make_vigilante(&vig_cfg);
     let mut compilador = Compilador::nuevo();
+    compilador.vigilante = Some(std::rc::Rc::new(vigilante));
     if let Err(e) = compilador.compilar_programa(&programa) {
         return Err(format!("Error de compilación: {}", e));
     }
@@ -464,11 +466,21 @@ async fn execute_agent_tool(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, m
     match call.tool {
         AgentTool::ReadDirectory => {
             let path = call.args.get("path").and_then(|v| v.as_str()).unwrap_or("./").to_string();
+            
+            // 🛡️ Vigilante: verificar que la ruta está dentro del sandbox
+            vigilante.autorizar_ruta(&path)
+                .map_err(|e| format!("Agente bloqueado por el Vigilante:\n{}", e))?;
+                
             let res = read_directory(vig_cfg.clone(), path, Some(3))?;
             Ok(serde_json::to_string(&res).unwrap_or_else(|_| "[]".to_string()))
         },
         AgentTool::ReadFile => {
             let path = call.args.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            
+            // 🛡️ Vigilante: verificar que la ruta está dentro del sandbox
+            vigilante.autorizar_ruta(&path)
+                .map_err(|e| format!("Agente bloqueado por el Vigilante:\n{}", e))?;
+                
             read_file_content(vig_cfg.clone(), path)
         },
         AgentTool::WriteToFile | AgentTool::WriteFile => {
@@ -504,14 +516,19 @@ async fn execute_agent_tool(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, m
         AgentTool::SearchWorkspace => {
             let path = call.args.get("path").and_then(|v| v.as_str()).unwrap_or("./").to_string();
             let query = call.args.get("query").and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+            // 🛡️ Vigilante: verificar que la ruta raíz de búsqueda está dentro del sandbox
+            vigilante.autorizar_ruta(&path)
+                .map_err(|e| format!("Agente bloqueado por el Vigilante:\n{}", e))?;
+
             let res = search_workspace(vig_cfg.clone(), path, query)?;
             Ok(serde_json::to_string(&res).unwrap_or_else(|_| "[]".to_string()))
         },
         AgentTool::RunCommand => {
             let cmd = call.args.get("command").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
-            // 🛡️ Vigilante: auditar el comando antes de ejecutarlo.
-            vigilante.autorizar(&cmd, None)
+            // 🛡️ Vigilante: auditar el comando antes de ejecutarlo con nivel cauteloso (0.80).
+            vigilante.autorizar(&cmd, Some(0.80))
                 .map_err(|e| format!("Agente bloqueado por el Vigilante:\n{}", e))?;
 
             #[cfg(target_os = "windows")]
@@ -543,7 +560,7 @@ async fn execute_agent_tool(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, m
             let message = call.args.get("message").and_then(|v| v.as_str()).unwrap_or("Auto-commit por Agente Autónomo").to_string();
             let path = call.args.get("path").and_then(|v| v.as_str()).unwrap_or("./").to_string();
             
-            vigilante.autorizar("git commit", None)
+            vigilante.autorizar("git commit", Some(0.80))
                 .map_err(|e| format!("Agente bloqueado por el Vigilante:\n{}", e))?;
 
             std::process::Command::new("git").args(["add", "."]).current_dir(&path).output().ok();
@@ -562,6 +579,9 @@ async fn execute_agent_tool(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, m
             }
         },
         AgentTool::ListProcesses => {
+            vigilante.autorizar("tasklist", Some(0.80))
+                .map_err(|e| format!("Agente bloqueado por el Vigilante:\n{}", e))?;
+
             #[cfg(target_os = "windows")]
             let output = std::process::Command::new("tasklist").output();
             
@@ -595,7 +615,10 @@ async fn execute_agent_tool(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, m
             let tool = call.args.get("tool_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
             let args = call.args.get("arguments").cloned().unwrap_or(serde_json::json!({}));
             
-            // 🛡️ Vigilante: Opcional, auditar la herramienta. En este caso asumimos que si el server fue autorizado, la herramienta también.
+            // 🛡️ Vigilante: Auditar el nombre de la tool MCP contra la lista de operaciones peligrosas.
+            vigilante.autorizar(&format!("mcp:{}:{}", server, tool), Some(0.80))
+                .map_err(|e| format!("Agente bloqueado por el Vigilante (MCP tool '{}'):\n{}", tool, e))?;
+
             let clients = mcp_state.clients.lock().unwrap();
             if let Some(client) = clients.get(&server) {
                 let res = client.call_tool(&tool, args)?;

@@ -39,6 +39,30 @@ pub enum Valor {
     Nulo,
 }
 
+impl PartialEq for Valor {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Valor::Entero(a), Valor::Entero(b)) => a == b,
+            (Valor::Decimal(a), Valor::Decimal(b)) => a == b,
+            (Valor::Texto(a), Valor::Texto(b)) => a == b,
+            (Valor::Booleano(a), Valor::Booleano(b)) => a == b,
+            (Valor::Nulo, Valor::Nulo) => true,
+            (Valor::Lista(a), Valor::Lista(b)) => Rc::ptr_eq(a, b),
+            (Valor::Molde(a), Valor::Molde(b)) => Rc::ptr_eq(a, b),
+            (Valor::Funcion { nombre: n1, arity: a1, chunk: c1 }, Valor::Funcion { nombre: n2, arity: a2, chunk: c2 }) => {
+                n1 == n2 && a1 == a2 && Rc::ptr_eq(c1, c2)
+            },
+            (Valor::Closure { arity: a1, chunk: c1, capturas: cap1 }, Valor::Closure { arity: a2, chunk: c2, capturas: cap2 }) => {
+                a1 == a2 && Rc::ptr_eq(c1, c2) && cap1 == cap2
+            },
+            (Valor::Superposicion { alpha: a1, beta: b1 }, Valor::Superposicion { alpha: a2, beta: b2 }) => {
+                a1 == a2 && b1 == b2
+            },
+            _ => false,
+        }
+    }
+}
+
 impl std::fmt::Display for Valor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

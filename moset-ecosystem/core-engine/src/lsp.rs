@@ -72,8 +72,9 @@ impl LspClient {
                                                     serde_json::from_value(d.clone()).ok()
                                                 }).collect();
                                                 
-                                                let mut map = diag_clone.lock().unwrap();
-                                                map.insert(uri.to_string(), parsed_diags);
+                                                if let Ok(mut map) = diag_clone.lock() {
+                                                    map.insert(uri.to_string(), parsed_diags);
+                                                }
                                             }
                                         }
                                     }
@@ -116,13 +117,16 @@ impl LspClient {
     fn send_request(&self, req: &Value) -> Result<(), String> {
         let payload = serde_json::to_string(req).unwrap();
         let msg = format!("Content-Length: {}\r\n\r\n{}", payload.len(), payload);
-        let mut stdin = self.stdin.lock().unwrap();
+        let mut stdin = self.stdin.lock().map_err(|e| e.to_string())?;
         stdin.write_all(msg.as_bytes()).map_err(|e| e.to_string())?;
         stdin.flush().map_err(|e| e.to_string())
     }
 
     pub fn get_diagnostics(&self, file_uri: &str) -> Vec<Diagnostic> {
-        let map = self.diagnostics.lock().unwrap();
-        map.get(file_uri).cloned().unwrap_or_else(Vec::new)
+        if let Ok(map) = self.diagnostics.lock() {
+            map.get(file_uri).cloned().unwrap_or_else(Vec::new)
+        } else {
+            Vec::new()
+        }
     }
 }

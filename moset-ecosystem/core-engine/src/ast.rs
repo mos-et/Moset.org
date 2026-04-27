@@ -154,7 +154,7 @@ pub enum Nodo {
 
     // === Asignación de campo: obj.campo = valor ===
     AsignacionCampo {
-        objeto: String,
+        objeto: Box<Nodo>,
         campo: String,
         valor: Box<Nodo>,
     },

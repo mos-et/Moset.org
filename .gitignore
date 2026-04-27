@@ -43,8 +43,17 @@ credenciales_narakakore.txt
 
 # Moset Test/Temp files
 moset-ecosystem/core-engine/debug_out.txt
+moset-ecosystem/core-engine/err.txt
+moset-ecosystem/core-engine/error*.txt
+moset-ecosystem/core-engine/error.log
 moset-ecosystem/core-engine/*.et
 moset-ecosystem/core-engine/update_*.py
+moset-ecosystem/naraka-ide/tmp_transform*.cjs
+moset-ecosystem/naraka-ide/scratch-test.ts
+moset-ecosystem/naraka-ide/src-tauri/check_error.txt
+moset-ecosystem/naraka-ide/src-tauri/doc_output.txt
+moset-ecosystem/naraka-ide/src-tauri/test_moset.txt
+moset-ecosystem/naraka-ide/src-tauri/build.log
 moset-ecosystem/PlayGround/
 scripts/
 .moset/

@@ -34,6 +34,9 @@ jobs:
       # Esto chequea que el motor compila en CPU sin requerir la suite de CUDA instalada en los runners
       run: cargo check --manifest-path moset-ecosystem/core-engine/Cargo.toml
 
+    - name: Run Tests (No CUDA - Cross Platform)
+      run: cargo test --manifest-path moset-ecosystem/core-engine/Cargo.toml
+
     - name: Build Core Engine (Release)
       run: cargo build --release --manifest-path moset-ecosystem/core-engine/Cargo.toml
 
@@ -64,5 +67,5 @@ jobs:
         sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
     - name: Check Tauri Backend Compilation
-      # Asegura que el backend de Tauri compila nativamente y conecta con Webview cruzado
-      run: cargo check --manifest-path moset-ecosystem/naraka-ide/src-tauri/Cargo.toml
+      # Asegura que el backend de Tauri compila nativamente y conecta con Webview cruzado sin features pesadas
+      run: cargo check --no-default-features --manifest-path moset-ecosystem/naraka-ide/src-tauri/Cargo.toml
