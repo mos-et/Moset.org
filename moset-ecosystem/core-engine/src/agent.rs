@@ -43,18 +43,21 @@ pub struct ToolResponse {
 }
 
 #[deprecated(note = "MEJ-7: System prompt is now fully constructed in the frontend (useSoberanoChat.ts). This function is retained only for reference and potential WASM/CLI use.")]
-pub fn generar_system_prompt(modo: &str, workspace_root: &str, contexto_extra: Option<&str>) -> String {
+pub fn generar_system_prompt(modo: &str, workspace_root: &str, contexto_extra: Option<&str>, vigilante: &crate::vigilante::Vigilante) -> Result<String, String> {
     let base_agent_path = format!("{}/ai-corpus/prompts/base_agent.md", workspace_root);
     let task_format_path = format!("{}/ai-corpus/prompts/task_format.md", workspace_root);
 
+    vigilante.autorizar_ruta(&base_agent_path)?;
     let mut prompt = match std::fs::read_to_string(&base_agent_path) {
         Ok(content) => content,
-        Err(_) => String::from("Error: No se pudo cargar base_agent.md\n"),
+        Err(_) => return Err("Error: No se pudo cargar base_agent.md".into()),
     };
 
-    if let Ok(content) = std::fs::read_to_string(&task_format_path) {
-        prompt.push('\n');
-        prompt.push_str(&content);
+    if vigilante.autorizar_ruta(&task_format_path).is_ok() {
+        if let Ok(content) = std::fs::read_to_string(&task_format_path) {
+            prompt.push('\n');
+            prompt.push_str(&content);
+        }
     }
 
     prompt.push('\n');
@@ -70,7 +73,7 @@ pub fn generar_system_prompt(modo: &str, workspace_root: &str, contexto_extra: O
         }
     }
 
-    prompt
+    Ok(prompt)
 }
 
 pub fn validar_herramienta_fs(tool: &AgentTool, arg_path: &str, vigilante: &crate::vigilante::Vigilante) -> Result<(), String> {

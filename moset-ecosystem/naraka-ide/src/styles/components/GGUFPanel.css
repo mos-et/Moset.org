@@ -1,0 +1,547 @@
+/* Component: GGUFPanel — Metadata Inspector & Template Manager */
+
+.gguf-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-1);
+  overflow: hidden;
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* ─── Header ────────────────────────────────────────────────────────────────── */
+.gguf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(168, 85, 247, 0.03));
+  border-bottom: 1px solid rgba(168, 85, 247, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.gguf-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 14px;
+  right: 14px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.4), transparent);
+}
+
+.gguf-header-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #FFFFFF, #A855F7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gguf-header-title svg {
+  color: #A855F7;
+  flex-shrink: 0;
+}
+
+.gguf-header-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.gguf-header-btn {
+  background: rgba(168, 85, 247, 0.08);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  color: var(--text-3);
+  border-radius: 5px;
+  padding: 4px 6px;
+  cursor: pointer;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.gguf-header-btn:hover {
+  background: rgba(168, 85, 247, 0.2);
+  color: #A855F7;
+  border-color: #A855F7;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
+}
+
+/* ─── File Selector ─────────────────────────────────────────────────────────── */
+.gguf-file-section {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.gguf-file-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-3);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.gguf-file-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.gguf-file-path {
+  flex: 1;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  border-radius: 5px;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  outline: none;
+  transition: border-color 0.2s;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gguf-file-path:focus {
+  border-color: #A855F7;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.15);
+}
+
+.gguf-browse-btn {
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  color: #A855F7;
+  border-radius: 5px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.gguf-browse-btn:hover {
+  background: rgba(168, 85, 247, 0.25);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.3);
+  transform: translateY(-1px);
+}
+
+.gguf-load-btn {
+  background: linear-gradient(135deg, #A855F7, #7C3AED);
+  border: none;
+  color: #fff;
+  border-radius: 5px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  transition: all 0.2s;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gguf-load-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+}
+
+.gguf-load-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ─── Model Info Banner ─────────────────────────────────────────────────────── */
+.gguf-model-info {
+  padding: 8px 12px;
+  background: rgba(168, 85, 247, 0.06);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.gguf-model-badge {
+  background: linear-gradient(135deg, #A855F7, #7C3AED);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.gguf-model-name {
+  font-size: 12px;
+  color: var(--text-1);
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gguf-model-count {
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+/* ─── Tabs ──────────────────────────────────────────────────────────────────── */
+.gguf-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.gguf-tab {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-3);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.gguf-tab:hover {
+  color: var(--text-2);
+  background: var(--bg-3);
+}
+
+.gguf-tab.active {
+  color: #A855F7;
+}
+
+.gguf-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  background: #A855F7;
+  border-radius: 2px 2px 0 0;
+}
+
+/* ─── Metadata Table ────────────────────────────────────────────────────────── */
+.gguf-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.gguf-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  color: var(--text-3);
+  padding: 20px;
+  text-align: center;
+}
+
+.gguf-empty-icon {
+  font-size: 40px;
+  opacity: 0.3;
+}
+
+.gguf-empty-text {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.gguf-kv-list {
+  padding: 4px 0;
+}
+
+.gguf-kv-item {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  transition: background 0.15s;
+  cursor: default;
+}
+
+.gguf-kv-item:hover {
+  background: rgba(168, 85, 247, 0.04);
+}
+
+.gguf-kv-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gguf-kv-key {
+  font-size: 11px;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  color: #A855F7;
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gguf-kv-type {
+  font-size: 9px;
+  color: var(--text-3);
+  background: var(--bg-4);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: 'Cascadia Code', monospace;
+  flex-shrink: 0;
+}
+
+.gguf-kv-value {
+  font-size: 11px;
+  color: var(--text-2);
+  margin-top: 3px;
+  padding-left: 2px;
+  word-break: break-all;
+  max-height: 60px;
+  overflow-y: auto;
+  line-height: 1.4;
+}
+
+.gguf-kv-value.string { color: #10B981; }
+.gguf-kv-value.number { color: #3B82F6; }
+.gguf-kv-value.bool { color: #F97316; }
+.gguf-kv-value.array { color: var(--text-3); font-style: italic; }
+
+/* ─── Search/Filter ─────────────────────────────────────────────────────────── */
+.gguf-filter {
+  padding: 6px 12px;
+  flex-shrink: 0;
+}
+
+.gguf-filter-input {
+  width: 100%;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-size: 11px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.gguf-filter-input:focus {
+  border-color: #A855F7;
+}
+
+/* ─── Template Manager ──────────────────────────────────────────────────────── */
+.gguf-templates {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gguf-template-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.gguf-template-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.gguf-template-btn:hover {
+  background: rgba(168, 85, 247, 0.1);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #A855F7;
+  transform: translateY(-1px);
+}
+
+.gguf-template-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.gguf-template-btn.primary {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(124, 58, 237, 0.1));
+  border-color: rgba(168, 85, 247, 0.3);
+  color: #A855F7;
+  font-weight: 600;
+}
+
+.gguf-template-btn.primary:hover {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(124, 58, 237, 0.15));
+  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.2);
+}
+
+/* ─── Status Messages ───────────────────────────────────────────────────────── */
+.gguf-status {
+  padding: 8px 12px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg-2);
+}
+
+.gguf-status.loading {
+  color: #A855F7;
+}
+
+.gguf-status.success {
+  color: var(--green);
+}
+
+.gguf-status.error {
+  color: var(--red);
+}
+
+.gguf-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(168, 85, 247, 0.2);
+  border-top-color: #A855F7;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ─── Category groups ───────────────────────────────────────────────────────── */
+.gguf-category {
+  margin-top: 4px;
+}
+
+.gguf-category-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.gguf-category-header:hover {
+  background: rgba(168, 85, 247, 0.06);
+  color: var(--text-2);
+}
+
+.gguf-category-arrow {
+  font-size: 8px;
+  transition: transform 0.2s;
+  color: #A855F7;
+}
+
+.gguf-category-arrow.open {
+  transform: rotate(90deg);
+}
+
+.gguf-category-count {
+  font-size: 9px;
+  color: var(--text-3);
+  margin-left: auto;
+  opacity: 0.6;
+}
+
+/* ─── Editor ────────────────────────────────────────────────────────────────── */
+.gguf-editor-input {
+  width: 100%;
+  background: var(--bg-4);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  color: var(--text-1);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 11px;
+  font-family: 'Cascadia Code', monospace;
+  outline: none;
+  transition: all 0.2s;
+  margin-top: 4px;
+}
+
+.gguf-editor-input:focus {
+  border-color: #A855F7;
+  background: var(--bg-3);
+}
+
+.gguf-editor-actions {
+  padding: 10px 12px;
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-2);
+}
+
+.gguf-save-btn {
+  flex: 1;
+  background: linear-gradient(135deg, #10B981, #059669);
+  border: none;
+  color: #fff;
+  border-radius: 5px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  transition: all 0.2s;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.gguf-save-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+}
+
+.gguf-save-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}

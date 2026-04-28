@@ -884,6 +884,10 @@ impl Parser {
                     }
                 }
                 
+                if params.len() > 255 {
+                    return Err(self.error("Una función anónima (closure) no puede tener más de 255 parámetros."));
+                }
+                
                 if tiene_paren {
                     self.consumir(Token::ParenDer)?; // Consumir )
                 }

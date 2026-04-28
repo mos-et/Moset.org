@@ -31,6 +31,17 @@ export function ActivityBar({ active, setActive, chatOpen, setChatOpen }: Activi
         <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
       </svg>
     ), label: "Extensiones" },
+    { id: "gguf", icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <circle cx="12" cy="15" r="3"/>
+        <line x1="12" y1="12" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12" y2="18"/>
+        <line x1="9.5" y1="13.5" x2="10.2" y2="14.2"/>
+        <line x1="13.8" y1="15.8" x2="14.5" y2="16.5"/>
+      </svg>
+    ), label: "GGUF Config" },
   ];
 
   return (

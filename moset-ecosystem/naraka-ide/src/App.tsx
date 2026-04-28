@@ -23,6 +23,7 @@ import { setupMonaco } from "./utils/monacoSetup";
 
 import { WELCOME_CODE } from "./utils/constants";
 import { SettingsPanel } from "./components/Layout/SettingsPanel";
+import { GGUFPanel } from "./components/Layout/GGUFPanel";
 import { TabBar } from "./components/Layout/TabBar";
 import { StatusBar } from "./components/Layout/StatusBar";
 
@@ -389,7 +390,7 @@ export default function App() {
         setChatOpen={setChatOpen}
       />
 
-      {sidebarPanel && sidebarPanel !== "settings" && (
+      {sidebarPanel && sidebarPanel !== "settings" && sidebarPanel !== "gguf" && (
         <div className="sidebar">
           {sidebarPanel === "explorer" && (
             <Explorador
@@ -454,6 +455,7 @@ export default function App() {
           {sidebarPanel === "extensions" && (
             <ExtensionManager />
           )}
+          {/* GGUF se renderiza fuera del sidebar genérico, con layout propio */}
         </div>
       )}
 
@@ -532,6 +534,12 @@ export default function App() {
 
       {sidebarPanel === "settings" && (
         <SettingsPanel onUpdate={refreshTree} onClose={() => setSidebarPanel("")} />
+      )}
+
+      {sidebarPanel === "gguf" && (
+        <div className="sidebar" style={{ gridRow: 1, gridColumn: 2 }}>
+          <GGUFPanel onClose={() => setSidebarPanel("")} />
+        </div>
       )}
 
       <StatusBar

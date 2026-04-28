@@ -132,3 +132,57 @@ mientras a < 10000000:
         assert!(e.contains("Límite de ejecución excedido"), "El error no es por límite de instrucciones: {}", e);
     }
 }
+
+#[test]
+fn test_division_i64_min_neg1() {
+    let codigo = "res = (-9223372036854775807 - 1) / -1\n";
+    let mut lexer = Lexer::nuevo(codigo, None);
+    let tokens = lexer.tokenizar().expect("Error al tokenizar");
+    let mut parser = Parser::nuevo(tokens);
+    let statements = parser.parsear().expect("Error al parsear");
+    let mut compilador = Compilador::nuevo();
+    compilador.compilar_programa(&statements).expect("Error al compilar");
+    let mut vm = VM::nueva(compilador.chunk);
+    let resultado = vm.ejecutar();
+    
+    assert!(resultado.is_err(), "Debería fallar por desbordamiento en división");
+    if let Err(e) = resultado {
+        assert!(e.contains("Desbordamiento en división"), "Error incorrecto: {}", e);
+    }
+}
+
+#[test]
+fn test_modulo_i64_min_neg1() {
+    let codigo = "res = (-9223372036854775807 - 1) % -1\n";
+    let mut lexer = Lexer::nuevo(codigo, None);
+    let tokens = lexer.tokenizar().expect("Error al tokenizar");
+    let mut parser = Parser::nuevo(tokens);
+    let statements = parser.parsear().expect("Error al parsear");
+    let mut compilador = Compilador::nuevo();
+    compilador.compilar_programa(&statements).expect("Error al compilar");
+    let mut vm = VM::nueva(compilador.chunk);
+    let resultado = vm.ejecutar();
+    
+    assert!(resultado.is_err(), "Debería fallar por desbordamiento en módulo");
+    if let Err(e) = resultado {
+        assert!(e.contains("Desbordamiento en módulo"), "Error incorrecto: {}", e);
+    }
+}
+
+#[test]
+fn test_negacion_i64_min() {
+    let codigo = "res = -(-9223372036854775807 - 1)\n";
+    let mut lexer = Lexer::nuevo(codigo, None);
+    let tokens = lexer.tokenizar().expect("Error al tokenizar");
+    let mut parser = Parser::nuevo(tokens);
+    let statements = parser.parsear().expect("Error al parsear");
+    let mut compilador = Compilador::nuevo();
+    compilador.compilar_programa(&statements).expect("Error al compilar");
+    let mut vm = VM::nueva(compilador.chunk);
+    let resultado = vm.ejecutar();
+    
+    assert!(resultado.is_err(), "Debería fallar por desbordamiento en negación");
+    if let Err(e) = resultado {
+        assert!(e.contains("Desbordamiento en negación"), "Error incorrecto: {}", e);
+    }
+}

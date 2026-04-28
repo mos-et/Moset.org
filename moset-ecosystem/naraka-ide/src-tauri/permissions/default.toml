@@ -32,3 +32,9 @@ command = "descargar_modelo"
 command = "chat_soberano"
 [[allow]]
 command = "chat_orquestado"
+[[allow]]
+command = "read_gguf_metadata"
+[[allow]]
+command = "save_gguf_template"
+[[allow]]
+command = "load_gguf_template"

@@ -134,7 +134,7 @@ impl MotorCloud {
 
         let client = reqwest::blocking::Client::builder()
             .connect_timeout(std::time::Duration::from_secs(20))
-            .read_timeout(std::time::Duration::from_secs(60))
+            .timeout(std::time::Duration::from_secs(60))
             .build().unwrap_or_else(|_| reqwest::blocking::Client::new());
         let mut builder = client.post(&url)
             .header("Content-Type", "application/json");
@@ -183,7 +183,7 @@ impl MotorCloud {
 
         let client = reqwest::blocking::Client::builder()
             .connect_timeout(std::time::Duration::from_secs(20))
-            .read_timeout(std::time::Duration::from_secs(60))
+            .timeout(std::time::Duration::from_secs(60))
             .build().unwrap_or_else(|_| reqwest::blocking::Client::new());
         let builder = client.post(url)
             .header("Content-Type", "application/json")
@@ -238,7 +238,7 @@ impl MotorCloud {
 
         let client = reqwest::blocking::Client::builder()
             .connect_timeout(std::time::Duration::from_secs(20))
-            .read_timeout(std::time::Duration::from_secs(60))
+            .timeout(std::time::Duration::from_secs(60))
             .build().unwrap_or_else(|_| reqwest::blocking::Client::new());
         let res = client.post(&url)
             .header("Content-Type", "application/json")

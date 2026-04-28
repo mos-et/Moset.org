@@ -1774,6 +1774,7 @@ dependencies = [
  "candle-transformers",
  "clap",
  "getrandom 0.3.4",
+ "js-sys",
  "reqwest",
  "serde",
  "serde_json",

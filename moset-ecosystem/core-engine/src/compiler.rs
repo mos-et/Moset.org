@@ -85,6 +85,8 @@ pub struct Compilador {
     pub ruta_base: Option<std::path::PathBuf>,
     /// Vigilante para validar rutas de importación (BUG-059)
     pub vigilante: Option<std::rc::Rc<Vigilante>>,
+    /// Evita ciclos de importación infinitos
+    pub importados: std::collections::HashSet<std::path::PathBuf>,
 }
 
 #[derive(Clone, Debug)]
@@ -103,6 +105,7 @@ impl Compilador {
             moldes: HashMap::new(),
             ruta_base: None,
             vigilante: None,
+            importados: std::collections::HashSet::new(),
         }
     }
 
@@ -122,7 +125,7 @@ impl Compilador {
         for sentencia in &programa.sentencias {
             self.compilar_nodo(sentencia, 1)?;
         }
-        
+        self.emitir_byte(OpCode::Nulo as u8, 1);
         self.emitir_byte(OpCode::Retorno as u8, 1);
         Ok(())
     }
@@ -525,6 +528,13 @@ impl Compilador {
                         .map_err(|e| format!("Línea {}: Importación bloqueada para '{}': {}", linea, str_path, e))?;
                 }
 
+                // Ciclo de importación check
+                let abs_path = std::fs::canonicalize(&final_path).unwrap_or_else(|_| final_path.clone());
+                if self.importados.contains(&abs_path) {
+                    return Err(format!("Línea {}: Ciclo de importación detectado en '{}'", linea, str_path));
+                }
+                self.importados.insert(abs_path.clone());
+
                 let fuente = std::fs::read_to_string(&final_path)
                     .map_err(|e| format!("Línea {}: No se pudo importar '{}': {}", linea, str_path, e))?;
 
@@ -535,9 +545,7 @@ impl Compilador {
 
                 // Guardar la ruta_base original, actualizarla, compilar y restaurar
                 let old_base = self.ruta_base.clone();
-                if let Ok(abs_path) = std::fs::canonicalize(&final_path) {
-                    self.ruta_base = abs_path.parent().map(|p| p.to_path_buf());
-                }
+                self.ruta_base = abs_path.parent().map(|p| p.to_path_buf());
 
                 for stmt in programa_import.sentencias {
                     self.compilar_nodo(&stmt, linea)?;

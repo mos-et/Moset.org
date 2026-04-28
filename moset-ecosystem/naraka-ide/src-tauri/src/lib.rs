@@ -49,7 +49,7 @@ async fn ejecutar(_app: tauri::AppHandle, vig_cfg: tauri::State<'_, std::sync::M
             let raw = {
                 let guard = output.lock().unwrap();
                 if guard.is_empty() {
-                    res.to_string()
+                    format!("{:?}", res)
                 } else {
                     guard.clone()
                 }
@@ -658,11 +658,15 @@ async fn cargar_modelo(
     modelo_path: String,
     tokenizer_path: String,
 ) -> Result<String, String> {
+    eprintln!("[ORQUESTADOR] Iniciando carga de modelo: {}", modelo_path);
+    eprintln!("[ORQUESTADOR] Tokenizer: {}", tokenizer_path);
     let motor_clone = Arc::clone(&state.motor);
     tauri::async_runtime::spawn_blocking(move || {
         let mut motor = motor_clone.lock().map_err(|_| "Deadlock al bloquear MotorNaraka")?;
         motor.cargar_tokenizer(&tokenizer_path)?;
-        motor.cargar_gguf(&modelo_path)
+        let res = motor.cargar_gguf(&modelo_path)?;
+        eprintln!("[ORQUESTADOR] Modelo cargado exitosamente en memoria.");
+        Ok(res)
     })
     .await
     .map_err(|e| format!("Error en el hilo asíncrono: {}", e))?
@@ -670,14 +674,22 @@ async fn cargar_modelo(
 
 #[tauri::command]
 fn cancel_inference(state: tauri::State<'_, AiState>) {
+    eprintln!("[ORQUESTADOR] Señal de cancelación de inferencia recibida.");
     state.cancel_flag.store(true, std::sync::atomic::Ordering::Relaxed);
 }
 
 #[tauri::command]
-fn descargar_modelo(state: tauri::State<'_, AiState>) -> Result<String, String> {
-    let mut motor = state.motor.lock().map_err(|_| "Deadlock al bloquear Motor Soberano")?;
-    motor.descargar();
-    Ok("Modelo descargado. RAM/VRAM liberada.".to_string())
+async fn descargar_modelo(state: tauri::State<'_, AiState>) -> Result<String, String> {
+    eprintln!("[ORQUESTADOR] Iniciando descarga del modelo de VRAM/RAM.");
+    let motor_clone = Arc::clone(&state.motor);
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut motor = motor_clone.lock().map_err(|_| "Deadlock al bloquear Motor Soberano")?;
+        motor.descargar();
+        eprintln!("[ORQUESTADOR] Modelo descargado. Memoria liberada.");
+        Ok("Modelo descargado. RAM/VRAM liberada.".to_string())
+    })
+    .await
+    .map_err(|e| format!("Error en el hilo asíncrono: {}", e))?
 }
 
 #[derive(serde::Deserialize, PartialEq, Eq, Debug)]
@@ -714,6 +726,8 @@ async fn chat_orquestado(
 ) -> Result<String, String> {
     let cancel_flag = Arc::clone(&state.cancel_flag);
     cancel_flag.store(false, std::sync::atomic::Ordering::Relaxed);
+
+    eprintln!("[ORQUESTADOR] Iniciando chat_orquestado | Proveedor: {:?} | Modelo: {}", provider, model);
 
     // ─── Mapeo Cuántico ───────────────────────────────────────────────────────
     // alpha (amplitud del estado |0⟩) → temperature del modelo
@@ -761,12 +775,17 @@ async fn chat_orquestado(
 
         tauri::async_runtime::spawn_blocking(move || {
             let mut motor = motor_clone.lock().map_err(|_| "Deadlock al bloquear Motor Soberano")?;
+            eprintln!("[ORQUESTADOR] Inferencia local GGUF iniciada (Temp: {:.2})", temperature);
             // Aplicar temperatura cuántica al motor antes de inferir
             motor.set_temperature(temperature);
             let res = motor.inferir(&full_prompt, tokens_limit, |partial| {
                 window.emit("soberano-stream", partial).ok();
                 !cancel_flag.load(std::sync::atomic::Ordering::Relaxed)
-            }).map_err(|e| format!("Error en Motor Soberano: {}", e))?;
+            }).map_err(|e| {
+                eprintln!("[ORQUESTADOR] Error en inferencia local: {}", e);
+                format!("Error en Motor Soberano: {}", e)
+            })?;
+            eprintln!("[ORQUESTADOR] Inferencia local GGUF completada.");
 
             Ok(res.0)
         }).await.map_err(|e| format!("Error en el hilo asíncrono: {}", e))?
@@ -774,11 +793,16 @@ async fn chat_orquestado(
         let max_tokens_opt = max_tokens;
         tauri::async_runtime::spawn_blocking(move || {
             let provider_str = provider.as_cloud_str();
+            eprintln!("[ORQUESTADOR] Inferencia cloud iniciada ({})", provider_str);
             let motor_cloud = moset_core::cloud_ai::MotorCloud::nuevo(provider_str, &model, &api_key, base_url.as_deref());
             let res = motor_cloud.inferir(&sys_prompt, &filtered_messages, max_tokens_opt, |partial| {
                 window.emit("soberano-stream", partial).ok();
                 !cancel_flag.load(std::sync::atomic::Ordering::Relaxed)
-            }).map_err(|e| format!("Error en Motor Cloud: {}", e))?;
+            }).map_err(|e| {
+                eprintln!("[ORQUESTADOR] Error en inferencia cloud: {}", e);
+                format!("Error en Motor Cloud: {}", e)
+            })?;
+            eprintln!("[ORQUESTADOR] Inferencia cloud completada.");
             
             Ok(res)
         }).await.map_err(|e| format!("Error en el hilo asíncrono: {}", e))?
@@ -1130,6 +1154,209 @@ async fn lsp_get_diagnostics(state: tauri::State<'_, LspState>, server_name: Str
     Ok(client.get_diagnostics(&file_uri))
 }
 
+// ─── GGUF Metadata Manager ──────────────────────────────────────────────────
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+struct GgufKvEntry {
+    key: String,
+    value_type: String,
+    value: serde_json::Value,
+}
+
+fn read_gguf_string(f: &mut std::fs::File) -> Result<String, String> {
+    use std::io::Read;
+    let mut len_buf = [0u8; 8];
+    f.read_exact(&mut len_buf).map_err(|_| "Error leyendo longitud de string".to_string())?;
+    let len = u64::from_le_bytes(len_buf) as usize;
+    if len > 1_000_000 { return Err("String GGUF demasiado largo.".to_string()); }
+    let mut s_buf = vec![0u8; len];
+    f.read_exact(&mut s_buf).map_err(|_| "Error leyendo string GGUF".to_string())?;
+    Ok(String::from_utf8_lossy(&s_buf).to_string())
+}
+
+fn read_gguf_value(f: &mut std::fs::File, vtype: u32) -> Result<(String, serde_json::Value), String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut b1 = [0u8; 1];
+    let mut b4 = [0u8; 4];
+    let mut b8 = [0u8; 8];
+    match vtype {
+        0 => { f.read_exact(&mut b1).map_err(|_| "GGUF read u8".to_string())?; Ok(("uint8".into(), serde_json::json!(b1[0]))) },
+        1 => { f.read_exact(&mut b1).map_err(|_| "GGUF read i8".to_string())?; Ok(("int8".into(), serde_json::json!(b1[0] as i8))) },
+        2 => { let mut b2 = [0u8; 2]; f.read_exact(&mut b2).map_err(|_| "GGUF read u16".to_string())?; Ok(("uint16".into(), serde_json::json!(u16::from_le_bytes(b2)))) },
+        3 => { let mut b2 = [0u8; 2]; f.read_exact(&mut b2).map_err(|_| "GGUF read i16".to_string())?; Ok(("int16".into(), serde_json::json!(i16::from_le_bytes(b2)))) },
+        4 => { f.read_exact(&mut b4).map_err(|_| "GGUF read u32".to_string())?; Ok(("uint32".into(), serde_json::json!(u32::from_le_bytes(b4)))) },
+        5 => { f.read_exact(&mut b4).map_err(|_| "GGUF read i32".to_string())?; Ok(("int32".into(), serde_json::json!(i32::from_le_bytes(b4)))) },
+        6 => { f.read_exact(&mut b4).map_err(|_| "GGUF read f32".to_string())?; Ok(("float32".into(), serde_json::json!(f32::from_le_bytes(b4)))) },
+        7 => { f.read_exact(&mut b1).map_err(|_| "GGUF read bool".to_string())?; Ok(("bool".into(), serde_json::json!(b1[0] != 0))) },
+        8 => { let s = read_gguf_string(f)?; Ok(("string".into(), serde_json::json!(s))) },
+        9 => {
+            // Array: type(u32) + count(u64) + values
+            f.read_exact(&mut b4).map_err(|_| "GGUF read array type".to_string())?;
+            let arr_type = u32::from_le_bytes(b4);
+            f.read_exact(&mut b8).map_err(|_| "GGUF read array count".to_string())?;
+            let arr_count = u64::from_le_bytes(b8) as usize;
+            if arr_count > 100_000 { return Err("Array GGUF demasiado grande".to_string()); }
+
+            // For large arrays (like tokenizer data), just store count info
+            if arr_count > 500 {
+                let skip_bytes: usize = match arr_type {
+                    0 | 1 | 7 => arr_count,
+                    2 | 3 => arr_count * 2,
+                    4 | 5 | 6 => arr_count * 4,
+                    10 | 11 | 12 => arr_count * 8,
+                    8 => {
+                        for _ in 0..arr_count {
+                            let mut slen = [0u8; 8];
+                            f.read_exact(&mut slen).map_err(|_| "GGUF skip string array".to_string())?;
+                            let sl = u64::from_le_bytes(slen) as usize;
+                            f.seek(SeekFrom::Current(sl as i64)).map_err(|_| "GGUF seek skip".to_string())?;
+                        }
+                        0
+                    },
+                    _ => arr_count * 4,
+                };
+                if skip_bytes > 0 {
+                    f.seek(SeekFrom::Current(skip_bytes as i64)).map_err(|_| "GGUF seek skip large array".to_string())?;
+                }
+                return Ok(("array".into(), serde_json::json!(format!("[{} elements, type {}]", arr_count, arr_type))));
+            }
+
+            let mut items = Vec::new();
+            for _ in 0..arr_count {
+                let (_, val) = read_gguf_value(f, arr_type)?;
+                items.push(val);
+            }
+            Ok(("array".into(), serde_json::json!(items)))
+        },
+        10 => { f.read_exact(&mut b8).map_err(|_| "GGUF read u64".to_string())?; Ok(("uint64".into(), serde_json::json!(u64::from_le_bytes(b8)))) },
+        11 => { f.read_exact(&mut b8).map_err(|_| "GGUF read i64".to_string())?; Ok(("int64".into(), serde_json::json!(i64::from_le_bytes(b8)))) },
+        12 => { f.read_exact(&mut b8).map_err(|_| "GGUF read f64".to_string())?; Ok(("float64".into(), serde_json::json!(f64::from_le_bytes(b8)))) },
+        _ => Err(format!("Tipo GGUF desconocido: {}", vtype)),
+    }
+}
+
+#[tauri::command]
+async fn read_gguf_metadata(path: String, vig_cfg: tauri::State<'_, std::sync::Mutex<VigilanteConfig>>) -> Result<Vec<GgufKvEntry>, String> {
+    let vigilante = make_vigilante(&vig_cfg);
+    vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: {}", e))?;
+
+    use std::io::Read;
+    let mut file = std::fs::File::open(&path).map_err(|e| format!("Error abriendo {}: {}", path, e))?;
+
+    // Read magic
+    let mut magic = [0u8; 4];
+    file.read_exact(&mut magic).map_err(|e| format!("Error leyendo magic: {}", e))?;
+    if &magic != b"GGUF" {
+        return Err("No es un archivo GGUF válido (magic header incorrecto).".to_string());
+    }
+
+    // Read version
+    let mut buf4 = [0u8; 4];
+    file.read_exact(&mut buf4).map_err(|e| format!("Error leyendo versión: {}", e))?;
+    let version = u32::from_le_bytes(buf4);
+    if version < 2 || version > 3 {
+        return Err(format!("Versión GGUF no soportada: {}. Se soportan v2 y v3.", version));
+    }
+
+    // Read tensor count and metadata KV count
+    let mut buf8 = [0u8; 8];
+    file.read_exact(&mut buf8).map_err(|_| "Error leyendo tensor_count".to_string())?;
+    let _tensor_count = u64::from_le_bytes(buf8);
+
+    file.read_exact(&mut buf8).map_err(|_| "Error leyendo metadata_kv_count".to_string())?;
+    let kv_count = u64::from_le_bytes(buf8);
+
+    if kv_count > 10_000 {
+        return Err(format!("Demasiados metadatos KV: {}. Límite de seguridad: 10,000.", kv_count));
+    }
+
+    let mut entries = Vec::new();
+    for _ in 0..kv_count {
+        let key = read_gguf_string(&mut file)?;
+        let mut type_buf = [0u8; 4];
+        file.read_exact(&mut type_buf).map_err(|_| "Error leyendo tipo de valor KV".to_string())?;
+        let vtype = u32::from_le_bytes(type_buf);
+        let (type_name, value) = read_gguf_value(&mut file, vtype)?;
+        entries.push(GgufKvEntry { key, value_type: type_name, value });
+    }
+
+    Ok(entries)
+}
+
+#[tauri::command]
+async fn save_gguf_template(entries: Vec<GgufKvEntry>, output_path: String, vig_cfg: tauri::State<'_, std::sync::Mutex<VigilanteConfig>>) -> Result<String, String> {
+    let vigilante = make_vigilante(&vig_cfg);
+    vigilante.autorizar_ruta(&output_path).map_err(|e| format!("Vigilante: {}", e))?;
+
+    let json = serde_json::to_string_pretty(&entries).map_err(|e| format!("Error serializando: {}", e))?;
+    std::fs::write(&output_path, &json).map_err(|e| format!("Error escribiendo {}: {}", output_path, e))?;
+    Ok(format!("Plantilla guardada en {} ({} entradas, {} bytes)", output_path, entries.len(), json.len()))
+}
+
+#[tauri::command]
+async fn load_gguf_template(path: String, vig_cfg: tauri::State<'_, std::sync::Mutex<VigilanteConfig>>) -> Result<Vec<GgufKvEntry>, String> {
+    let vigilante = make_vigilante(&vig_cfg);
+    vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: {}", e))?;
+
+    let content = std::fs::read_to_string(&path).map_err(|e| format!("Error leyendo {}: {}", path, e))?;
+    let entries: Vec<GgufKvEntry> = serde_json::from_str(&content).map_err(|e| format!("Error parseando JSON: {}", e))?;
+    Ok(entries)
+}
+
+#[tauri::command]
+async fn write_gguf_metadata(path: String, entries: Vec<GgufKvEntry>, vig_cfg: tauri::State<'_, std::sync::Mutex<VigilanteConfig>>) -> Result<String, String> {
+    let vigilante = make_vigilante(&vig_cfg);
+    vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: {}", e))?;
+
+    let temp_dir = std::env::temp_dir();
+    let script_path = temp_dir.join("moset_gguf_editor.py");
+    let json_path = temp_dir.join("moset_gguf_edits.json");
+
+    let json_data = serde_json::to_string(&entries).map_err(|e| e.to_string())?;
+    std::fs::write(&json_path, json_data).map_err(|e| e.to_string())?;
+
+    let py_script = r#"
+import sys
+import json
+import subprocess
+
+model_path = sys.argv[1]
+json_path = sys.argv[2]
+
+with open(json_path, "r", encoding="utf-8") as f:
+    entries = json.load(f)
+
+for entry in entries:
+    key = entry["key"]
+    val = entry["value"]
+    vtype = entry["value_type"]
+    
+    # We only update simple values
+    if vtype == "string" or vtype.startswith("int") or vtype.startswith("float") or vtype == "bool":
+        str_val = str(val).lower() if vtype == "bool" else str(val)
+        try:
+            print(f"Updating {key} = {str_val}")
+            subprocess.run([sys.executable, "-m", "gguf.scripts.gguf_set_metadata", "--force", model_path, key, str_val], check=True, capture_output=True)
+        except Exception as e:
+            print(f"Error updating {key}: {e}")
+"#;
+    std::fs::write(&script_path, py_script).map_err(|e| e.to_string())?;
+
+    let output = std::process::Command::new("python")
+        .arg(&script_path)
+        .arg(&path)
+        .arg(&json_path)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok("Metadatos inyectados correctamente.".into())
+    } else {
+        let err = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Error inyectando metadatos: {}", err))
+    }
+}
+
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -1265,6 +1492,9 @@ pub fn run() {
             mcp_call_tool,
             start_lsp_server,
             lsp_get_diagnostics,
+            read_gguf_metadata,
+            save_gguf_template,
+            load_gguf_template,
         ])
         .run(tauri::generate_context!())
         .expect("Error iniciando Moset IDE");

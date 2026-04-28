@@ -30,6 +30,12 @@ struct CallFrame {
 
 pub type PrintCallback = Box<dyn FnMut(&str) + Send + Sync>;
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum EstadoVM {
+    Terminado(Valor),
+    Suspendido(Valor),
+}
+
 pub struct VM {
     chunk: Chunk,
     ip: usize,
@@ -65,15 +71,12 @@ impl VM {
 
     // MED-002 Fix: Enforce stack depth limit to prevent unbounded memory growth
     #[inline(always)]
-    fn push(&mut self, valor: Valor) {
+    fn push(&mut self, valor: Valor) -> Result<(), String> {
         if self.pila.len() >= MAX_PILA {
-            // Silently replace the last element instead of growing unboundedly.
-            // The instruction limit (5M) will catch infinite loops, but this
-            // prevents memory exhaustion for pathological stack-heavy programs.
-            *self.pila.last_mut().unwrap() = valor;
-            return;
+            return Err("Stack Overflow: Límite máximo de la pila alcanzado".into());
         }
         self.pila.push(valor);
+        Ok(())
     }
 
     #[inline(always)]
@@ -89,6 +92,12 @@ impl VM {
         Ok(&self.pila[self.pila.len() - 1 - distance])
     }
 
+    #[inline(always)]
+    fn leer_constante(&self, idx: usize) -> Result<&Valor, String> {
+        self.chunk.constantes.get(idx).ok_or_else(|| format!("Índice de constante fuera de rango: {}", idx))
+    }
+
+
     /// Evalúa si un valor es "falsy" en la semántica Moset
     fn es_falso(valor: &Valor) -> bool {
         match valor {
@@ -99,7 +108,12 @@ impl VM {
         }
     }
 
-    pub fn ejecutar(&mut self) -> Result<Valor, String> {
+    pub fn reanudar(&mut self, valor_resuelto: Valor) -> Result<EstadoVM, String> {
+        self.push(valor_resuelto)?;
+        self.ejecutar()
+    }
+
+    pub fn ejecutar(&mut self) -> Result<EstadoVM, String> {
         let mut instruction_count: u64 = 0;
         const MAX_INSTRUCTIONS: u64 = 5_000_000;
         loop {
@@ -108,21 +122,18 @@ impl VM {
                 return Err("ERR_LIMIT: Límite de ejecución excedido (Seguridad contra bucles infinitos - BUG-022)".to_string());
             }
             if self.ip >= self.chunk.codigo.len() {
-                return Ok(Valor::Nulo); // Fin seguro
+                return Ok(EstadoVM::Terminado(Valor::Nulo)); // Fin seguro
             }
-            let instruccion = self.leer_byte();
+            let instruccion = self.leer_byte()?;
             let op: OpCode = instruccion.into();
 
-            let resultado_paso = (|| -> Result<Option<Valor>, String> {
+            let resultado_paso = (|| -> Result<Option<EstadoVM>, String> {
                 match op {
                     // ─── CONSTANTES ─────────────────────────────────────
                     OpCode::Constante => {
-                    let indice = self.leer_u16() as usize;
-                    if indice >= self.chunk.constantes.len() {
-                        return Err(format!("Índice de constante fuera de rango: {}", indice));
-                    }
-                    let constante = self.chunk.constantes[indice].clone();
-                    self.push(constante);
+                    let indice = self.leer_u16()? as usize;
+                    let constante = self.leer_constante(indice)?.clone();
+                    self.push(constante)?;
                 },
 
                 // ─── ARITMÉTICA ─────────────────────────────────────
@@ -130,7 +141,13 @@ impl VM {
                     let b = self.pop()?;
                     let a = self.pop()?;
                     let res = match (&a, &b) {
-                        (Valor::Entero(x), Valor::Entero(y)) => Valor::Entero(x + y),
+                        (Valor::Entero(x), Valor::Entero(y)) => {
+                            if let Some(r) = x.checked_add(*y) {
+                                Valor::Entero(r)
+                            } else {
+                                return Err("Desbordamiento en suma de enteros".into());
+                            }
+                        },
                         (Valor::Decimal(x), Valor::Decimal(y)) => Valor::Decimal(x + y),
                         (Valor::Entero(x), Valor::Decimal(y)) => Valor::Decimal(*x as f64 + y),
                         (Valor::Decimal(x), Valor::Entero(y)) => Valor::Decimal(x + *y as f64),
@@ -140,31 +157,43 @@ impl VM {
                         (_, Valor::Texto(s)) => Valor::Texto(format!("{}{}", a, s)),
                         _ => return Err(format!("No se puede sumar {:?} + {:?}", a, b)),
                     };
-                    self.push(res);
+                    self.push(res)?;
                 },
                 OpCode::Resta => {
                     let b = self.pop()?;
                     let a = self.pop()?;
                     let res = match (a, b) {
-                        (Valor::Entero(x), Valor::Entero(y)) => Valor::Entero(x - y),
+                        (Valor::Entero(x), Valor::Entero(y)) => {
+                            if let Some(r) = x.checked_sub(y) {
+                                Valor::Entero(r)
+                            } else {
+                                return Err("Desbordamiento en resta de enteros".into());
+                            }
+                        },
                         (Valor::Decimal(x), Valor::Decimal(y)) => Valor::Decimal(x - y),
                         (Valor::Entero(x), Valor::Decimal(y)) => Valor::Decimal(x as f64 - y),
                         (Valor::Decimal(x), Valor::Entero(y)) => Valor::Decimal(x - y as f64),
                         _ => return Err("Operadores inválidos para resta".into()),
                     };
-                    self.push(res);
+                    self.push(res)?;
                 },
                 OpCode::Multiplicacion => {
                     let b = self.pop()?;
                     let a = self.pop()?;
                     let res = match (a, b) {
-                        (Valor::Entero(x), Valor::Entero(y)) => Valor::Entero(x * y),
+                        (Valor::Entero(x), Valor::Entero(y)) => {
+                            if let Some(r) = x.checked_mul(y) {
+                                Valor::Entero(r)
+                            } else {
+                                return Err("Desbordamiento en multiplicación de enteros".into());
+                            }
+                        },
                         (Valor::Decimal(x), Valor::Decimal(y)) => Valor::Decimal(x * y),
                         (Valor::Entero(x), Valor::Decimal(y)) => Valor::Decimal(x as f64 * y),
                         (Valor::Decimal(x), Valor::Entero(y)) => Valor::Decimal(x * y as f64),
                         _ => return Err("Operadores inválidos para multiplicación".into()),
                     };
-                    self.push(res);
+                    self.push(res)?;
                 },
                 OpCode::Division => {
                     let b = self.pop()?;
@@ -172,7 +201,11 @@ impl VM {
                     let res = match (a, b) {
                         (Valor::Entero(x), Valor::Entero(y)) => {
                             if y == 0 { return Err("División por cero".into()); }
-                            Valor::Entero(x / y)
+                            if let Some(r) = x.checked_div(y) {
+                                Valor::Entero(r)
+                            } else {
+                                return Err("Desbordamiento en división de enteros".into());
+                            }
                         },
                         (Valor::Decimal(x), Valor::Decimal(y)) => {
                             if y == 0.0 { return Err("División por cero".into()); }
@@ -188,7 +221,7 @@ impl VM {
                         },
                         _ => return Err("Operadores inválidos para división".into()),
                     };
-                    self.push(res);
+                    self.push(res)?;
                 },
                 OpCode::Modulo => {
                     let b = self.pop()?;
@@ -196,33 +229,43 @@ impl VM {
                     let res = match (a, b) {
                         (Valor::Entero(x), Valor::Entero(y)) => {
                             if y == 0 { return Err("Módulo por cero".into()); }
-                            Valor::Entero(x % y)
+                            if let Some(r) = x.checked_rem(y) {
+                                Valor::Entero(r)
+                            } else {
+                                return Err("Desbordamiento en módulo de enteros".into());
+                            }
                         },
                         _ => return Err("Módulo solo soporta enteros".into()),
                     };
-                    self.push(res);
+                    self.push(res)?;
                 },
 
                 // ─── NEGACIÓN ───────────────────────────────────────
                 OpCode::Negacion => {
                     let val = self.pop()?;
                     let res = match val {
-                        Valor::Entero(n) => Valor::Entero(-n),
+                        Valor::Entero(n) => {
+                            if let Some(r) = n.checked_neg() {
+                                Valor::Entero(r)
+                            } else {
+                                return Err("Desbordamiento en negación de entero".into());
+                            }
+                        },
                         Valor::Decimal(n) => Valor::Decimal(-n),
                         _ => return Err("No se puede negar este valor".into()),
                     };
-                    self.push(res);
+                    self.push(res)?;
                 },
 
                 // ─── BOOLEANOS / NULO ───────────────────────────────
-                OpCode::Verdadero => self.push(Valor::Booleano(true)),
-                OpCode::Falso => self.push(Valor::Booleano(false)),
-                OpCode::Nulo => self.push(Valor::Nulo),
+                OpCode::Verdadero => self.push(Valor::Booleano(true))?,
+                OpCode::Falso => self.push(Valor::Booleano(false))?,
+                OpCode::Nulo => self.push(Valor::Nulo)?,
 
                 // ─── LÓGICA ─────────────────────────────────────────
                 OpCode::No => {
                     let val = self.pop()?;
-                    self.push(Valor::Booleano(Self::es_falso(&val)));
+                    self.push(Valor::Booleano(Self::es_falso(&val)))?;
                 },
 
                 // ─── COMPARACIONES ──────────────────────────────────
@@ -237,7 +280,7 @@ impl VM {
                         (Valor::Nulo, Valor::Nulo) => true,
                         _ => false,
                     };
-                    self.push(Valor::Booleano(res));
+                    self.push(Valor::Booleano(res))?;
                 },
                 OpCode::NoIgual => {
                     let b = self.pop()?;
@@ -250,7 +293,7 @@ impl VM {
                         (Valor::Nulo, Valor::Nulo) => false,
                         _ => true,
                     };
-                    self.push(Valor::Booleano(res));
+                    self.push(Valor::Booleano(res))?;
                 },
                 OpCode::Mayor => {
                     let b = self.pop()?;
@@ -262,7 +305,7 @@ impl VM {
                         (Valor::Decimal(x), Valor::Entero(y)) => x > y as f64,
                         _ => return Err("Comparación inválida (>)".into()),
                     };
-                    self.push(Valor::Booleano(res));
+                    self.push(Valor::Booleano(res))?;
                 },
                 OpCode::Menor => {
                     let b = self.pop()?;
@@ -274,7 +317,7 @@ impl VM {
                         (Valor::Decimal(x), Valor::Entero(y)) => x < y as f64,
                         _ => return Err("Comparación inválida (<)".into()),
                     };
-                    self.push(Valor::Booleano(res));
+                    self.push(Valor::Booleano(res))?;
                 },
                 OpCode::MayorIgual => {
                     let b = self.pop()?;
@@ -286,7 +329,7 @@ impl VM {
                         (Valor::Decimal(x), Valor::Entero(y)) => x >= y as f64,
                         _ => return Err("Comparación inválida (>=)".into()),
                     };
-                    self.push(Valor::Booleano(res));
+                    self.push(Valor::Booleano(res))?;
                 },
                 OpCode::MenorIgual => {
                     let b = self.pop()?;
@@ -298,14 +341,14 @@ impl VM {
                         (Valor::Decimal(x), Valor::Entero(y)) => x <= y as f64,
                         _ => return Err("Comparación inválida (<=)".into()),
                     };
-                    self.push(Valor::Booleano(res));
+                    self.push(Valor::Booleano(res))?;
                 },
 
                 // ─── CONCATENAR TEXTO ───────────────────────────────
                 OpCode::Concatenar => {
                     let b = self.pop()?;
                     let a = self.pop()?;
-                    self.push(Valor::Texto(format!("{}{}", a, b)));
+                    self.push(Valor::Texto(format!("{}{}", a, b)))?;
                 },
 
                 // ─── IMPRIMIR ───────────────────────────────────────
@@ -316,7 +359,7 @@ impl VM {
                     } else {
                         println!("{}", val);
                     }
-                    self.push(Valor::Nulo);
+                    self.push(Valor::Nulo)?;
                 },
 
                 // ─── PILA ───────────────────────────────────────────
@@ -326,8 +369,8 @@ impl VM {
 
                 // ─── VARIABLES GLOBALES ─────────────────────────────
                 OpCode::DefinirGlobal => {
-                    let idx = self.leer_u16() as usize;
-                    let nombre = match &self.chunk.constantes[idx] {
+                    let idx = self.leer_u16()? as usize;
+                    let nombre = match self.leer_constante(idx)? {
                         Valor::Texto(s) => s.clone(),
                         _ => return Err("Nombre de variable global no es texto".into()),
                     };
@@ -335,19 +378,19 @@ impl VM {
                     self.globales.insert(nombre, valor);
                 },
                 OpCode::ObtenerGlobal => {
-                    let idx = self.leer_u16() as usize;
-                    let nombre = match &self.chunk.constantes[idx] {
+                    let idx = self.leer_u16()? as usize;
+                    let nombre = match self.leer_constante(idx)? {
                         Valor::Texto(s) => s.clone(),
                         _ => return Err("Nombre de variable global no es texto".into()),
                     };
                     match self.globales.get(&nombre) {
-                        Some(val) => self.push(val.clone()),
+                        Some(val) => self.push(val.clone())?,
                         None => return Err(format!("Variable global no definida: '{}'", nombre)),
-                    }
+                    };
                 },
                 OpCode::AsignarGlobal => {
-                    let idx = self.leer_u16() as usize;
-                    let nombre = match &self.chunk.constantes[idx] {
+                    let idx = self.leer_u16()? as usize;
+                    let nombre = match self.leer_constante(idx)? {
                         Valor::Texto(s) => s.clone(),
                         _ => return Err("Nombre de variable global no es texto".into()),
                     };
@@ -361,16 +404,16 @@ impl VM {
 
                 // ─── VARIABLES LOCALES ──────────────────────────────
                 OpCode::ObtenerLocal => {
-                    let slot = self.leer_byte() as usize;
+                    let slot = self.leer_byte()? as usize;
                     let idx = self.base_pila + slot;
                     if idx >= self.pila.len() {
                         return Err(format!("Slot local fuera de rango: {}", idx));
                     }
                     let valor = self.pila[idx].clone();
-                    self.push(valor);
+                    self.push(valor)?;
                 },
                 OpCode::AsignarLocal => {
-                    let slot = self.leer_byte() as usize;
+                    let slot = self.leer_byte()? as usize;
                     let idx = self.base_pila + slot;
                     let valor = self.peek(0)?.clone();
                     if idx >= self.pila.len() {
@@ -381,24 +424,27 @@ impl VM {
 
                 // ─── SALTOS ─────────────────────────────────────────
                 OpCode::Salto => {
-                    let offset = self.leer_u16() as usize;
+                    let offset = self.leer_u16()? as usize;
                     self.ip += offset;
                 },
                 OpCode::SaltoSiFalso => {
-                    let offset = self.leer_u16() as usize;
+                    let offset = self.leer_u16()? as usize;
                     let condicion = self.peek(0)?;
                     if Self::es_falso(condicion) {
                         self.ip += offset;
                     }
                 },
                 OpCode::Bucle => {
-                    let offset = self.leer_u16() as usize;
+                    let offset = self.leer_u16()? as usize;
                     self.ip -= offset;
                 },
 
                 // ─── LLAMADAS A FUNCIÓN ─────────────────────────────
                 OpCode::Llamar => {
-                    let arg_count = self.leer_byte() as usize;
+                    let arg_count = self.leer_byte()? as usize;
+                    if self.pila.len() < 1 + arg_count {
+                        return Err(format!("Pila insuficiente para Llamar: necesita {}, tiene {}", 1 + arg_count, self.pila.len()));
+                    }
                     let func_slot = self.pila.len() - 1 - arg_count;
                     let func = self.pila[func_slot].clone();
 
@@ -449,7 +495,7 @@ impl VM {
 
                 // ─── RETORNO ────────────────────────────────────────
                 OpCode::Retorno => {
-                    let res = self.pop().unwrap_or(Valor::Nulo);
+                    let res = self.pop()?;
                     if let Some(frame) = self.frames.pop() {
                         // Limpiar locales y argumentos de la pila, incluida la propia funcion (base_pila - 1)
                         if self.base_pila > 0 {
@@ -457,7 +503,7 @@ impl VM {
                         } else {
                             self.pila.clear();
                         }
-                        self.push(res);
+                        self.push(res)?;
                         
                         // Restaurar caller
                         self.ip = frame.ip_retorno;
@@ -466,7 +512,7 @@ impl VM {
                         self.capturas = frame.capturas;
                         self.este = frame.este;
                     } else {
-                        return Ok(Some(res));
+                        return Ok(Some(EstadoVM::Terminado(res)));
                     }
                 },
 
@@ -487,7 +533,7 @@ impl VM {
                         _ => return Err("El valor alpha del Qubit no es numérico".into()),
                     };
                     
-                    self.push(Valor::Superposicion { alpha, beta });
+                    self.push(Valor::Superposicion { alpha, beta })?;
                 },
 
                 // ─── COLAPSO CUÁNTICO ──────────────────────────────
@@ -497,27 +543,32 @@ impl VM {
                         Valor::Superposicion { alpha: _, beta } => {
                             // Colapso probabilístico: β² es la probabilidad de verdadero
                             let probabilidad = beta * beta;
-                            // Usar un hash simple del instruction_count como semilla pseudo-random
-                            let pseudo_random = {
+                            
+                            let mut buf = [0u8; 8];
+                            if getrandom::fill(&mut buf).is_err() {
+                                // Fallback a LCG si falla la entropía del OS
                                 let seed = instruction_count.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-                                ((seed >> 33) as f64) / (u32::MAX as f64)
-                            };
+                                buf = seed.to_le_bytes();
+                            }
+                            let rand_u64 = u64::from_le_bytes(buf);
+                            // 53 bits de precisión para f64
+                            let pseudo_random = ((rand_u64 >> 11) as f64) / ((1u64 << 53) as f64);
                             let resultado = pseudo_random < probabilidad;
-                            self.push(Valor::Booleano(resultado));
+                            self.push(Valor::Booleano(resultado))?;
                         },
                         // Si ya es un booleano, el colapso es idempotente
-                        Valor::Booleano(b) => self.push(Valor::Booleano(b)),
+                        Valor::Booleano(b) => self.push(Valor::Booleano(b))?,
                         other => {
                             // Colapso de cualquier valor a booleano
-                            self.push(Valor::Booleano(!Self::es_falso(&other)));
+                            self.push(Valor::Booleano(!Self::es_falso(&other)))?;
                         }
                     }
                 },
 
                 // ─── CONSTRUIR CLOSURE Y MOLDE ───────────────────────────
                 OpCode::ConstruirClosure => {
-                    let idx = self.leer_u16() as usize;
-                    let funcion_base = match &self.chunk.constantes[idx] {
+                    let idx = self.leer_u16()? as usize;
+                    let funcion_base = match self.leer_constante(idx)? {
                         Valor::Funcion { nombre, arity, chunk } => Valor::Funcion {
                             nombre: nombre.clone(),
                             arity: *arity,
@@ -528,11 +579,11 @@ impl VM {
                     
                     if let Valor::Funcion { arity, chunk, .. } = funcion_base {
                         // Leer la cantidad de capturas y consumir sus bytes del stream
-                        let capture_count = self.leer_byte() as usize;
+                        let capture_count = self.leer_byte()? as usize;
                         let mut capturas_vals = Vec::with_capacity(capture_count);
                         for _ in 0..capture_count {
-                            let es_local = self.leer_byte() == 1;
-                            let index = self.leer_byte() as usize;
+                            let es_local = self.leer_byte()? == 1;
+                            let index = self.leer_byte()? as usize;
                             if es_local {
                                 // Capturar valor local del frame actual
                                 let idx = self.base_pila + index;
@@ -556,12 +607,12 @@ impl VM {
                             chunk,
                             capturas: capturas_vals,
                         };
-                        self.push(closure);
+                        self.push(closure)?;
                     }
                 },
                 OpCode::ConstruirMolde => {
-                    let idx = self.leer_u16() as usize;
-                    let nombre = match &self.chunk.constantes[idx] {
+                    let idx = self.leer_u16()? as usize;
+                    let nombre = match self.leer_constante(idx)? {
                         Valor::Texto(t) => t.clone(),
                         _ => return Err("Nombre de molde no es texto".into()),
                     };
@@ -571,19 +622,19 @@ impl VM {
                         campos: std::collections::HashMap::new(),
                         extra: std::collections::HashMap::new(),
                     })));
-                    self.push(instancia);
+                    self.push(instancia)?;
                 },
 
                 // ─── CONSTRUIR LISTA ───────────────────────────────
                 OpCode::ConstruirLista => {
-                    let count = self.leer_u16() as usize;
+                    let count = self.leer_u16()? as usize;
                     let mut items = Vec::with_capacity(count);
                     // Los elementos están en la pila en orden: primero el [0], último el [n-1]
                     for _ in 0..count {
                         items.push(self.pop()?);
                     }
                     items.reverse();
-                    self.push(Valor::Lista(std::rc::Rc::new(std::cell::RefCell::new(items))));
+                    self.push(Valor::Lista(std::rc::Rc::new(std::cell::RefCell::new(items))))?;
                 },
 
                 // ─── COLECCIONES ──────────────────────────────────────────
@@ -600,7 +651,7 @@ impl VM {
                             let lista_ref = lista.borrow();
                             let i = *idx as usize;
                             if i < lista_ref.len() {
-                                self.push(lista_ref[i].clone());
+                                self.push(lista_ref[i].clone())?;
                             } else {
                                 return Err(format!("Índice de lista fuera de rango: {} (longitud: {})", i, lista_ref.len()));
                             }
@@ -612,12 +663,14 @@ impl VM {
                     let coleccion = self.pop()?;
                     match &coleccion {
                         Valor::Lista(lista) => {
-                            let len = lista.borrow().len() as i64;
-                            self.push(Valor::Entero(len));
+                            let l = lista.borrow().len();
+                            let len = i64::try_from(l).map_err(|_| format!("Desbordamiento: lista demasiado grande ({})", l))?;
+                            self.push(Valor::Entero(len))?;
                         },
                         Valor::Texto(t) => {
-                            let len = t.len() as i64;
-                            self.push(Valor::Entero(len));
+                            let l = t.len();
+                            let len = i64::try_from(l).map_err(|_| format!("Desbordamiento: texto demasiado grande ({})", l))?;
+                            self.push(Valor::Entero(len))?;
                         },
                         _ => return Err(format!("ObtenerLongitud no soportado para {:?}", coleccion)),
                     }
@@ -637,7 +690,7 @@ impl VM {
                             let i = *idx as usize;
                             if i < lista_ref.len() {
                                 lista_ref[i] = valor.clone();
-                                self.push(valor);
+                                self.push(valor)?;
                             } else {
                                 return Err(format!("Índice de lista fuera de rango: {} (longitud: {})", i, lista_ref.len()));
                             }
@@ -648,8 +701,8 @@ impl VM {
 
                 // ─── OBTENER CAMPO ─────────────────────────────────
                 OpCode::ObtenerCampo => {
-                    let idx = self.leer_u16() as usize;
-                    let campo = match &self.chunk.constantes[idx] {
+                    let idx = self.leer_u16()? as usize;
+                    let campo = match self.leer_constante(idx)? {
                         Valor::Texto(s) => s.clone(),
                         _ => return Err("Nombre de campo no es texto".into()),
                     };
@@ -658,9 +711,9 @@ impl VM {
                         Valor::Molde(instancia_rc) => {
                             let instancia = instancia_rc.borrow();
                             if let Some(v) = instancia.campos.get(&campo) {
-                                self.push(v.clone());
+                                self.push(v.clone())?;
                             } else if let Some(v) = instancia.extra.get(&campo) {
-                                self.push(v.clone());
+                                self.push(v.clone())?;
                             } else {
                                 return Err(format!("Campo '{}' no encontrado en el molde", campo));
                             }
@@ -671,8 +724,8 @@ impl VM {
 
                 // ─── ASIGNAR CAMPO ─────────────────────────────────
                 OpCode::AsignarCampo => {
-                    let idx = self.leer_u16() as usize;
-                    let campo = match &self.chunk.constantes[idx] {
+                    let idx = self.leer_u16()? as usize;
+                    let campo = match self.leer_constante(idx)? {
                         Valor::Texto(s) => s.clone(),
                         _ => return Err("Nombre de campo no es texto".into()),
                     };
@@ -690,14 +743,14 @@ impl VM {
                         },
                         _ => return Err(format!("No se puede asignar al campo '{}' de un valor que no es molde", campo)),
                     }
-                    self.push(objeto);
+                    self.push(objeto)?;
                 },
 
                 // ─── LLAMAR BUILTIN ────────────────────────────────
                 OpCode::LlamarBuiltin => {
-                    let name_idx = self.leer_u16() as usize;
-                    let arg_count = self.leer_byte() as usize;
-                    let nombre = match &self.chunk.constantes[name_idx] {
+                    let name_idx = self.leer_u16()? as usize;
+                    let arg_count = self.leer_byte()? as usize;
+                    let nombre = match self.leer_constante(name_idx)? {
                         Valor::Texto(s) => s.clone(),
                         _ => return Err("Nombre de builtin no es texto".into()),
                     };
@@ -757,10 +810,10 @@ impl VM {
                         },
                         _ => return Err(format!("Función builtin desconocida: '{}'", nombre)),
                     };
-                    self.push(resultado);
+                    self.push(resultado)?;
                 },
                 OpCode::ConfigurarCatch => {
-                    let offset = self.leer_u16() as usize;
+                    let offset = self.leer_u16()? as usize;
                     let target_ip = self.ip + offset;
                     self.handlers_catch.push((target_ip, self.pila.len(), self.frames.len()));
                 },
@@ -772,17 +825,20 @@ impl VM {
                     return Err(format!("{}", err_val));
                 },
                 OpCode::Esperar => {
-                    // Esperar (async/await) en un entorno síncrono no requiere pausar la VM v0.1.
-                    // Funciona como un no-op passthrough del valor ya existente en la pila.
+                    let promesa = self.pop()?;
+                    return Ok(Some(EstadoVM::Suspendido(promesa)));
                 },
                 OpCode::InvocacionMetodo => {
-                    let name_idx = self.leer_u16() as usize;
-                    let arg_count = self.leer_byte() as usize;
-                    let nombre_metodo = match &self.chunk.constantes[name_idx] {
+                    let name_idx = self.leer_u16()? as usize;
+                    let arg_count = self.leer_byte()? as usize;
+                    let nombre_metodo = match self.leer_constante(name_idx)? {
                         Valor::Texto(s) => s.clone(),
                         _ => return Err("Nombre de método no es texto".into()),
                     };
 
+                    if self.pila.len() < 1 + arg_count {
+                        return Err(format!("Pila insuficiente para InvocacionMetodo: necesita {}, tiene {}", 1 + arg_count, self.pila.len()));
+                    }
                     let offset_obj = self.pila.len() - 1 - arg_count;
                     let obj = self.pila[offset_obj].clone();
 
@@ -848,7 +904,7 @@ impl VM {
                 },
                 OpCode::ObtenerEste => {
                     if let Some(ref e) = self.este {
-                        self.push(e.clone());
+                        self.push(e.clone())?;
                     } else {
                         return Err("No se puede usar 'este' fuera de un método de molde".into());
                     }
@@ -860,10 +916,10 @@ impl VM {
                     // Shadow environment marker (para aislamiento de scopes a futuro)
                 },
                 OpCode::ObtenerCaptura => {
-                    let idx = self.leer_byte() as usize;
+                    let idx = self.leer_byte()? as usize;
                     if idx < self.capturas.len() {
                         let val = self.capturas[idx].clone();
-                        self.push(val);
+                        self.push(val)?;
                     } else {
                         return Err(format!("Captura fuera de rango: {} (disponibles: {})", idx, self.capturas.len()));
                     }
@@ -895,7 +951,7 @@ impl VM {
                     
                     self.ip = ip_handler;
                     self.pila.truncate(len_pila);
-                    self.push(Valor::Texto(e));
+                    self.push(Valor::Texto(e))?;
                 } else {
                     return Err(e);
                 }
@@ -905,17 +961,20 @@ impl VM {
 }
 
     #[inline(always)]
-    fn leer_byte(&mut self) -> u8 {
+    fn leer_byte(&mut self) -> Result<u8, String> {
+        if self.ip >= self.chunk.codigo.len() {
+            return Err("Bytecode truncado: se esperaba un byte adicional pero el flujo terminó".to_string());
+        }
         let byte = self.chunk.codigo[self.ip];
         self.ip += 1;
-        byte
+        Ok(byte)
     }
 
     #[inline(always)]
-    fn leer_u16(&mut self) -> u16 {
-        let lo = self.leer_byte() as u16;
-        let hi = self.leer_byte() as u16;
-        (hi << 8) | lo
+    fn leer_u16(&mut self) -> Result<u16, String> {
+        let lo = self.leer_byte()? as u16;
+        let hi = self.leer_byte()? as u16;
+        Ok((hi << 8) | lo)
     }
 }
 
@@ -951,7 +1010,7 @@ mod tests {
         let resultado = vm.ejecutar();
         println!("RESULTADO: {:?}", resultado);
         assert!(resultado.is_ok());
-        if let Ok(Valor::Entero(res)) = resultado {
+        if let Ok(EstadoVM::Terminado(Valor::Entero(res))) = resultado {
             assert_eq!(res, 7);
         } else {
             panic!("El resultado no fue un Entero con valor 7: {:?}", resultado);

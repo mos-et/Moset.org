@@ -27,6 +27,9 @@ and = "TOKEN_Y"
 or = "TOKEN_O"
 not = "TOKEN_NO"
 return = "TOKEN_DEVOLVER"
+think = "TOKEN_PENSAR"
+self = "TOKEN_ESTE"
+this = "TOKEN_ESTE"
 
 [semantico]
 first = "INDEX_1"

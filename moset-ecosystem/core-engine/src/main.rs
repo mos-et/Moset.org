@@ -171,9 +171,16 @@ fn repl() -> anyhow::Result<()> {
 
                         let mut vm = vm::VM::nueva(compilador.chunk);
                         match vm.ejecutar() {
-                            Ok(val) => {
-                                if !matches!(val, valor::Valor::Nulo) {
-                                    println!("  => {:?}", val);
+                            Ok(estado) => {
+                                match estado {
+                                    moset_core::vm::engine::EstadoVM::Terminado(v) => {
+                                        if !matches!(v, valor::Valor::Nulo) {
+                                            println!("  => {:?}", v);
+                                        }
+                                    },
+                                    moset_core::vm::engine::EstadoVM::Suspendido(_) => {
+                                        println!("  => (Suspendido)");
+                                    }
                                 }
                             }
                             Err(e) => eprintln!("  ✗ Error de Ejecución: {}", e),

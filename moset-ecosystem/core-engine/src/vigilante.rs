@@ -110,10 +110,11 @@ impl Vigilante {
                 base.cautelosos.push(sl);
             }
         }
-        // Reemplazar sandbox paths si el usuario configuró los suyos
+        // Reemplazar sandbox paths si el usuario configuró los suyos, protegiendo las comas escapadas \,
         let sandbox_trim: Vec<String> = sandbox_paths_raw
+            .replace("\\,", "\0")
             .split(',')
-            .map(|s| s.trim().replace('\\', "/").to_lowercase())
+            .map(|s| s.replace('\0', ",").trim().replace('\\', "/").to_lowercase())
             .filter(|s| !s.is_empty())
             .collect();
         if !sandbox_trim.is_empty() {
@@ -220,18 +221,32 @@ impl Vigilante {
             return Err("🛑 Vigilante: PATH TRAVERSAL DETECTADO (Uso de '../'). Acceso denegado.".into());
         }
 
-        let ruta_lower = ruta_normal.to_lowercase();
+        // Si la ruta existe, usar su forma canónica para evitar escapes por symlinks
+        let path_obj = std::path::Path::new(ruta);
+        let check_path = if path_obj.exists() {
+            if let Ok(abs) = std::fs::canonicalize(path_obj) {
+                let mut p = abs.to_string_lossy().replace('\\', "/").to_lowercase();
+                if p.starts_with("//?/") {
+                    p = p[4..].to_string();
+                }
+                p
+            } else {
+                ruta_normal.to_lowercase()
+            }
+        } else {
+            ruta_normal.to_lowercase()
+        };
 
         // 🟢 Temporales y rutas relativas siempre permitidos
-        if ruta_lower.contains("/temp/")
-            || ruta_lower.contains("/tmp/")
-            || (!ruta_lower.starts_with('/') && !ruta_lower.contains(":/"))
+        if check_path.contains("/temp/")
+            || check_path.contains("/tmp/")
+            || (!check_path.starts_with('/') && !check_path.contains(":/"))
         {
             return Ok(());
         }
 
         // 🟢 Verificar contra sandbox_paths configurado
-        let en_sandbox = self.sandbox_paths.iter().any(|sp| ruta_lower.starts_with(sp.as_str()));
+        let en_sandbox = self.sandbox_paths.iter().any(|sp| check_path.starts_with(sp.as_str()));
         if en_sandbox {
             Ok(())
         } else {
