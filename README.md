@@ -18,6 +18,26 @@
 
 <br/>
 
+## 📜 A Personal Note from the Creator
+
+> *This section is not technical. It's human.*
+
+I built Moset alone, from scratch, across countless sleepless nights — fueled by mate, stubborn curiosity, and a conviction that the tools we use to think should belong to us, not to the cloud, not to corporations, not to anyone who can flip a switch and take them away.
+
+Moset started as an obsession: *What if a programming language could speak every human language? What if AI inference could run natively on your machine, sovereign and silent, owing nothing to anyone?* That question consumed me. And this repository is the answer — or at least, the best answer I could give with the time and energy I had.
+
+**Version 1.0.0 is my gift to the community.** It is complete, it compiles on every major OS, it passes every test, and it works. It is not perfect, but it is real.
+
+After this release, I'm stepping away for an indefinite period. Not because I've lost faith in the project — quite the opposite. I'm stepping away because I need to recover. Building something this large alone takes a toll that doesn't show up in commit logs.
+
+If you find value in Moset, use it freely. Fork it. Break it. Rebuild it better. Teach someone to code in their own language. Run an AI model on your own hardware without asking anyone for permission. That was always the point.
+
+*Thank you for reading this far. Now go build something sovereign.*
+
+— **The Creator**, April 2026
+
+---
+
 **Moset** (from Selk'nam: *"Sovereignty"*) is much more than a framework; it is a complete ecosystem for developing local, private, and high-performance Artificial Intelligence. Moset combines the spotless power of native compiled engines with visual flexibility, creating a revolutionary IDE that runs native AI without relying on the cloud.
 
 ---
