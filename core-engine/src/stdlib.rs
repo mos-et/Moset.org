@@ -222,7 +222,8 @@ mod tests {
 
     #[test]
     fn test_escribir_leer() {
-        let ruta = std::env::temp_dir().join("moset_test_brazos.txt");
+        // Usamos current_dir en vez de temp_dir para mantenernos dentro del sandbox del Vigilante
+        let ruta = std::env::current_dir().unwrap().join("moset_test_brazos.txt");
         let ruta_str = ruta.to_str().unwrap();
         let vigilante = Vigilante::nuevo();
 
