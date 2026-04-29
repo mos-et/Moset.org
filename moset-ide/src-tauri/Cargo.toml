@@ -28,7 +28,7 @@ tokio = { version = "1", features = ["process"] }
 tauri-plugin-http = "2.0.0"
 
 [features]
-default = ["ai", "cuda"]
+default = ["ai"]
 ai = ["moset_core/ai"]
 cuda = ["moset_core/cuda"]
 metal = ["moset_core/metal"]
