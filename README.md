@@ -68,7 +68,8 @@ To fully dive into the philosophy, technical foundations, and the "Lore" behind 
 | Platform | Download |
 |:---------|:---------|
 | Windows x64 | [Moset IDE_1.0.0_x64-setup.exe](https://github.com/mos-et/moset.org/releases/latest) |
-| macOS / Linux | Coming via CI/CD pipeline |
+| macOS x64 | [Moset IDE_1.0.0_x64.dmg](https://github.com/mos-et/moset.org/releases/latest) |
+| Linux amd64 | [Moset IDE_1.0.0_amd64.AppImage](https://github.com/mos-et/moset.org/releases/latest) |
 
 > **Note:** The Windows installer includes the full IDE, core engine, and CLI tools.
 
