@@ -66,4 +66,4 @@ jobs:
         sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
     - name: Check Tauri Backend Compilation
-      run: cargo check --no-default-features --manifest-path moset-ide/src-tauri/Cargo.toml
+      run: cargo check --no-default-features --features ai --manifest-path moset-ide/src-tauri/Cargo.toml
