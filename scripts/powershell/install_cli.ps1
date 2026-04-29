@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 
 # Directorio destino para el CLI
 $mosetBinDir = "$env:LOCALAPPDATA\Moset\bin"
-$sourceExe = "$PSScriptRoot\core-engine\target\release\moset.exe"
+$sourceExe = "$PSScriptRoot\..\..\core-engine\target\release\moset.exe"
 
 # Verificar que el .exe existe
 if (-not (Test-Path $sourceExe)) {

@@ -1,5 +1,5 @@
 // Código de Fase Futura: Análisis semántico estático (Linter). Aún no integrado.
-// TODO: Implementación futura del Linter Estático para Naraka IDE.
+// TODO: Implementación futura del Linter Estático para Moset IDE.
 // Analiza el AST sin generar bytecode ni ejecutar en la VM.
 // Mantenemos las estructuras para desarrollo posterior.
 
@@ -115,7 +115,43 @@ impl Linter {
             Nodo::Identificador(nom) => self.obtener_tipo(nom).unwrap_or(TipoInferido::Desconocido),
             Nodo::MoldeInstancia { .. } => TipoInferido::Molde,
             Nodo::Metadata { nodo, .. } => self.inferir_tipo(nodo),
-            _ => TipoInferido::Desconocido, // Simplificado, un Linter real calcularía las operaciones binarias
+            Nodo::Binario { izq, op, der } => {
+                use crate::ast::OpBinario::*;
+                match op {
+                    Igual | NoIgual | Mayor | Menor | MayorIgual | MenorIgual | Y | O => TipoInferido::Booleano,
+                    Sumar | Restar | Multiplicar | Dividir | Modulo => {
+                        let t_izq = self.inferir_tipo(izq);
+                        let t_der = self.inferir_tipo(der);
+                        if t_izq == TipoInferido::Texto || t_der == TipoInferido::Texto {
+                            TipoInferido::Texto
+                        } else if t_izq == TipoInferido::Decimal || t_der == TipoInferido::Decimal {
+                            TipoInferido::Decimal
+                        } else if t_izq == TipoInferido::Entero && t_der == TipoInferido::Entero {
+                            TipoInferido::Entero
+                        } else {
+                            TipoInferido::Desconocido
+                        }
+                    }
+                }
+            },
+            Nodo::Unario { op, expr } => {
+                use crate::ast::OpUnario::*;
+                match op {
+                    No => TipoInferido::Booleano,
+                    Negar => {
+                        let t = self.inferir_tipo(expr);
+                        if t == TipoInferido::Decimal { TipoInferido::Decimal }
+                        else if t == TipoInferido::Entero { TipoInferido::Entero }
+                        else { TipoInferido::Desconocido }
+                    }
+                }
+            },
+            Nodo::Colapsar(_) => TipoInferido::Entero,
+            Nodo::Esperar(expr) => self.inferir_tipo(expr),
+            Nodo::Condicional { cuerpo_si, .. } => {
+                cuerpo_si.last().map(|n| self.inferir_tipo(n)).unwrap_or(TipoInferido::Nulo)
+            },
+            _ => TipoInferido::Desconocido,
         }
     }
 

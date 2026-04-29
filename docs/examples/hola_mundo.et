@@ -1,0 +1,34 @@
+:@ Hola Mundo - El primer programa en el lenguaje soberano.
+nombre = "Naraka"
+edad = 25
+version = 0.1
+
+mostrar "¡Hola, Mundo!"
+mostrar "Bienvenido al Motor Soberano, " + nombre + "."
+mostrar "Edad: "
+mostrar edad
+mostrar "Versión Moset: "
+mostrar version
+
+estado = si edad > 18: "Mayor de edad" sino: "Menor de edad"
+mostrar estado
+
+colores = ["rojo", "azul", "verde"]
+mostrar "Primer color: " + colores[1]
+mostrar "Último: " + colores[2]
+
+:,] sumar(a, b)
+    a + b
+
+resultado = sumar(10, 32)
+mostrar "10 + 32 = "
+mostrar resultado
+
+
+mostrar "Colores disponibles:"
+por cada color en colores:
+    mostrar "  → " + color
+
+seguro = sumar(5, 5) :,[ "Fallo"
+mostrar "Resultado seguro: "
+mostrar seguro

@@ -5,7 +5,7 @@
 $destino = "S:\Data Strix\Modelos LM Studio"
 
 Write-Host ""
-Write-Host "=== NARAKA MODEL DOWNLOADER ===" -ForegroundColor Cyan
+Write-Host "=== MOSET MODEL DOWNLOADER ===" -ForegroundColor Cyan
 Write-Host "Destino: $destino" -ForegroundColor Gray
 Write-Host "Criterio: Modelos <= 8B, cuantizacion Q4_K_M" -ForegroundColor Gray
 Write-Host ""
@@ -145,7 +145,7 @@ foreach ($e in $existentes) {
 # Inventario final
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Green
-Write-Host "  INVENTARIO FINAL - MODELOS NARAKA" -ForegroundColor Green
+Write-Host "  INVENTARIO FINAL - MODELOS MOSET" -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Green
 
 $allDirs = Get-ChildItem -Path $destino -Directory -ErrorAction SilentlyContinue

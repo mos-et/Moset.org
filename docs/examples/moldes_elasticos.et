@@ -1,0 +1,40 @@
+:@ === MOSET: MOLDES ELÁSTICOS (La Corteza y el Núcleo) ===
+mostrar "=== MOLDES ELASTICOS ==="
+mostrar ""
+
+:@ -- 1. Molde elástico con espacio latente --
+molde Escaneo: ip, puerto, ...
+
+scan = Escaneo { ip: "192.168.1.1", puerto: 80 }
+mostrar "Instancia base:"
+mostrar scan
+
+:@ -- 2. Naraka inyecta en espacio latente --
+scan.version = "Apache 2.4"
+scan.confianza = Bit:[0.87]
+mostrar ""
+mostrar "Después de inyección al núcleo:"
+mostrar scan
+
+:@ -- 3. Leer desde la corteza y el núcleo --
+mostrar ""
+mostrar "Corteza (ip): " + scan.ip
+mostrar "Corteza (puerto): "
+mostrar scan.puerto
+mostrar "Núcleo (version): " + scan.version
+mostrar "Núcleo (confianza):"
+mostrar scan.confianza
+
+:@ -- 4. Reasignar campo fijo (corteza) --
+scan.ip = "10.0.0.42"
+mostrar ""
+mostrar "IP reasignada: " + scan.ip
+
+:@ -- 5. Molde puro elástico (solo núcleo) --
+molde Libre: ...
+pensamiento = Libre {}
+pensamiento.idea = "El Soberano es libre"
+pensamiento.certeza = Bit:[0.99]
+mostrar ""
+mostrar "Pensamiento libre:"
+mostrar pensamiento

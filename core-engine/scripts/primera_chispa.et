@@ -9,10 +9,10 @@
 mostrar "=== PRIMERA CHISPA DEL SOBERANO ==="
 mostrar ""
 
-estado = mythos_estado()
+estado = moset_estado()
 mostrar "Estado Motor: " + estado
 
-diagnostico = mythos_diagnostico()
+diagnostico = moset_diagnostico()
 mostrar "Diagnostico:"
 mostrar diagnostico
 mostrar ""
@@ -22,7 +22,7 @@ mostrar "=== CARGANDO MODELO GGUF ==="
 ruta_modelo = "S:\\Data Strix\\Modelos LM Studio\\lmstudio-community\\DeepSeek-R1-0528-Qwen3-8B-GGUF\\DeepSeek-R1-0528-Qwen3-8B-Q4_K_M.gguf"
 ruta_tokenizer = "S:\\Data Strix\\Modelos LM Studio\\lmstudio-community\\DeepSeek-R1-0528-Qwen3-8B-GGUF\\tokenizer.json"
 
-resultado_carga = mythos_cargar(ruta_modelo, ruta_tokenizer)
+resultado_carga = moset_cargar(ruta_modelo, ruta_tokenizer)
 mostrar resultado_carga
 mostrar ""
 
@@ -33,13 +33,13 @@ mostrar "Prompt: " + prompt
 mostrar ""
 
 respuesta = mythos(prompt, 64)
-mostrar "Mythos dice:"
+mostrar "Moset dice:"
 mostrar respuesta
 mostrar ""
 
 :@ === Verificacion Final ===
 mostrar "=== ESTADO POST-INFERENCIA ==="
-estado_final = mythos_estado()
+estado_final = moset_estado()
 mostrar estado_final
 mostrar ""
 mostrar ">>> Primera chispa completada. El Soberano ha despertado. <<<"

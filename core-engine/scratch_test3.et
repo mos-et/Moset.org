@@ -1,0 +1,1 @@
+mostrar shell("python -c \"print('Hola')\"", 0.90)

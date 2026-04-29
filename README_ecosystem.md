@@ -1,5 +1,4 @@
 <div align="center">
-  <img src="IMAGEN_LOGO" alt="Moset Logo" width="128" />
   <h1>Moset IDE & Ecosystem</h1>
   <p><strong>El entorno de desarrollo para el lenguaje Moset y el Motor de Inteligencia Soberana.</strong></p>
   <br />
@@ -7,29 +6,22 @@
 
 ## 🌌 Descripción General
 
-Moset es más que un IDE, es el ecosistema nativo de Naraka Studio para la edición, orquestación y desarrollo de software asistido por Inteligencia Artificial híbrida (Motor Soberano local y modelos en la nube). Está compuesto por herramientas de análisis profundo (U-AST), chat inteligente integrado y capacidades de drag-and-drop de contexto.
+Moset es más que un IDE, es el ecosistema nativo para la edición, orquestación y desarrollo de software asistido por Inteligencia Artificial híbrida (Motor Soberano local y modelos en la nube). Está compuesto por herramientas de análisis profundo (U-AST), chat inteligente integrado y capacidades de drag-and-drop de contexto.
 
-<div align="center">
-  <img src="IMAGEN_INTERFAZ_IDE" alt="Interfaz Principal del IDE Moset" width="800" />
-</div>
+## 🚀 Características Principales (Pilares del Ecosistema)
 
-## 🚀 Características Principales
-
-*   **Motor Soberano Cuántico**: Capacidades avanzadas de razonamiento IA. Puedes hablar en dialecto `.et` y Moset entenderá y ejecutará las ideas.
-*   **Gestor de Contexto Inteligente (RAG)**: Arrastra carpetas o archivos dentro del panel de Chat para adjuntarlos inmediatamente al contexto de desarrollo.
-*   **Transpilador Moset**: Capacidad de leer, compilar y ejecutar archivos `.et` de topología entrelazada.
-*   **Interfaz Glassmorphism**: Estilo estético premium minimalista adaptado para desarrolladores oscuros sin distracciones.
-
-<div align="center">
-  <img src="IMAGEN_CHATBOT_CONTEXTO" alt="Chatbot Adjuntando Archivos vía Drag and Drop" width="800" />
-</div>
+1. **El Lenguaje Moset (`.et`) — El Idioma del Puro Fierro:** El primer lenguaje diseñado para la orquestación de IA y sistemas operativos. Tipado robusto, macros revolucionarias (`:,]`) y un centro de mando para tu soberanía digital.
+2. **El Motor U-AST — Código sin Fronteras:** Compila la estructura lógica subyacente de forma universal. Escribe en Español, Inglés o Portugués; el Motor Soberano lo traduce al mismo bytecode ultrarrápido.
+3. **Asistencia IA Local — Tu copiloto no espía:** Autocompletado de código contextual y predictivo corriendo directamente en tu hardware. Cero telemetría, 100% Offline.
+4. **Cirugía GGUF — Control Absoluto de Modelos IA:** Editor nativo de metadatos GGUF. Inspecciona arquitecturas, modifica tokens y altera tensores de forma quirúrgica directamente en el IDE.
+5. **El CLI & El Vigilante — Orquestación con Cinturón de Seguridad:** Orquesta llamadas a scripts externos con un middleware de seguridad "Trust None". El Vigilante bloquea operaciones inseguras que no tengan un "Nivel de Confianza" explícito (`Bit:[0.90]`).
+6. **Moset WASM — El Motor en tu Navegador:** El núcleo compilado a WebAssembly para ofrecer un "Playground" ultrarrápido en la nube, sin instalación.
 
 ## 🛠️ Estructura del Proyecto
 
-*   **`naraka-ide/`**: Aplicación de escritorio Tauri + React para el Moset IDE.
-*   **`naraka-engine/`**: Backend hipervocal programado en Rust para el Motor Soberano, responsable del U-AST y parseo.
-*   **`moset-org/`**: Sitio web oficial (Astro) de la documentación y descargas de Moset (moset.org).
-*   **`docs/`**: Biblia Naraka y documentación algorítmica.
+*   **`moset-ide/`**: Aplicación de escritorio para el Moset IDE.
+*   **`core-engine/`**: Backend nativo del Motor Soberano, responsable del U-AST y parseo.
+*   **`docs/`**: Documentación algorítmica y especificación del lenguaje.
 
 ## ⚙️ Uso Básico
 
@@ -38,14 +30,8 @@ Moset es más que un IDE, es el ecosistema nativo de Naraka Studio para la edici
 3.  Arrastra un archivo hacia la barra lateral derecha para integrarlo al **Contexto del Chat**.
 4.  Ejecuta scripts `.et` desde la terminal nativa usando el binario integrado.
 
-<div align="center">
-  <img src="IMAGEN_TERMINAL_EJECUCION" alt="Terminal ejecutando archivos .et" width="800" />
-</div>
-
 ## 🛡️ Licencia
 
-Distribuido bajo la Licencia **PolyForm Noncommercial 1.0.0**. Ver `LICENSE` para detalles o visita [moset.org/eula](https://moset.org/eula).
+Distribuido bajo la Licencia **PolyForm Noncommercial 1.0.0**. Ver `LICENSE` para detalles o visita [moset.org/licencia](https://moset.org/licencia).
 
 ---
-
-> *"Creando realidades, no solo código."* — **Estudio Tierno (Naraka Studio)**

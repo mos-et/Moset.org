@@ -1,0 +1,24 @@
+:@ Llamadas a Aplicaciones Externas desde Moset
+:@ ---------------------------------------------
+:@ Moset puede orquestar sistemas enteros usando
+:@ los brazos nativos del sistema (shell y peticiones).
+
+mostrar "=== Orquestando Aplicaciones Externas ==="
+
+:@ 1. Llamada a un script de Python (Data Science, AI)
+mostrar "[+] Ejecutando script de Python..."
+res_py = shell("python -c \"print('Hola desde Python, orquestado por Moset')\"", 0.90) :,[ "Fallo al ejecutar Python"
+mostrar "Salida de Python: " + res_py
+
+:@ 2. Llamada a un script de Node.js (Ecosistema Web, NPM)
+mostrar "[+] Ejecutando script de Node.js..."
+res_js = shell("node -e \"console.log('Hola desde Node.js, operado por Moset')\"", 0.90) :,[ "Fallo al ejecutar Node.js"
+mostrar "Salida de JS: " + res_js
+
+:@ 3. Petición a una API Externa (Ej: FastAPI, Express, etc.)
+mostrar "[+] Realizando petición GET a una API remota..."
+:@ Usamos un endpoint de prueba (puedes cambiarlo a http://localhost:8000 de FastAPI)
+res_api = peticion_get("https://api.github.com/zen") :,[ "Fallo al conectar con la API"
+mostrar "Respuesta del Servidor (FastAPI): " + res_api
+
+mostrar "=== Orquestación Completada ==="

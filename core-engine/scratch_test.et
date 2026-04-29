@@ -1,0 +1,3 @@
+mostrar shell("python --version", 1.0)
+mostrar shell("node --version", 1.0)
+mostrar peticion_get("https://api.github.com/zen")

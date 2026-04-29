@@ -56,7 +56,7 @@ path = entorno("USERPROFILE")
 mostrar "Home: " + path
 
 :@ -- Escribir + Leer: tocar el disco --
-escribir("T:\\moset_firma.txt", "Naraka Studio - Motor Soberano v0.1.0")
+escribir("T:\\moset_firma.txt", "Moset IDE - Motor Soberano v1.0.0")
 contenido = leer("T:\\moset_firma.txt")
 mostrar "Archivo leido: " + contenido
 
@@ -502,7 +502,7 @@ molde Metadata: ...
 
 meta = Metadata {}
 meta.version = "1.0.0"
-meta.autor = "Naraka Studio"
+meta.autor = "Moset"
 meta.licencia = "Soberana"
 mostrar meta
 

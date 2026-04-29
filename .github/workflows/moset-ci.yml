@@ -28,17 +28,16 @@ jobs:
     - name: Cache Cargo Dependencies
       uses: Swatinem/rust-cache@v2
       with:
-        workspaces: moset-ecosystem/core-engine
+        workspaces: core-engine
 
     - name: Check Compilation (No CUDA - Cross Platform)
-      # Esto chequea que el motor compila en CPU sin requerir la suite de CUDA instalada en los runners
-      run: cargo check --manifest-path moset-ecosystem/core-engine/Cargo.toml
+      run: cargo check --manifest-path core-engine/Cargo.toml
 
     - name: Run Tests (No CUDA - Cross Platform)
-      run: cargo test --manifest-path moset-ecosystem/core-engine/Cargo.toml
+      run: cargo test --manifest-path core-engine/Cargo.toml
 
     - name: Build Core Engine (Release)
-      run: cargo build --release --manifest-path moset-ecosystem/core-engine/Cargo.toml
+      run: cargo build --release --manifest-path core-engine/Cargo.toml
 
   build_ide_backend:
     name: Build IDE Tauri Backend (${{ matrix.os }})
@@ -67,5 +66,4 @@ jobs:
         sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
     - name: Check Tauri Backend Compilation
-      # Asegura que el backend de Tauri compila nativamente y conecta con Webview cruzado sin features pesadas
-      run: cargo check --no-default-features --manifest-path moset-ecosystem/naraka-ide/src-tauri/Cargo.toml
+      run: cargo check --no-default-features --manifest-path moset-ide/src-tauri/Cargo.toml

@@ -25,6 +25,7 @@ pub enum AgentTool {
     McpListTools,
     McpCallTool,
     LspDiagnostics,
+    InjectGgufUi,
 }
 
 /// Representa una herramienta invocada por el modelo (IA).

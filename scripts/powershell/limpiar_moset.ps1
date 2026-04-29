@@ -13,7 +13,7 @@ $processList = @(
     "cl",
     "link",
     "mspdbsrv",
-    "moset-app"
+    "moset-ide"
 )
 
 $freedCount = 0

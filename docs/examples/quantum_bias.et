@@ -1,0 +1,24 @@
+mostrar "=== BITS CUANTICOS SESGADOS ==="
+mostrar ""
+
+moneda = Bit:~
+mostrar "Moneda justa (50/50):"
+mostrar moneda
+
+confianza = Bit:[0.85]
+mostrar "Naraka dice 85% seguro:"
+mostrar confianza
+
+certeza = Bit:[0.99]
+mostrar "Certeza absoluta (99%):"
+mostrar certeza
+
+trampa = Bit:[0.0]
+mostrar "Imposible (0%):"
+mostrar trampa
+
+mostrar ""
+mostrar "=== COLAPSANDO ==="
+mostrar !confianza
+mostrar !certeza
+mostrar !trampa

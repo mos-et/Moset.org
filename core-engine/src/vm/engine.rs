@@ -546,6 +546,7 @@ impl VM {
                             
                             let mut buf = [0u8; 8];
                             if getrandom::fill(&mut buf).is_err() {
+                                println!("GETRANDOM FALLO EN WINDOWS");
                                 // Fallback a LCG si falla la entropía del OS
                                 let seed = instruction_count.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
                                 buf = seed.to_le_bytes();
@@ -763,9 +764,18 @@ impl VM {
 
                     let resultado = match nombre.as_str() {
                         "shell" => {
-                            if args.len() != 1 { return Err("shell() requiere 1 argumento".into()); }
+                            if args.len() < 1 || args.len() > 2 { return Err("shell() requiere 1 o 2 argumentos".into()); }
                             let cmd = format!("{}", args[0]);
-                            match crate::stdlib::shell(&cmd, &self.vigilante) {
+                            let confianza = if args.len() == 2 {
+                                match args[1] {
+                                    Valor::Decimal(d) => Some(d),
+                                    Valor::Entero(i) => Some(i as f64),
+                                    _ => return Err("El nivel de confianza debe ser numérico".into()),
+                                }
+                            } else {
+                                None
+                            };
+                            match crate::stdlib::shell(&cmd, confianza, &self.vigilante) {
                                 Ok(out) => Valor::Texto(out),
                                 Err(e) => return Err(e),
                             }
@@ -1125,5 +1135,81 @@ mod tests {
         let res = vm.ejecutar();
         
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_invocacion_metodo_y_este() {
+        // Simular:
+        // c = Contador { valor: 10 }
+        // c.inc = closure() { este.valor = este.valor + 1 }
+        // c.inc()
+        // c.valor
+        
+        let programa = Programa {
+            sentencias: vec![
+                // 1. Definir Molde
+                Nodo::MoldeDefinicion {
+                    nombre: "Contador".to_string(),
+                    campos: vec!["valor".to_string()],
+                    elastico: true,
+                },
+                // 2. Instanciar
+                Nodo::Asignacion {
+                    nombre: "c".to_string(),
+                    valor: Box::new(Nodo::MoldeInstancia {
+                        nombre: "Contador".to_string(),
+                        valores: vec![("valor".to_string(), Nodo::EnteroLit(10))],
+                    }),
+                },
+                // 3. Asignar método (closure que usa 'este')
+                Nodo::AsignacionCampo {
+                    objeto: Box::new(Nodo::Identificador("c".to_string())),
+                    campo: "inc".to_string(),
+                    valor: Box::new(Nodo::Closure {
+                        params: vec![],
+                        cuerpo: vec![
+                            Nodo::AsignacionCampo {
+                                objeto: Box::new(Nodo::Este),
+                                campo: "valor".to_string(),
+                                valor: Box::new(Nodo::Binario {
+                                    izq: Box::new(Nodo::AccesoCampo {
+                                        objeto: Box::new(Nodo::Este),
+                                        campo: "valor".to_string(),
+                                    }),
+                                    op: OpBinario::Sumar,
+                                    der: Box::new(Nodo::EnteroLit(1)),
+                                }),
+                            },
+                        ],
+                    }),
+                },
+                // 4. Llamar al método
+                Nodo::LlamadaMetodo {
+                    objeto: Box::new(Nodo::Identificador("c".to_string())),
+                    metodo: "inc".to_string(),
+                    args: vec![],
+                },
+                // 5. Dejar el valor final en la pila para verificar
+                Nodo::Retornar(Box::new(Nodo::AccesoCampo {
+                    objeto: Box::new(Nodo::Identificador("c".to_string())),
+                    campo: "valor".to_string(),
+                }))
+            ],
+        };
+
+        let mut compilador = Compilador::nuevo();
+        assert!(compilador.compilar_programa(&programa).is_ok());
+
+        let mut vm = VM::nueva(compilador.chunk);
+        let res = vm.ejecutar();
+        
+        println!("RESULTADO FINAL: {:?}", res);
+        assert!(res.is_ok());
+        
+        if let Ok(EstadoVM::Terminado(Valor::Entero(v))) = res {
+            assert_eq!(v, 11);
+        } else {
+            panic!("Se esperaba un Entero(11), se obtuvo: {:?}", res);
+        }
     }
 }

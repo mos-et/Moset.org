@@ -1,0 +1,32 @@
+mostrar "=== MOSET: BRAZOS DEL SISTEMA ==="
+mostrar ""
+
+:@ -- Shell: ejecutar comandos del SO --
+usuario = shell("whoami")
+mostrar "Usuario: " + usuario
+
+hostname = shell("hostname")
+mostrar "Hostname: " + hostname
+
+:@ -- Entorno: leer variables del SO --
+path = entorno("USERPROFILE")
+mostrar "Home: " + path
+
+:@ -- Escribir + Leer: tocar el disco --
+escribir("S:\\Naraka Studio\\Moset\\moset_firma.txt", "Naraka Studio - Motor Soberano v0.1.0")
+contenido = leer("S:\\Naraka Studio\\Moset\\moset_firma.txt")
+mostrar "Archivo leido: " + contenido
+
+:@ -- Existe: verificar paths --
+mostrar "Existe S:\\Naraka Studio\\Moset\\moset_firma.txt: "
+mostrar existe("S:\\Naraka Studio\\Moset\\moset_firma.txt")
+
+mostrar "Existe /ruta/imposible: "
+mostrar existe("/ruta/imposible")
+
+:@ -- Quantum + Shell: el Soberano con agencia --
+confianza = Bit:[0.95]
+mostrar ""
+mostrar "Confianza del agente:"
+mostrar confianza
+mostrar "Decision: " + shell("echo EJECUTAR_MISION")

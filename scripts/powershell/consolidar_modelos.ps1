@@ -2,7 +2,7 @@
 # Junta todos los GGUFs y tokenizers en S:\Data Strix\Modelos LM Studio
 $destino = "S:\Data Strix\Modelos LM Studio"
 
-Write-Host "=== CONSOLIDADOR DE MODELOS NARAKA ===" -ForegroundColor Cyan
+Write-Host "=== CONSOLIDADOR DE MODELOS MOSET ===" -ForegroundColor Cyan
 Write-Host ""
 
 # 1. Copiar Phi-3 de Naraka Studio

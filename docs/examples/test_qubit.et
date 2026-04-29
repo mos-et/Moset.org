@@ -1,0 +1,7 @@
+q = Bit:~
+r = !q
+mostrar r :@ Deberia imprimir verdadero o falso
+
+q2 = Bit:[0.9]
+r2 = !q2
+mostrar r2 :@ Probablemente imprima verdadero

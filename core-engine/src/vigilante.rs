@@ -265,7 +265,7 @@ impl Vigilante {
         
         let allowlist = [
             "HOME", "PATH", "OS", "USER", "TEMP", "TMP", 
-            "LOGNAME", "USERNAME", "APPDATA", "LOCALAPPDATA"
+            "LOGNAME", "USERNAME", "APPDATA", "LOCALAPPDATA", "USERPROFILE"
         ];
 
         if allowlist.contains(&nombre_upper.as_str()) {

@@ -1,0 +1,704 @@
+{
+  "$schema": "moset-dict/1.0",
+  "proyecto": "examples",
+  "idioma_canonico": "es",
+  "version": 5,
+  "identifiers": {
+    "str": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "str"
+      }
+    },
+    "Moset": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Moset"
+      }
+    },
+    "box": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "box"
+      }
+    },
+    "En": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "En"
+      }
+    },
+    "string": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "string"
+      }
+    },
+    "sigue": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "sigue"
+      }
+    },
+    "interpolación": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "interpolación"
+      }
+    },
+    "inválido": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "inválido"
+      }
+    },
+    "drawing": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "drawing"
+      }
+    },
+    "strings": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "strings"
+      }
+    },
+    "un": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "un"
+      }
+    },
+    "sin": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "sin"
+      }
+    },
+    "hay": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "hay"
+      }
+    },
+    "colores": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "colores"
+      }
+    },
+    "que": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "que"
+      }
+    },
+    "es": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "es"
+      }
+    },
+    "el": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "el"
+      }
+    },
+    "podría": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "podría"
+      }
+    },
+    "símbolos": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "símbolos"
+      }
+    },
+    "Reemplazar": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Reemplazar"
+      }
+    },
+    "print": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "print"
+      }
+    },
+    "cambios": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "cambios"
+      }
+    },
+    "reconocer": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "reconocer"
+      }
+    },
+    "como": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "como"
+      }
+    },
+    "guiones": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "guiones"
+      }
+    },
+    "Proporcionar": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Proporcionar"
+      }
+    },
+    "requiere": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "requiere"
+      }
+    },
+    "bucles": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "bucles"
+      }
+    },
+    "Línea": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Línea"
+      }
+    },
+    "Añadir": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Añadir"
+      }
+    },
+    "Conversión": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Conversión"
+      }
+    },
+    "columna": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "columna"
+      }
+    },
+    "Usar": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Usar"
+      }
+    },
+    "moset": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "moset"
+      }
+    },
+    "debería": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "debería"
+      }
+    },
+    "etc": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "etc"
+      }
+    },
+    "corregida": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "corregida"
+      }
+    },
+    "estado": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "estado"
+      }
+    },
+    "son": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "son"
+      }
+    },
+    "mínimos": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "mínimos"
+      }
+    },
+    "Versión": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Versión"
+      }
+    },
+    "a": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "a"
+      }
+    },
+    "Revisar": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Revisar"
+      }
+    },
+    "especiales": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "especiales"
+      }
+    },
+    "Analizando": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Analizando"
+      }
+    },
+    "entero": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "entero"
+      }
+    },
+    "Correcciones": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Correcciones"
+      }
+    },
+    "lugar": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "lugar"
+      }
+    },
+    "fuera": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "fuera"
+      }
+    },
+    "seguro": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "seguro"
+      }
+    },
+    "ASCII": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "ASCII"
+      }
+    },
+    "caja": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "caja"
+      }
+    },
+    "Solución": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Solución"
+      }
+    },
+    "comentarios": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "comentarios"
+      }
+    },
+    "errores": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "errores"
+      }
+    },
+    "version": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "version"
+      }
+    },
+    "convertirse": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "convertirse"
+      }
+    },
+    "intérprete": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "intérprete"
+      }
+    },
+    "sintaxis": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "sintaxis"
+      }
+    },
+    "ser": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "ser"
+      }
+    },
+    "al": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "al"
+      }
+    },
+    "eliminarlos": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "eliminarlos"
+      }
+    },
+    "línea": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "línea"
+      }
+    },
+    "Revisando": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Revisando"
+      }
+    },
+    "para": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "para"
+      }
+    },
+    "faltante": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "faltante"
+      }
+    },
+    "IDE": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "IDE"
+      }
+    },
+    "la": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "la"
+      }
+    },
+    "con": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "con"
+      }
+    },
+    "Respuesta": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Respuesta"
+      }
+    },
+    "conversión": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "conversión"
+      }
+    },
+    "El": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "El"
+      }
+    },
+    "Asegurar": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Asegurar"
+      }
+    },
+    "directa": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "directa"
+      }
+    },
+    "indica": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "indica"
+      }
+    },
+    "tipos": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "tipos"
+      }
+    },
+    "inicio": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "inicio"
+      }
+    },
+    "debe": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "debe"
+      }
+    },
+    "archivo": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "archivo"
+      }
+    },
+    "hola_mundo": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "hola_mundo"
+      }
+    },
+    "b": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "b"
+      }
+    },
+    "caracteres": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "caracteres"
+      }
+    },
+    "explícita": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "explícita"
+      }
+    },
+    "incompleta": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "incompleta"
+      }
+    },
+    "original": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "original"
+      }
+    },
+    "Posibles": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Posibles"
+      }
+    },
+    "ej": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "ej"
+      }
+    },
+    "corregido": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "corregido"
+      }
+    },
+    "edad": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "edad"
+      }
+    },
+    "Shebang": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Shebang"
+      }
+    },
+    "Estructura": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Estructura"
+      }
+    },
+    "del": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "del"
+      }
+    },
+    "color": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "color"
+      }
+    },
+    "versión": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "versión"
+      }
+    },
+    "valor_default": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "valor_default"
+      }
+    },
+    "parece": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "parece"
+      }
+    },
+    "haya": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "haya"
+      }
+    },
+    "thought": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "thought"
+      }
+    },
+    "los": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "los"
+      }
+    },
+    "La": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "La"
+      }
+    },
+    "Catch": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Catch"
+      }
+    },
+    "backtick": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "backtick"
+      }
+    },
+    "necesarias": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "necesarias"
+      }
+    },
+    "nombre": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "nombre"
+      }
+    },
+    "válidos": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "válidos"
+      }
+    },
+    "error": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "error"
+      }
+    },
+    "identificar": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "identificar"
+      }
+    },
+    "carácter": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "carácter"
+      }
+    },
+    "válida": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "válida"
+      }
+    },
+    "Los": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "Los"
+      }
+    },
+    "catch": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "catch"
+      }
+    },
+    "primera": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "primera"
+      }
+    },
+    "resultado": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "resultado"
+      }
+    },
+    "código": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "código"
+      }
+    },
+    "sumar": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "sumar"
+      }
+    },
+    "de": {
+      "tipo": "variable",
+      "traducciones": {
+        "en": "de"
+      }
+    }
+  }
+}

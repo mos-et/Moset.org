@@ -1,7 +1,7 @@
 #  BIBLIA MOSET — Documento Definitivo del Ecosistema (Motor Soberano)
 
 > **Este archivo define la arquitectura, visión, estado real y auditoría completa de Moset IDE y su ecosistema.**
-> Última consolidación: 2026-04-28 — **v0.4.0 (OOP, Closures, Vigilante SSRF, 75 Tests)**
+> Última consolidación: 2026-04-29 — **v1.0.0 — Release Estable (Localization Lens, 75 Tests, Instalador NSIS)**
 > Dueño: Equipo Central de Moset
 
 ---
@@ -82,7 +82,7 @@ El ecosistema se divide en dos grandes monolitos fuertemente acoplados por IPC (
 │   │       ├── mod.rs                  ← Exportación
 │   │       └── (bytecode/opcode integrados en engine.rs)
 │
-├── naraka-ide/                         ← FRONTEND REACT + TAURI v2 (Moset IDE)
+├── moset-ide/                         ← FRONTEND REACT + TAURI v2 (Moset IDE)
 │   ├── package.json                    ← productName: "moset-ide" (React 19, Monaco)
 │   ├── vite.config.ts
 │   ├── src-tauri/
@@ -908,7 +908,7 @@ Además de los endpoints del lenguaje Moset, el IDE incluye un **agente autónom
 
 ## 12. Roadmap y Estado Actual
 
-###  Implementado (v0.1 → v0.2)
+###  Implementado (v0.1 → v1.0.0)
 - [x] Lexer multi-idioma (es/en) con tokens especiales y tracking de posición
 - [x] Parser descenso recursivo completo con precedencia de operadores
 - [x] Tracking de líneas/columnas en el U-AST para reportes precisos del Linter (BUG-004)
@@ -945,7 +945,7 @@ Además de los endpoints del lenguaje Moset, el IDE incluye un **agente autónom
 - [x] Botón copiar inline en bloques de código
 - [x] Stop tokens expandidos para Qwen3/Llama3 (endoftext, eot_id, im_start)
 
-###  Próximos Pasos (v0.3 → v1.0) 
+###  Completado (v0.3 → v1.0.0) 
 
 **Fase 6 — Hardening & Polish:**
 - [x] Estabilización del arranque y SplashScreen: Handlers de `MOSET_ERROR`, captura stderr y validación estricta de Exit Code en el launcher. 
@@ -1039,13 +1039,20 @@ Además de los endpoints del lenguaje Moset, el IDE incluye un **agente autónom
 - [x] **Sanitización Segura de Tags Parciales** — Removidos filtros Regex destructivos (`/<\|?$/g`) responsables de la amputación del `</think>` nativo del modelo, logrando un DOM resiliente.
 - [x] **Tauri Capabilities ACL v2 (Build Fix)** — Resolución del pánico de validación en Tauri 2.0 (`failed to run custom build command`) eliminando identificadores huérfanos (`moset-ide:default`, `app:default`) del archivo `capabilities/default.toml`, logrando un pipeline de empaquetado 100% estable.
 
+**Fase 12 — Localization Lens & Release v1.0.0:**
+- [x] **Localization Lens (Lupa de Traducción)** — Motor de proyección visual inline refactorizado: migración de `deltaDecorations` (obsoleto en Monaco 0.55+) a `createDecorationsCollection`. Introducción de estado `editorReady` para sincronización post-montaje. La lente ahora es reactiva, estable y opera en tiempo real sobre el editor activo.
+- [x] **Normalización de Versiones** — Barrido completo de `package.json`, `tauri.conf.json`, `Cargo.toml` y UI (`StatusBar.tsx`) unificando todas las referencias a `v1.0.0`.
+- [x] **Build de Producción** — Compilación exitosa Rust/Tauri + generación del instalador NSIS (`Moset IDE_1.0.0_x64-setup.exe`).
+- [x] **Cross-OS CI/CD Pipeline** — GitHub Actions configurado para Win/Mac/Linux con desacople de CUDA por defecto.
+- [x] **0 Errores TypeScript** — Validación `tsc` sin errores en el frontend completo.
+
 ---
 
 **Licencia:** PolyForm Noncommercial 1.0.0
 ---
 
 <div align="center">
-  <i>Moset 2026 - Desarrollado por <b>narakastudio.com</b></i>
+  <i>Moset 2026 - Desarrollado por <b>moset.org</b></i>
 </div>
 
 
@@ -1053,7 +1060,19 @@ Además de los endpoints del lenguaje Moset, el IDE incluye un **agente autónom
 
 ## Última Actualización
 
-**2026-04-20 — Fase 12: Estabilización Motor Visual + Arquitectura mos.et**
+**2026-04-29 — v1.0.0 Release: Localization Lens + Instalador de Producción**
+
+### Localization Lens — Reparación Crítica
+- [x] **Diagnóstico**: El motor de renderizado de la "Lupa de Traducción" fallaba en Monaco v0.55+ debido a la obsolescencia de `deltaDecorations` con `after.content`.
+- [x] **Solución**: Refactorización de `CodeEditor.tsx` usando `createDecorationsCollection` + estado `editorReady` para garantizar sincronización post-montaje.
+- [x] **Resultado**: Funcionalidad de traducción en tiempo real plenamente operativa y reactiva.
+
+### Consolidación v1.0.0
+- [x] **Auditoría de Versiones**: Normalización en `package.json`, `tauri.conf.json`, `Cargo.toml`, `StatusBar.tsx`.
+- [x] **Build + Instalador**: Generación exitosa de `Moset IDE_1.0.0_x64-setup.exe` via NSIS.
+- [x] **Documentación**: Biblias (ES/EN) y README actualizados para reflejar v1.0.0.
+
+### Fase 12 Previa: Estabilización Motor Visual + Arquitectura mos.et (2026-04-20)
 
 ### Motor de Ejecución Visual (MosetOutputPanel)
 - [x] **Backend Rust refactorizado**: Comando ejecutar ahora retorna JSON estructurado con tipos (quantum, molde, header, error, 	ext, separator) via classify_output_line.
@@ -1140,3 +1159,35 @@ un-moset-code va window.addEventListener. El handler del event usa invoke() dire
 - **Biblia Moset v0.4.0**: Reconciliación completa del documento técnico con el estado real del código.
 - **Fix Mojibake**: Reparación de caracteres UTF-8 corrompidos en toda la documentación via script `fix_encoding.py`.
 - **Sincronización de métricas**: Conteo de líneas, tests y arquitectura alineados con `HEAD` del repositorio.
+
+---
+
+## 9. Marketing & Copywriting Oficial del Ecosistema
+
+Para asegurar una comunicación consistente en todos los canales de Moset (sitio web, repositorios, y redes), el ecosistema se rige por estos 6 pilares de copywriting, manteniendo el tono "Puro Fierro", Hacktech y de Soberanía Absoluta.
+
+### 9.1. El Lenguaje Moset (`.et`) — El Idioma del Puro Fierro
+**Tagline:** *El primer lenguaje verdaderamente tuyo. Escrito en tu idioma, ejecutado a la velocidad del metal.*
+**Copy Principal:** Olvídate de adaptar tu cerebro a sintaxis extranjeras. Moset es un lenguaje de programación compilado de alto rendimiento diseñado para la orquestación de IA y sistemas operativos. Tipado robusto, manejo de errores asertivo, y una estructura sintáctica revolucionaria (macros `:,]`).
+
+### 9.2. El Motor U-AST — Código sin Fronteras
+**Tagline:** *Un Árbol de Sintaxis Universal. Tu código, en cualquier idioma humano.*
+**Copy Principal:** El núcleo de Moset implementa el U-AST (Universal Abstract Syntax Tree). Esto permite que el motor comprenda la estructura lógica subyacente independientemente de si los tokens están en Español, Inglés o Portugués. 
+
+### 9.3. Asistencia IA Local (Motor Naraka) — Tu copiloto no espía
+**Tagline:** *Autocompletado inteligente. Cero telemetría. 100% Offline.*
+**Copy Principal:** El IDE de Moset integra su propio motor de inferencia (Candle/Llama.cpp) corriendo directamente en tu hardware. Tienes autocompletado de código contextual y predictivo, pero tus algoritmos nunca abandonan tu disco duro. Inteligencia Artificial real, sin intermediarios corporativos.
+
+*(Nota sobre Soberanía Absoluta: Si el usuario desactiva todas las reglas, blacklists y sandboxes del Vigilante desde los Ajustes del IDE, la IA alcanza un estado de "Libertad Total", pudiendo modificar el Sistema Operativo subyacente sin restricciones, bajo la propia responsabilidad del usuario).*
+
+### 9.4. Cirugía GGUF — Control Absoluto de Modelos IA
+**Tagline:** *Edita el ADN de la Inteligencia Artificial.*
+**Copy Principal:** No dependas de plataformas de terceros para gestionar tus modelos. El IDE de Moset incluye un editor nativo de metadatos GGUF. Inspecciona arquitecturas, modifica tokens, altera tensores y personaliza la identidad de tus modelos locales de forma quirúrgica.
+
+### 9.5. El CLI & El Vigilante — Orquestación con Cinturón de Seguridad
+**Tagline:** *Poder absoluto para controlar tu PC. Seguridad militar para no destruirla.*
+**Copy Principal:** A través del CLI, Moset orquesta scripts de Python, NodeJS y peticiones web. Pero el poder desmedido requiere control. Conoce al Vigilante: un middleware "Trust None". Comandos destructivos o accesos a secretos requieren explícitamente tu "Nivel de Confianza" (`Bit:[0.90]`).
+
+### 9.6. Moset WASM — El Motor en tu Navegador
+**Tagline:** *Poder nativo, sin instalaciones. Directamente en la Web.*
+**Copy Principal:** Hemos compilado el núcleo de Rust a WebAssembly (WASM). Experimenta la velocidad de Moset directamente desde moset.org, sin descargar absolutamente nada. Un Playground en tiempo real que compila y muestra el AST instantáneamente en tu navegador.

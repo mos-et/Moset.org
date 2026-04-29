@@ -1,6 +1,0 @@
-x = 10
-pensar:
-    x = 99
-    mostrar("En espejo x = " + x)
-
-mostrar("Real x = " + x) :@ Deberia imprimir 10

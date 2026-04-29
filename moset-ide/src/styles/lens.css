@@ -1,0 +1,9 @@
+/* Translation Lens para Moset */
+.moset-lens-hidden {
+  color: transparent !important;
+  caret-color: var(--text-primary);
+}
+.moset-lens-projected {
+  color: #00A8FF !important; /* Mismo color de las keywords */
+  font-weight: bold;
+}

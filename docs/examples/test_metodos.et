@@ -1,0 +1,8 @@
+molde Persona: nombre, saludar
+
+p = Persona { nombre: "Moset" }
+
+p.saludar = :,] ()
+    mostrar "Hola, soy " + este.nombre
+
+p.saludar()

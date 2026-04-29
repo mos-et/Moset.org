@@ -638,7 +638,11 @@ impl Compilador {
             // ─── LLAMADAS (extendido para builtins) ─────────────────────────
             Nodo::Llamada { funcion, args } => {
                 // Check if it's a builtin call
-                let builtin_name = match funcion.as_ref() {
+                let funcion_real = match funcion.as_ref() {
+                    Nodo::Metadata { nodo, .. } => nodo.as_ref(),
+                    otro => otro,
+                };
+                let builtin_name = match funcion_real {
                     Nodo::Identificador(name) => {
                         match name.as_str() {
                             "shell" | "leer" | "escribir" | "entorno" | "existe" | "peticion_get" 

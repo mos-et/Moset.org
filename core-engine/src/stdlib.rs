@@ -24,7 +24,7 @@ use std::fs;
 use std::env;
 
 #[cfg(not(target_arch = "wasm32"))]
-use crate::vigilante::{Vigilante, Veredicto};
+use crate::vigilante::Vigilante;
 #[cfg(target_arch = "wasm32")]
 use crate::vigilante::Vigilante;
 
@@ -37,22 +37,20 @@ use crate::vigilante::Vigilante;
 /// mostrar resultado
 /// ```
 #[cfg(not(target_arch = "wasm32"))]
-pub fn shell(comando: &str, vigilante: &Vigilante) -> Result<String, String> {
-    match vigilante.auditar(comando) {
-        Veredicto::Permitido => {}
-        Veredicto::RequiereConfianza { nivel_minimo, categoria } => {
-            return Err(format!("Vigilante Bloqueado: '{}' requiere nivel de confianza {} (Categoría: {})", comando, nivel_minimo, categoria));
-        }
-        Veredicto::Prohibido { razon } => {
-            return Err(format!("Vigilante PROHIBIDO: {}", razon));
-        }
-    }
+pub fn shell(comando: &str, confianza: Option<f64>, vigilante: &Vigilante) -> Result<String, String> {
+    vigilante.autorizar(comando, confianza)?;
 
-    let output = if cfg!(target_os = "windows") {
+    #[cfg(target_os = "windows")]
+    let output = {
+        use std::os::windows::process::CommandExt;
         Command::new("cmd")
-            .args(["/C", comando])
+            .arg("/C")
+            .raw_arg(comando)
             .output()
-    } else {
+    };
+
+    #[cfg(not(target_os = "windows"))]
+    let output = {
         Command::new("sh")
             .args(["-c", comando])
             .output()
@@ -78,7 +76,7 @@ pub fn shell(comando: &str, vigilante: &Vigilante) -> Result<String, String> {
 }
 
 #[cfg(target_arch = "wasm32")]
-pub fn shell(_comando: &str, _vigilante: &Vigilante) -> Result<String, String> {
+pub fn shell(_comando: &str, _confianza: Option<f64>, _vigilante: &Vigilante) -> Result<String, String> {
     Err("La función 'shell' no está disponible en WebAssembly (WASM).".to_string())
 }
 
@@ -210,7 +208,7 @@ mod tests {
             "whoami"
         } else {
             "echo test"
-        }, &vigilante);
+        }, None, &vigilante);
         assert!(resultado.is_ok(), "shell debe ejecutar: {:?}", resultado);
         assert!(!resultado.unwrap().is_empty());
     }
@@ -218,7 +216,7 @@ mod tests {
     #[test]
     fn test_shell_comando_invalido() {
         let vigilante = Vigilante::nuevo();
-        let resultado = shell("comando_que_no_existe_xyz_12345", &vigilante);
+        let resultado = shell("comando_que_no_existe_xyz_12345", None, &vigilante);
         assert!(resultado.is_err());
     }
 

@@ -1,0 +1,55 @@
+:@ ═══════════════════════════════════════════════
+:@ MOSET — Variables y Tipos
+:@ Demostración de inferencia de tipos nativos
+:@ ═══════════════════════════════════════════════
+
+:@ Variables numéricas
+x = 42
+y_val = 3.14
+z = x + y_val
+mostrar "Suma de entero y decimal: "
+mostrar z
+
+:@ Variables de texto
+nombre = "Naraka"
+saludo = "Hola, " + nombre + "!"
+mostrar saludo
+
+:@ Reasignación
+contador = 0
+contador = contador + 1
+contador = contador + 1
+mostrar "Contador: "
+mostrar contador
+
+:@ Variables booleanas
+activo = verdadero
+disponible = falso
+mostrar "Estado activo: " + activo
+mostrar "Disponible: " + disponible
+
+:@ Operaciones lógicas
+puede_entrar = activo y disponible
+mostrar "Puede entrar (y lógico): " + puede_entrar
+puede_ver = activo o disponible
+mostrar "Puede ver (o lógico): " + puede_ver
+negado = no activo
+mostrar "Negación de activo: " + negado
+
+:@ Comparaciones que retornan booleanos
+es_mayor = x > 10
+mostrar "42 > 10: " + es_mayor
+iguales = x == 42
+mostrar "42 == 42: " + iguales
+
+:@ Conversión de tipos
+numero_texto = "El valor es: " + x
+mostrar numero_texto
+
+:@ Alcance de variables con bloque pensar
+pensar:
+    variable_local = "Solo visible aquí"
+    mostrar variable_local
+    mostrar "Acceso a x desde bloque: " + x
+
+:@ mostrar "Variable local fuera del bloque: " + variable_local  :@ Descomentar esto dará error de variable no definida

@@ -1,0 +1,50 @@
+{
+  "en": {
+    "si": "if", "sino": "else", "mientras": "while", "molde": "struct", "devolver": "return",
+    "importar": "import", "exportar": "export", "verdadero": "true", "falso": "false",
+    "nulo": "null", "pensar": "shadow", "procedimiento": "function", "romper": "break",
+    "intentar": "try", "capturar": "catch", "para": "for", "en": "in",
+    "metodo": "method", "imprimir": "print", "crear": "new", "este": "this",
+    "clase": "class", "herencia": "extends", "interfaz": "interface"
+  },
+  "pt": {
+    "si": "se", "sino": "senão", "mientras": "enquanto", "molde": "classe", "devolver": "retornar",
+    "importar": "importar", "exportar": "exportar", "verdadero": "verdadeiro", "falso": "falso",
+    "nulo": "nulo", "pensar": "pensar", "procedimiento": "função", "romper": "parar",
+    "intentar": "tentar", "capturar": "capturar", "para": "para", "en": "em",
+    "metodo": "método", "imprimir": "imprimir", "crear": "novo", "este": "este",
+    "clase": "classe", "herencia": "herda", "interfaz": "interface"
+  },
+  "zh": {
+    "si": "如果", "sino": "否则", "mientras": "当", "molde": "类", "devolver": "返回",
+    "importar": "导入", "exportar": "导出", "verdadero": "真", "falso": "假",
+    "nulo": "空", "pensar": "思考", "procedimiento": "函数", "romper": "中断",
+    "intentar": "尝试", "capturar": "捕获", "para": "对于", "en": "在",
+    "metodo": "方法", "imprimir": "打印", "crear": "新建", "este": "此",
+    "clase": "类", "herencia": "继承", "interfaz": "接口"
+  },
+  "ja": {
+    "si": "もし", "sino": "それ以外", "mientras": "間", "molde": "型", "devolver": "返す",
+    "importar": "取込", "exportar": "公開", "verdadero": "真", "falso": "偽",
+    "nulo": "空", "pensar": "思考", "procedimiento": "関数", "romper": "中断",
+    "intentar": "試行", "capturar": "捕捉", "para": "対象", "en": "中",
+    "metodo": "手法", "imprimir": "表示", "crear": "生成", "este": "自己",
+    "clase": "類", "herencia": "継承", "interfaz": "境界"
+  },
+  "ko": {
+    "si": "만약", "sino": "아니면", "mientras": "동안", "molde": "구조", "devolver": "반환",
+    "importar": "가져오기", "exportar": "내보내기", "verdadero": "참", "falso": "거짓",
+    "nulo": "없음", "pensar": "사고", "procedimiento": "함수", "romper": "중단",
+    "intentar": "시도", "capturar": "포착", "para": "반복", "en": "안",
+    "metodo": "방법", "imprimir": "출력", "crear": "생성", "este": "이것",
+    "clase": "클래스", "herencia": "상속", "interfaz": "인터페이스"
+  },
+  "ar": {
+    "si": "إذا", "sino": "وإلا", "mientras": "بينما", "molde": "هيكل", "devolver": "إرجاع",
+    "importar": "استيراد", "exportar": "تصدير", "verdadero": "صحيح", "falso": "خطأ",
+    "nulo": "فارغ", "pensar": "تفكير", "procedimiento": "دالة", "romper": "كسر",
+    "intentar": "محاولة", "capturar": "التقاط", "para": "لكل", "en": "في",
+    "metodo": "طريقة", "imprimir": "طباعة", "crear": "إنشاء", "este": "هذا",
+    "clase": "فئة", "herencia": "وراثة", "interfaz": "واجهة"
+  }
+}

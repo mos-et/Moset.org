@@ -214,7 +214,7 @@ ESTRUCTURA FINAL DEL ECOSISTEMA
 ────────────────────────────────
 moset-ecosystem/
 ├── core-engine/      → Motor Rust puro (Lexer, Parser, VM, Compiler, AI)
-├── naraka-ide/       → IDE Tauri+React (MosetOutputPanel, Chat, Explorer)
+├── moset-ide/       → IDE Tauri+React (MosetOutputPanel, Chat, Explorer)
 ├── mos.et/           → Plataforma del Lenguaje
 │   ├── examples/         → 15 scripts .et de demostración
 │   ├── moset-lang/
