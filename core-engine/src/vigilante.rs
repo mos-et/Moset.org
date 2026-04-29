@@ -72,10 +72,22 @@ impl Vigilante {
                 "python".into(), "node".into(), "cargo".into(), "npm".into(),
                 "pip".into(), "powershell".into(), "bash".into(),
             ],
-            sandbox_paths: vec![
-                "s:/naraka studio".into(),
-                "s:/data strix".into(),
-            ],
+            sandbox_paths: {
+                let mut paths = vec![
+                    "s:/naraka studio".into(),
+                    "s:/data strix".into(),
+                ];
+                if let Ok(cwd) = std::env::current_dir() {
+                    let mut cwd_norm = cwd.to_string_lossy().replace('\\', "/").to_lowercase();
+                    if cwd_norm.starts_with("//?/") {
+                        cwd_norm = cwd_norm[4..].to_string();
+                    }
+                    if !paths.contains(&cwd_norm) {
+                        paths.push(cwd_norm);
+                    }
+                }
+                paths
+            },
         }
     }
 
