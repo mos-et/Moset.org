@@ -402,8 +402,6 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
   background: var(--bg-2);
   border-bottom: 1px solid var(--border);
   min-height: var(--tab-h);
-  overflow-x: auto;
-  overflow-y: hidden;
 }
 
 /* ─── Tabs ───────────────────────────────────────────────────────────────────── */
