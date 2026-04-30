@@ -53,7 +53,7 @@
   "plugins": {
     "updater": {
       "endpoints": ["https://moset.org/api/update.json"],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMyREM4QTk0NUM1NUQ3MjcKUldRbjExVmNsSXJjTW5IOTNSK2VtRGwrVEpoU09Rbnh5RGpZT1hIa0hhN1pkajVzUys3cDZiUU4K"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE5MERBMjhCMEMzNTMwNUEKUldSYU1EVU1pNklOR2FZWmt0NFhsR3VQV3k5NTkxNFVnMEVZSnd6eWIzek9pK1ZSNlBCcklENE0K"
     }
   }
 }
