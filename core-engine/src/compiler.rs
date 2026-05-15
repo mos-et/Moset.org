@@ -660,7 +660,7 @@ impl Compilador {
                     }
                     let name_idx = self.identificador_constante(&name)?;
                     self.emitir_byte(OpCode::LlamarBuiltin as u8, linea);
-                    let bytes = (name_idx as u16).to_le_bytes();
+                    let bytes = (name_idx as u16).to_be_bytes();
                     self.emitir_byte(bytes[0], linea);
                     self.emitir_byte(bytes[1], linea);
                     self.emitir_byte(args.len() as u8, linea);
@@ -822,7 +822,7 @@ impl Compilador {
 
     fn emitir_op_u16(&mut self, opcode: u8, operando: u16, linea: usize) {
         self.chunk.escribir(opcode, linea);
-        let bytes = operando.to_le_bytes();
+        let bytes = operando.to_be_bytes();
         self.chunk.escribir(bytes[0], linea);
         self.chunk.escribir(bytes[1], linea);
     }

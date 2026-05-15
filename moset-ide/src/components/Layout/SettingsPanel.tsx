@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { PanelHeader } from "./PanelHeader";
 import { useIdeConfig } from "../../hooks/useIdeConfig";
 import "../../styles/components/SettingsPanel.css";
@@ -77,6 +78,79 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
 
   // Pestañas de configuración
   const [activeTab, setActiveTab] = useState<string>("general");
+
+  // Sincronización multiventana (reactividad para campos de localStorage exclusivos)
+  useEffect(() => {
+    const handleStorageUpdate = () => {
+      setGlassEnabled(localStorage.getItem("moset_glass_enabled") === "true");
+      setPrePrompt(localStorage.getItem("moset_pre_prompt") || defaultPrePrompt);
+      setGoogleApiKey(localStorage.getItem("moset_google_api_key") || "");
+      setAnthropicApiKey(localStorage.getItem("moset_anthropic_api_key") || "");
+      setOpenaiApiKey(localStorage.getItem("moset_openai_api_key") || "");
+      setOpenaiBaseUrl(localStorage.getItem("moset_openai_base_url") || "");
+      setMistralApiKey(localStorage.getItem("moset_mistral_api_key") || "");
+      setGroqApiKey(localStorage.getItem("moset_groq_api_key") || "");
+      setHfToken(localStorage.getItem("moset_hf_token") || "");
+      setorqLocalIp(localStorage.getItem("moset_orq_local_ip") || "");
+      setorqRemoteIp(localStorage.getItem("moset_orq_remote_ip") || "");
+      setOrqApiPort(localStorage.getItem("moset_orq_api_port") || "8000");
+      setOrqProfilePath(localStorage.getItem("moset_orq_profile_path") || "");
+      setGithubApiKey(localStorage.getItem("moset_github_api_key") || "");
+      setVigProhibidos(localStorage.getItem("moset_vig_prohibidos") || "");
+      setVigPeligrosos(localStorage.getItem("moset_vig_peligrosos") || "");
+      setVigCautelosos(localStorage.getItem("moset_vig_cautelosos") || "");
+      setVigSandboxPaths(localStorage.getItem("moset_vig_sandbox") || "");
+      setQCollapseMethod(localStorage.getItem("moset_q_collapse") || "probabilistic");
+      setQDefaultAlpha(localStorage.getItem("moset_q_alpha") || "0.7071");
+      setQEntanglementEnabled(localStorage.getItem("moset_q_entanglement") === "true");
+      setQPensarEnabled(localStorage.getItem("moset_q_pensar") === "true" || localStorage.getItem("moset_q_pensar") === null);
+      setCudaCacheAutoClean(localStorage.getItem("moset_cuda_autoclean") === "true");
+      setMaxTokens(localStorage.getItem("moset_max_tokens") || "2048");
+      setContextTokens(localStorage.getItem("moset_context_tokens") || "4096");
+    };
+
+    window.addEventListener("storage", handleStorageUpdate);
+    window.addEventListener("moset-settings-updated", handleStorageUpdate);
+
+    let lastBackendCfg = {
+      prohibidos: localStorage.getItem("moset_vig_prohibidos") || "",
+      peligrosos: localStorage.getItem("moset_vig_peligrosos") || "",
+      cautelosos: localStorage.getItem("moset_vig_cautelosos") || "",
+      sandbox_paths: localStorage.getItem("moset_vig_sandbox") || ""
+    };
+
+    const pollBackend = setInterval(async () => {
+      try {
+        const cfg = await invoke<any>("get_config_vigilante");
+        
+        if (cfg.prohibidos !== lastBackendCfg.prohibidos ||
+            cfg.peligrosos !== lastBackendCfg.peligrosos ||
+            cfg.cautelosos !== lastBackendCfg.cautelosos ||
+            cfg.sandbox_paths !== lastBackendCfg.sandbox_paths) {
+          
+          lastBackendCfg = cfg;
+          
+          setVigProhibidos(cfg.prohibidos);
+          setVigPeligrosos(cfg.peligrosos);
+          setVigCautelosos(cfg.cautelosos);
+          setVigSandboxPaths(cfg.sandbox_paths);
+
+          localStorage.setItem("moset_vig_prohibidos", cfg.prohibidos);
+          localStorage.setItem("moset_vig_peligrosos", cfg.peligrosos);
+          localStorage.setItem("moset_vig_cautelosos", cfg.cautelosos);
+          localStorage.setItem("moset_vig_sandbox", cfg.sandbox_paths);
+        }
+      } catch (e) {
+        console.warn("Polling vigilante config failed", e);
+      }
+    }, 2000);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageUpdate);
+      window.removeEventListener("moset-settings-updated", handleStorageUpdate);
+      clearInterval(pollBackend);
+    };
+  }, []);
 
   const save = () => {
     // Sync campos compartidos al Context Provider (propaga a toda la app)
@@ -160,11 +234,33 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
     }
   };
 
+  const [hwInfo, setHwInfo] = useState<{total_ram_gb: number, free_ram_gb: number, estimated_vram_gb: number, recommended_quantization: string} | null>(null);
+
   useEffect(() => {
     // Initial load occurs via lazy init of useState. 
     // Apply initial glass hook
     document.documentElement.style.setProperty('--glass', localStorage.getItem("moset_glass_enabled") !== "false" ? "blur(20px) saturate(180%)" : "none");
+    
+    // Fetch hardware info
+    invoke("get_hardware_info").then((info: any) => setHwInfo(info)).catch(console.error);
+
+    // Fetch model catalog
+    invoke("get_model_catalog").then((catalog: any) => setModelCatalog(catalog)).catch(console.error);
   }, []);
+
+  const openFileSelectorWrapperModel = async (setter: React.Dispatch<React.SetStateAction<string>>) => {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const selected = await open({ multiple: false, filters: [{ name: 'GGUF Models', extensions: ['gguf'] }] });
+      if (selected && typeof selected === "string") {
+        setter(selected);
+        // Automatically try to download tokenizer for this model
+        await autoDownloadTokenizerIntelligent(selected);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const openFileSelectorWrapper = async (setter: React.Dispatch<React.SetStateAction<string>>) => {
     try {
@@ -197,24 +293,138 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
     "Qwen-2.5-3B-Instruct": "Qwen/Qwen2.5-3B-Instruct"
   };
 
-  const [downloadingTokenizer, setDownloadingTokenizer] = useState(false);
+  interface AIModelCatalogItem {
+    id: string;
+    name: string;
+    description: string;
+    repo_id: string;
+    filename: string;
+    tokenizer_url: string | null;
+    size_gb: number;
+    architecture: string;
+  }
 
-  const autoDownloadTokenizer = async () => {
-    if (!modelPath) {
+  const [modelCatalog, setModelCatalog] = useState<AIModelCatalogItem[]>([]);
+
+  const [downloadingTokenizer, setDownloadingTokenizer] = useState(false);
+  const [downloadingModel, setDownloadingModel] = useState(false);
+  const [modelProgress, setModelProgress] = useState(0);
+
+  useEffect(() => {
+    let unlisten: () => void;
+    listen("download-progress", (event: any) => {
+      const { downloaded, total } = event.payload;
+      if (total) {
+        setModelProgress(Math.round((downloaded / total) * 100));
+      }
+    }).then((un) => unlisten = un);
+
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
+
+  const autoDownloadTokenizerIntelligent = async (currentModelPath: string) => {
+    const normalizedPath = currentModelPath.replace(/\\/g, "/");
+    const pathParts = normalizedPath.split("/");
+    const filename = pathParts[pathParts.length - 1].toLowerCase();
+    const targetDir = pathParts.slice(0, -1).join("/");
+    
+    // Si ya existe un tokenizer.json, simplemente lo mapeamos
+    const targetPath = `${targetDir}/tokenizer.json`;
+    try {
+      const { exists } = await import("@tauri-apps/plugin-fs");
+      if (await exists(targetPath)) {
+        setTokenizerPath(targetPath);
+        return;
+      }
+    } catch (e) {
+      // Ignore if exists is not available
+    }
+
+    let repoId = "";
+    if (filename.includes("qwen") || filename.includes("deepseek-r1-qwen")) repoId = "Qwen/Qwen2.5-3B-Instruct";
+    else if (filename.includes("phi-3") || filename.includes("phi3")) repoId = "microsoft/Phi-3-mini-4k-instruct";
+    else if (filename.includes("llama-3") || filename.includes("llama3")) repoId = "meta-llama/Meta-Llama-3-8B-Instruct";
+    else if (filename.includes("llama-2") || filename.includes("llama2") || filename.includes("llama")) repoId = "meta-llama/Llama-2-7b-chat-hf";
+    else if (filename.includes("mistral")) repoId = "mistralai/Mistral-7B-Instruct-v0.2";
+    else if (filename.includes("gemma-2")) repoId = "google/gemma-2-9b-it";
+    else if (filename.includes("gemma")) repoId = "google/gemma-7b-it";
+    else if (filename.includes("granite")) repoId = "ibm-granite/granite-3.0-2b-instruct";
+    
+    if (!repoId) {
+      // Fallback: ask the user to specify the architecture so we can fetch the tokenizer behind the scenes
+      const arch = prompt(
+        "Moset no pudo detectar la arquitectura del modelo por su nombre.\n" +
+        "Para realizar la tokenización nativa, escribe el número de la familia:\n" +
+        "1. Llama 3\n" +
+        "2. Llama 2\n" +
+        "3. Qwen 2.5 / DeepSeek R1 (Qwen)\n" +
+        "4. Phi-3\n" +
+        "5. Mistral"
+      );
+      
+      switch (arch?.trim()) {
+        case "1": repoId = "meta-llama/Meta-Llama-3-8B-Instruct"; break;
+        case "2": repoId = "meta-llama/Llama-2-7b-chat-hf"; break;
+        case "3": repoId = "Qwen/Qwen2.5-3B-Instruct"; break;
+        case "4": repoId = "microsoft/Phi-3-mini-4k-instruct"; break;
+        case "5": repoId = "mistralai/Mistral-7B-Instruct-v0.2"; break;
+        default: 
+          alert("No se descargará el tokenizer automáticamente. Moset podría fallar al cargar el motor.");
+          return;
+      }
+    }
+
+    setDownloadingTokenizer(true);
+    try {
+      const url = `https://huggingface.co/${repoId}/resolve/main/tokenizer.json`;
+      const headers: Record<string, string> = {};
+      if (hfToken) headers["Authorization"] = `Bearer ${hfToken}`;
+      
+      const res = await fetch(url, { headers });
+      if (res.ok) {
+        const text = await res.text();
+        const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+        await writeTextFile(targetPath, text);
+        setTokenizerPath(targetPath);
+      }
+    } catch (e) {
+      console.error("Auto tokenizer download failed:", e);
+    } finally {
+      setDownloadingTokenizer(false);
+    }
+  };
+
+  const downloadTokenizerForModel = async (currentModelPath: string, manualRepoId?: string) => {
+    if (!currentModelPath) {
       alert("Primero selecciona la Ruta del Modelo GGUF para saber qué carpeta leer.");
       return;
     }
     
-    const normalizedPath = modelPath.replace(/\\/g, "/");
+    const normalizedPath = currentModelPath.replace(/\\/g, "/");
     const pathParts = normalizedPath.split("/");
     const folderName = pathParts[pathParts.length - 2];
+    const filename = pathParts[pathParts.length - 1].toLowerCase();
     const targetDir = pathParts.slice(0, -1).join("/");
     
-    let repoId = HF_MAPPING[folderName];
+    let repoId = manualRepoId || HF_MAPPING[folderName];
     if (!repoId) {
-      const manualRepo = prompt(`No hay un mapeo predefinido para la carpeta "${folderName}".\nPor favor, ingresa el ID del repositorio en HuggingFace (ej. "Qwen/Qwen2.5-3B-Instruct"):`);
-      if (!manualRepo) return;
-      repoId = manualRepo.trim();
+      // Inferencia inteligente basada en el nombre del GGUF
+      if (filename.includes("qwen") || filename.includes("deepseek-r1-qwen")) repoId = "Qwen/Qwen2.5-3B-Instruct";
+      else if (filename.includes("phi-3") || filename.includes("phi3")) repoId = "microsoft/Phi-3-mini-4k-instruct";
+      else if (filename.includes("llama-3") || filename.includes("llama3")) repoId = "meta-llama/Meta-Llama-3-8B-Instruct";
+      else if (filename.includes("llama-2") || filename.includes("llama2") || filename.includes("llama")) repoId = "meta-llama/Llama-2-7b-chat-hf";
+      else if (filename.includes("mistral")) repoId = "mistralai/Mistral-7B-Instruct-v0.2";
+      else if (filename.includes("gemma-2")) repoId = "google/gemma-2-9b-it";
+      else if (filename.includes("gemma")) repoId = "google/gemma-7b-it";
+      else if (filename.includes("granite")) repoId = "ibm-granite/granite-3.0-2b-instruct";
+      
+      if (!repoId) {
+        const manualRepo = prompt(`No hay un mapeo predefinido ni logramos detectarlo por el nombre.\nPor favor, ingresa el ID del repositorio en HuggingFace (ej. "Qwen/Qwen2.5-3B-Instruct"):`);
+        if (!manualRepo) return;
+        repoId = manualRepo.trim();
+      }
     }
     
     setDownloadingTokenizer(true);
@@ -234,12 +444,151 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
       
       await writeTextFile(targetPath, text);
       setTokenizerPath(targetPath);
-      alert(`✅ Tokenizer descargado exitosamente desde ${repoId}`);
+      if (manualRepoId) {
+        alert(`✅ Modelo y Tokenizer descargados exitosamente desde ${repoId}`);
+      } else {
+        alert(`✅ Tokenizer descargado exitosamente (repo detectado: ${repoId})`);
+      }
     } catch (e: any) {
       console.error(e);
-      alert("❌ Error descargando tokenizer: " + e.message);
+      if (manualRepoId) {
+        alert("⚠️ Modelo descargado, pero falló la descarga del tokenizer: " + e.message);
+      } else {
+        alert("❌ Error descargando tokenizer: " + e.message);
+      }
     } finally {
       setDownloadingTokenizer(false);
+    }
+  };
+
+  const autoDownloadTokenizer = () => downloadTokenizerForModel(modelPath);
+
+  const autoDownloadModel = async () => {
+    const inputStr = prompt("Ingresa la URL de Hugging Face del archivo GGUF\n(o simplemente el 'RepoID/NombreArchivo.gguf'):");
+    if (!inputStr) return;
+
+    let repoId = "";
+    let filename = "";
+    let url = "";
+
+    // Parsear si es una URL completa de Hugging Face
+    // Ejemplo: https://huggingface.co/Qwen/Qwen2.5-3B-Instruct/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf
+    if (inputStr.startsWith("http")) {
+      try {
+        const urlObj = new URL(inputStr);
+        const parts = urlObj.pathname.split("/");
+        // pathname format: /repo_owner/repo_name/resolve/main/filename.gguf
+        if (parts.length >= 5) {
+          repoId = `${parts[1]}/${parts[2]}`;
+          filename = parts[parts.length - 1];
+          url = inputStr;
+        } else {
+          alert("URL no reconocida. Asegúrate de copiar el enlace directo (Download) del archivo GGUF.");
+          return;
+        }
+      } catch (e) {
+        alert("URL inválida.");
+        return;
+      }
+    } else {
+      // Intentar parsear el formato manual: "Owner/Repo/archivo.gguf"
+      const parts = inputStr.split("/");
+      if (parts.length >= 3) {
+        repoId = `${parts[0]}/${parts[1]}`;
+        filename = parts.slice(2).join("/");
+        url = `https://huggingface.co/${repoId}/resolve/main/${filename}`;
+      } else {
+        alert("Formato no válido. Usa una URL directa o 'Usuario/Repo/archivo.gguf'.");
+        return;
+      }
+    }
+
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const selectedDir = await open({ directory: true, multiple: false });
+      if (!selectedDir || typeof selectedDir !== "string") return;
+
+      setDownloadingModel(true);
+      setModelProgress(0);
+      
+      const targetPath = `${selectedDir}/${filename}`.replace(/\\/g, "/");
+
+      await invoke("download_model_turbo", {
+        url,
+        destPath: targetPath,
+        numThreads: 8
+      });
+
+      setModelPath(targetPath);
+      
+      // Auto-descarga del tokenizer desde el mismo repo inferido
+      await downloadTokenizerForModel(targetPath, repoId);
+
+    } catch (e: any) {
+      console.error(e);
+      alert("❌ Error descargando modelo: " + e.message);
+    } finally {
+      setDownloadingModel(false);
+      setModelProgress(0);
+    }
+  };
+
+  const downloadCatalogModel = async (model: AIModelCatalogItem) => {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const selectedDir = await open({ directory: true, multiple: false });
+      if (!selectedDir || typeof selectedDir !== "string") return;
+
+      setDownloadingModel(true);
+      setModelProgress(0);
+      
+      const targetPath = `${selectedDir}/${model.filename}`.replace(/\\/g, "/");
+      const url = `https://huggingface.co/${model.repo_id}/resolve/main/${model.filename}`;
+
+      await invoke("download_model_turbo", {
+        url,
+        destPath: targetPath,
+        numThreads: 8
+      });
+
+      setModelPath(targetPath);
+      
+      // Auto-descarga del tokenizer
+      if (model.tokenizer_url) {
+        setDownloadingTokenizer(true);
+        try {
+          const targetDir = selectedDir.replace(/\\/g, "/");
+          const targetTokenizerPath = `${targetDir}/tokenizer.json`;
+          const headers: Record<string, string> = {};
+          if (hfToken) {
+            headers["Authorization"] = `Bearer ${hfToken}`;
+          }
+          const res = await fetch(model.tokenizer_url, { headers });
+          if (res.ok) {
+            const text = await res.text();
+            const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+            await writeTextFile(targetTokenizerPath, text);
+            setTokenizerPath(targetTokenizerPath);
+            alert(`✅ Modelo y Tokenizer descargados exitosamente desde ${model.repo_id}`);
+          } else {
+            alert(`✅ Modelo descargado exitosamente. No se pudo obtener el tokenizer: ${res.statusText}`);
+          }
+        } catch (e: any) {
+          console.error("Error tokenizer:", e);
+          alert(`✅ Modelo descargado exitosamente. No se pudo obtener el tokenizer: ${e.message}`);
+        } finally {
+          setDownloadingTokenizer(false);
+        }
+      } else {
+        await downloadTokenizerForModel(targetPath, model.repo_id);
+      }
+
+    } catch (e: any) {
+      console.error(e);
+      alert("❌ Error descargando modelo: " + e.message);
+    } finally {
+      setDownloadingModel(false);
+      setModelProgress(0);
     }
   };
 
@@ -255,25 +604,52 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
 
 
   return (
-    <div className="sidebar-placeholder" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <PanelHeader title="CONFIGURACIÓN" onClose={() => { save(); onClose(); }} isFloating={isFloating} onToggleFloating={onToggleFloating} />
+    <div className="settings-panel-wrapper" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <PanelHeader title="CONFIGURACIÓN GLOBAL" onClose={() => { save(); onClose(); }} isFloating={isFloating} onToggleFloating={onToggleFloating} />
 
-      <div style={{ padding: '0 10px 10px 10px' }}>
-        <select 
-          className="settings-input" 
-          value={activeTab} 
-          onChange={(e) => setActiveTab(e.target.value)}
-          style={{ marginBottom: '10px', fontSize: '13px', padding: '6px' }}
-        >
-          {menuItems.map(item => (
-            <option key={item.id} value={item.id}>
-              {item.icon} {item.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <div className="settings-layout" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        
+        {/* SIDEBAR DE NAVEGACIÓN */}
+        <div className="settings-sidebar" style={{ width: '280px', borderRight: '1px solid var(--border)', background: 'var(--bg-secondary)', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+          <div style={{ padding: '20px 15px' }}>
+            <h3 style={{ margin: '0 0 15px 10px', fontSize: '13px', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '1px' }}>Categorías</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {menuItems.map(item => (
+                <button 
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px',
+                    background: activeTab === item.id ? 'var(--accent-dim)' : 'transparent',
+                    border: '1px solid',
+                    borderColor: activeTab === item.id ? 'var(--accent)' : 'transparent',
+                    color: activeTab === item.id ? 'var(--accent)' : 'var(--text-1)',
+                    borderRadius: '8px', cursor: 'pointer', textAlign: 'left',
+                    fontSize: '15px', fontWeight: activeTab === item.id ? 'bold' : 'normal',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => { if (activeTab !== item.id) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                  onMouseOut={(e) => { if (activeTab !== item.id) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span style={{ fontSize: '18px' }}>{item.icon}</span>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          <div style={{ marginTop: 'auto', padding: '20px' }}>
+            <button className="btn-primary" onClick={() => { save(); onClose(); }} style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center' }}>
+              <span>💾</span> Guardar Cambios
+            </button>
+          </div>
+        </div>
 
-      <div className="settings-content-area" style={{ flex: 1, padding: '0 10px 20px 10px', overflowY: 'auto' }}>
+        {/* CONTENIDO PRINCIPAL */}
+        <div className="settings-content-area" style={{ flex: 1, padding: '40px 60px', overflowY: 'auto', background: 'var(--bg-0)' }}>
+            <h2 style={{ fontSize: '28px', color: 'var(--text-1)', marginBottom: '30px', paddingBottom: '15px', borderBottom: '1px solid var(--border)' }}>
+              {menuItems.find(i => i.id === activeTab)?.icon} {menuItems.find(i => i.id === activeTab)?.label}
+            </h2>
 
             {/* ─── General ─────────────────────────────────────────────── */}
             {activeTab === "general" && (
@@ -329,7 +705,7 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
                         }
                       }}
                       className="btn-danger"
-                      style={{ padding: "12px", fontSize: "12px" }}
+                      style={{ padding: "14px", fontSize: "14px" }}
                     >
                       🧊 Expulsar de vRAM
                     </button>
@@ -344,7 +720,7 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
                         }
                       }}
                       className="btn-info"
-                      style={{ padding: "12px", fontSize: "12px" }}
+                      style={{ padding: "14px", fontSize: "14px" }}
                     >
                       🧹 Limpiar DXCache
                     </button>
@@ -368,7 +744,7 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
                         alert(`Se liberaron ${count} entradas de memoria de sesión (RAM Virtual).`);
                       }}
                       className="btn-secondary"
-                      style={{ padding: "12px", fontSize: "12px", gridColumn: "span 2" }}
+                      style={{ padding: "14px", fontSize: "14px", gridColumn: "span 2" }}
                     >
                       ♻️ Liberar Memoria de Sesión (RAM)
                     </button>
@@ -463,17 +839,98 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
 
                 <h3 className="settings-section-title">Modelo Base (Soberano Local)</h3>
                 
+                {hwInfo && (
+                  <div className="settings-card" style={{ marginBottom: "15px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", gap: "20px" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "12px", color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Diagnóstico de Hardware</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+                        <div><strong style={{ color: "var(--text-1)" }}>RAM Libre:</strong> <span style={{ color: hwInfo.free_ram_gb < 4 ? "var(--danger)" : "var(--accent)" }}>{hwInfo.free_ram_gb.toFixed(1)} GB</span> / {hwInfo.total_ram_gb.toFixed(1)} GB</div>
+                        <div style={{ width: "1px", height: "16px", background: "var(--border)" }}></div>
+                        <div><strong style={{ color: "var(--text-1)" }}>Cuantización Óptima:</strong> <span style={{ color: "var(--text-accent)" }}>{hwInfo.recommended_quantization}</span></div>
+                      </div>
+                    </div>
+                    {hwInfo.free_ram_gb < 8 && (
+                      <div style={{ fontSize: "12px", color: "var(--danger)", maxWidth: "200px", lineHeight: "1.3" }}>
+                        ⚠️ Memoria RAM baja. Descarga modelos pequeños o cierra otras aplicaciones.
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="settings-card">
                   <label className="settings-label">Ruta del Modelo Soberano (Archivo GGUF)</label>
                   <div className="form-input-row" style={{ display: "flex", gap: "10px" }}>
                     <input type="text" value={modelPath} onChange={e => setModelPath(e.target.value)} placeholder="C:/ruta/a/mi/modelo.gguf" className="settings-input" />
-                    <button className="btn-secondary" style={{ width: "auto" }} onClick={() => openFileSelectorWrapper(setModelPath)}>
+                    <button className="btn-secondary" style={{ width: "auto" }} onClick={() => openFileSelectorWrapperModel(setModelPath)}>
                       Examinar
                     </button>
+                    <button 
+                      className="btn-primary" 
+                      style={{ width: "auto", background: "linear-gradient(90deg, #00d2ff, #3a7bd5)", border: "none" }} 
+                      onClick={autoDownloadModel}
+                      disabled={downloadingModel}
+                    >
+                      {downloadingModel ? `⏳ Descargando... ${modelProgress}%` : "⬇ Turbo Download"}
+                    </button>
                   </div>
+                  {downloadingModel && (
+                    <div style={{ marginTop: '10px', height: '6px', background: 'var(--bg-3)', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{ width: `${modelProgress}%`, height: '100%', background: 'linear-gradient(90deg, #00d2ff, #3a7bd5)', transition: 'width 0.2s' }}></div>
+                    </div>
+                  )}
                   <span className="form-hint">
-                    ℹ️ Se usará para inferencia local a menos que habilites Inteligencia en la Nube.
+                    ℹ️ Pega una URL directa de Hugging Face para descargar cualquier GGUF, o selecciona un modelo del catálogo a continuación.
                   </span>
+                </div>
+
+                <h4 className="settings-section-subtitle" style={{marginTop: '25px', marginBottom: '15px', color: 'var(--text-1)', fontSize: '18px'}}>Catálogo de Modelos (Recomendados)</h4>
+                <div className="model-catalog-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '15px', marginBottom: '30px' }}>
+                  {modelCatalog.map(model => {
+                    const ramRequired = model.size_gb + 1; // Aproximadamente 1GB de overhead
+                    const hasEnoughRam = hwInfo ? hwInfo.free_ram_gb >= ramRequired : true;
+                    return (
+                      <div key={model.id} className="model-catalog-card" style={{ 
+                        background: 'var(--bg-1)', 
+                        border: '1px solid var(--border)', 
+                        borderRadius: '10px', 
+                        padding: '18px', 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        transition: 'transform 0.2s, border-color 0.2s',
+                        cursor: 'default'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                          <h5 style={{ margin: 0, fontSize: '16px', color: 'var(--text-1)', fontWeight: '600', maxWidth: '180px' }}>{model.name}</h5>
+                          <span style={{ fontSize: '12px', background: 'var(--accent-dim)', color: 'var(--accent)', padding: '3px 8px', borderRadius: '12px', fontWeight: 'bold', textTransform: 'uppercase' }}>{model.architecture}</span>
+                        </div>
+                        <p style={{ fontSize: '13px', color: 'var(--text-2)', margin: '0 0 15px 0', flex: 1, lineHeight: '1.4' }}>{model.description}</p>
+                        
+                        {!hasEnoughRam && (
+                          <div style={{ fontSize: '12px', color: 'var(--danger)', marginBottom: '12px', background: 'rgba(255, 80, 80, 0.1)', padding: '6px', borderRadius: '4px' }}>
+                            ⚠️ Requiere {ramRequired.toFixed(1)}GB RAM Libre (Tienes {hwInfo?.free_ram_gb.toFixed(1)}GB)
+                          </div>
+                        )}
+                        
+                        <button 
+                          className="btn-primary" 
+                          style={{ 
+                            width: '100%', 
+                            display: 'flex', 
+                            justifyContent: 'center', 
+                            alignItems: 'center', 
+                            gap: '8px', 
+                            background: hasEnoughRam ? 'var(--accent)' : 'var(--bg-3)',
+                            color: hasEnoughRam ? '#000' : 'var(--text-3)',
+                            opacity: downloadingModel ? 0.5 : 1
+                          }}
+                          onClick={() => downloadCatalogModel(model)}
+                          disabled={downloadingModel}
+                        >
+                          ⬇ Descargar e Instalar
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="form-group">
@@ -482,26 +939,8 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
                   <span className="form-hint">Sirve para descargar archivos protegidos de HuggingFace Hub.</span>
                 </div>
 
-                <div className="form-group">
-                  <label className="settings-label">Ruta del Tokenizer (tokenizer.json)</label>
-                  <div className="form-input-row" style={{ display: "flex", gap: "10px" }}>
-                    <input type="text" value={tokenizerPath} onChange={e => setTokenizerPath(e.target.value)} placeholder="C:/ruta/a/mi/tokenizer.json" className="settings-input" />
-                    <button className="btn-secondary" style={{ width: "auto" }} onClick={() => openFileSelectorWrapper(setTokenizerPath)}>
-                      Examinar
-                    </button>
-                    <button 
-                      className="btn-primary" 
-                      style={{ width: "auto", background: "linear-gradient(90deg, #ff9900, #ff5500)", border: "none" }} 
-                      onClick={autoDownloadTokenizer}
-                      disabled={downloadingTokenizer}
-                    >
-                      {downloadingTokenizer ? "⏳ Descargando..." : "⬇ HF Auto-Download"}
-                    </button>
-                  </div>
-                  <span className="form-hint">
-                    ℹ️ Requerido por el Motor Soberano para procesar texto (HuggingFace tokenizer format).
-                  </span>
-                </div>
+                  {/* La sección del tokenizer se oculta ya que se resuelve automáticamente */}
+                  <input type="hidden" value={tokenizerPath} />
 
                 <h3 className="settings-section-title">Comportamiento del Agente</h3>
 
@@ -537,7 +976,7 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
             {activeTab === "orquestador" && (
               <div className="anim-fade-in">
                 <h3 className="settings-section-title">Comunicaciones del Orquestador N5</h3>
-                <div style={{ marginBottom: "20px", padding: "12px 16px", background: "rgba(0,229,255,0.05)", borderRadius: "8px", border: "1px solid rgba(0,229,255,0.15)", fontSize: "12px", color: "var(--accent)", lineHeight: 1.5 }}>
+                <div style={{ marginBottom: "20px", padding: "12px 16px", background: "rgba(0,229,255,0.05)", borderRadius: "8px", border: "1px solid rgba(0,229,255,0.15)", fontSize: "14px", color: "var(--accent)", lineHeight: 1.5 }}>
                   💡 Estas IPs dirigen a dónde enviará Moset sus delegaciones cuando la IA no tenga suficiente poder local.
                 </div>
                 
@@ -564,14 +1003,14 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
               <div className="anim-fade-in">
                 <h3 className="settings-section-title">Configuración de Vigilante (Módulo de Seguridad)</h3>
                 
-                <div style={{ marginBottom: "20px", padding: "12px 16px", background: "rgba(255,80,80,0.05)", borderRadius: "8px", border: "1px solid rgba(255,80,80,0.15)", fontSize: "12px", color: "var(--danger)", lineHeight: 1.5 }}>
+                <div style={{ marginBottom: "20px", padding: "12px 16px", background: "rgba(255,80,80,0.05)", borderRadius: "8px", border: "1px solid rgba(255,80,80,0.15)", fontSize: "14px", color: "var(--danger)", lineHeight: 1.5 }}>
                   🛡️ El módulo Vigilante auditará cada proxy local y prohibirá la ejecución a través de perfiles de restricción léxica.
                 </div>
 
                 <div className="form-group">
                   <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
                     <label className="settings-label" style={{marginBottom: 0, fontWeight: 600}}>⛔ Prohibidos Completamente</label>
-                    <select onChange={(e) => applySecurityPreset('prohibidos', e.target.value)} style={{background: 'var(--bg-3)', color: 'var(--text-1)', border: '1px solid var(--border)', fontSize: '11px', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', outline: 'none'}}>
+                    <select onChange={(e) => applySecurityPreset('prohibidos', e.target.value)} style={{background: 'var(--bg-3)', color: 'var(--text-1)', border: '1px solid var(--border)', fontSize: '13px', borderRadius: '4px', padding: '6px 10px', cursor: 'pointer', outline: 'none'}}>
                       <option value="">Carga Rápida Preset...</option>
                       <option value="libertad">Anarquía (0 Restricciones)</option>
                       <option value="moderado">Medio (Sistema Base)</option>
@@ -584,7 +1023,7 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
                 <div className="form-group">
                   <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
                     <label className="settings-label" style={{marginBottom: 0, fontWeight: 600}}>🔴 Peligrosos Condicionados (Requieren confirmación humana o Q=0.95)</label>
-                    <select onChange={(e) => applySecurityPreset('peligrosos', e.target.value)} style={{background: 'var(--bg-3)', color: 'var(--text-1)', border: '1px solid var(--border)', fontSize: '11px', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', outline: 'none'}}>
+                    <select onChange={(e) => applySecurityPreset('peligrosos', e.target.value)} style={{background: 'var(--bg-3)', color: 'var(--text-1)', border: '1px solid var(--border)', fontSize: '13px', borderRadius: '4px', padding: '6px 10px', cursor: 'pointer', outline: 'none'}}>
                       <option value="">Carga Rápida Preset...</option>
                       <option value="libertad">Anarquía (0 Restricciones)</option>
                       <option value="moderado">Medio (Sistema Base)</option>
@@ -597,7 +1036,7 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
                 <div className="form-group">
                   <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
                     <label className="settings-label" style={{marginBottom: 0, fontWeight: 600}}>🟡 Cautelosos (Solo modo seguro)</label>
-                    <select onChange={(e) => applySecurityPreset('cautelosos', e.target.value)} style={{background: 'var(--bg-3)', color: 'var(--text-1)', border: '1px solid var(--border)', fontSize: '11px', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', outline: 'none'}}>
+                    <select onChange={(e) => applySecurityPreset('cautelosos', e.target.value)} style={{background: 'var(--bg-3)', color: 'var(--text-1)', border: '1px solid var(--border)', fontSize: '13px', borderRadius: '4px', padding: '6px 10px', cursor: 'pointer', outline: 'none'}}>
                       <option value="">Carga Rápida Preset...</option>
                       <option value="libertad">Anarquía (0 Restricciones)</option>
                       <option value="moderado">Medio (Sistema Base)</option>
@@ -610,7 +1049,7 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
                 <div className="form-group">
                   <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
                     <label className="settings-label" style={{marginBottom: 0, fontWeight: 600}}>🟢 Rutas Libres Autorizadas (Sandbox Bypasses)</label>
-                    <select onChange={(e) => applySecurityPreset('sandbox', e.target.value)} style={{background: 'var(--bg-3)', color: 'var(--text-1)', border: '1px solid var(--border)', fontSize: '11px', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', outline: 'none'}}>
+                    <select onChange={(e) => applySecurityPreset('sandbox', e.target.value)} style={{background: 'var(--bg-3)', color: 'var(--text-1)', border: '1px solid var(--border)', fontSize: '13px', borderRadius: '4px', padding: '6px 10px', cursor: 'pointer', outline: 'none'}}>
                       <option value="">Carga Rápida Preset...</option>
                       <option value="libertad">Anarquía (0 Restricciones)</option>
                       <option value="moderado">Medio (Sistema Base)</option>
@@ -627,7 +1066,7 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
                 <h3 className="settings-section-title">Opciones VRAM/GPU y Computación Avanzada</h3>
                 
                 <div className="settings-card">
-                  <h4 style={{ margin: "0 0 12px 0", fontSize: "13px", color: "var(--text-1)" }}>Sistema Cuántico · Entrelazamiento AST</h4>
+                  <h4 style={{ margin: "0 0 12px 0", fontSize: "15px", color: "var(--text-1)" }}>Sistema Cuántico · Entrelazamiento AST</h4>
                   <div className="form-group">
                     <label className="settings-label">Técnica de Colapso (OP_QUANTUM_COLLAPSE)</label>
                     <select
@@ -645,13 +1084,13 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
                     <input type="text" value={qDefaultAlpha} onChange={e => setQDefaultAlpha(e.target.value)} placeholder="0.7071" className="settings-input" style={{ width: "120px" }} />
                   </div>
                   <div className="form-group" style={{ marginBottom: "10px" }}>
-                    <label className="ext-toggle" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12px' }}>
+                    <label className="ext-toggle" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '14px' }}>
                       <input type="checkbox" checked={qEntanglementEnabled} onChange={e => setQEntanglementEnabled(e.target.checked)} style={{ transform: "scale(1.2)" }} />
                       <span>Habilitar Entrelazamiento Cuántico Dinámico Inter-hilos</span>
                     </label>
                   </div>
                   <div className="form-group">
-                    <label className="ext-toggle" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12px' }}>
+                    <label className="ext-toggle" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '14px' }}>
                       <input type="checkbox" checked={qPensarEnabled} onChange={e => setQPensarEnabled(e.target.checked)} style={{ transform: "scale(1.2)" }} />
                       <span>Habilitar Cadena Lógica "Pensar" (Shadow Inference mode)</span>
                     </label>
@@ -659,9 +1098,9 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
                 </div>
 
                 <div className="settings-card">
-                  <h4 style={{ margin: "0 0 12px 0", fontSize: "13px", color: "var(--text-1)" }}>Memoria y Hardware Dedicado (Compute/CUDA)</h4>
+                  <h4 style={{ margin: "0 0 12px 0", fontSize: "15px", color: "var(--text-1)" }}>Memoria y Hardware Dedicado (Compute/CUDA)</h4>
                   <div className="form-group" style={{ marginBottom: "16px" }}>
-                    <label className="ext-toggle" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12px' }}>
+                    <label className="ext-toggle" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '14px' }}>
                       <input type="checkbox" checked={cudaCacheAutoClean} onChange={e => setCudaCacheAutoClean(e.target.checked)} style={{ transform: "scale(1.2)" }} />
                       <span>Auto-Limpiar CUDA Compute/DXCache al apagar Moset</span>
                     </label>
@@ -697,12 +1136,6 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
                 </div>
               </div>
             )}
-      </div>
-
-      <div style={{ padding: '10px', borderTop: '1px solid var(--border)', background: 'var(--bg-0)' }}>
-        <button className="btn-primary" onClick={() => { save(); onClose(); }} style={{ width: '100%', marginBottom: '8px' }}>
-          Guardar Cambios
-        </button>
       </div>
     </div>
   );

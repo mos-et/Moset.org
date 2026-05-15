@@ -146,7 +146,7 @@ impl Linter {
                     }
                 }
             },
-            Nodo::Colapsar(_) => TipoInferido::Entero,
+            Nodo::Colapsar(_) => TipoInferido::Booleano,
             Nodo::Esperar(expr) => self.inferir_tipo(expr),
             Nodo::Condicional { cuerpo_si, .. } => {
                 cuerpo_si.last().map(|n| self.inferir_tipo(n)).unwrap_or(TipoInferido::Nulo)
@@ -338,5 +338,40 @@ mod tests {
         assert_eq!(diags[0].linea, 2);
         assert_eq!(diags[0].severidad, Severidad::Error);
         assert!(diags[0].mensaje.contains("TypeError"));
+    }
+
+    #[test]
+    fn test_linter_colapsar_infiere_booleano() {
+        // Colapsar siempre retorna Booleano.
+        // Si asignamos el resultado a una variable y luego intentamos
+        // reasignar esa variable con un Entero, el linter debe detectar TypeError.
+        let programa = Programa {
+            sentencias: vec![
+                Nodo::Metadata {
+                    linea: 1,
+                    columna: 1,
+                    nodo: Box::new(Nodo::Asignacion {
+                        nombre: "q".to_string(),
+                        valor: Box::new(Nodo::Colapsar(Box::new(Nodo::BooleanoLit(true)))),
+                    }),
+                },
+                Nodo::Metadata {
+                    linea: 2,
+                    columna: 1,
+                    nodo: Box::new(Nodo::Asignacion {
+                        nombre: "q".to_string(),
+                        valor: Box::new(Nodo::EnteroLit(42)),
+                    }),
+                },
+            ],
+        };
+
+        let mut linter = Linter::nuevo();
+        let diags = linter.analizar(&programa);
+
+        assert_eq!(diags.len(), 1, "Debería haber exactamente 1 diagnóstico de TypeError");
+        assert_eq!(diags[0].linea, 2);
+        assert_eq!(diags[0].severidad, Severidad::Error);
+        assert!(diags[0].mensaje.contains("Booleano"), "Debe mencionar que el tipo previo era Booleano: {}", diags[0].mensaje);
     }
 }

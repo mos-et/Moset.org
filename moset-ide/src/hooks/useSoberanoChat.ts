@@ -393,6 +393,10 @@ export function useSoberanoChat(ideConfig: IdeConfigState, projectRoot?: string 
 
   const handleStop = async () => {
     try { await invoke("cancel_inference"); } catch (e) { console.error(e); }
+    setLoading(false);
+    setStreamBuffer("");
+    streamBufferRef.current = "";
+    streamBlockedRef.current = false;
   };
 
   const newChat = () => {

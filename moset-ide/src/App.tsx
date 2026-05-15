@@ -37,7 +37,7 @@ setupMonaco(monaco);
 
 
 // ─── App principal ──────────────────────────────────────────────────────────
-const PANEL_ORDER = ["explorer", "search", "run", "settings", "extensions", "gguf", "uast"];
+const PANEL_ORDER = ["explorer", "search", "run", "extensions", "gguf", "uast"];
 
 export default function App() {
   const ideConfig = useIdeConfig();
@@ -257,12 +257,28 @@ export default function App() {
 
   // D4g: Sincronizar config del Vigilante con el backend Rust al arrancar el IDE
   useEffect(() => {
-    invoke("configurar_vigilante", {
-      prohibidos: localStorage.getItem("moset_vig_prohibidos") || "",
-      peligrosos: localStorage.getItem("moset_vig_peligrosos") || "",
-      cautelosos: localStorage.getItem("moset_vig_cautelosos") || "",
-      sandboxPaths: localStorage.getItem("moset_vig_sandbox") || "",
-    }).catch((e: any) => console.warn("Vigilante config startup sync failed:", e));
+    invoke<any>("get_config_vigilante")
+      .then((cfg) => {
+        const isBackendEmpty = !cfg.prohibidos && !cfg.peligrosos && !cfg.cautelosos && !cfg.sandbox_paths;
+        
+        if (isBackendEmpty) {
+          // Backend vacío (primer arranque), inyectar desde localStorage
+          invoke("configurar_vigilante", {
+            prohibidos: localStorage.getItem("moset_vig_prohibidos") || "",
+            peligrosos: localStorage.getItem("moset_vig_peligrosos") || "",
+            cautelosos: localStorage.getItem("moset_vig_cautelosos") || "",
+            sandboxPaths: localStorage.getItem("moset_vig_sandbox") || "",
+          }).catch((e: any) => console.warn("Vigilante config startup sync failed:", e));
+        } else {
+          // Backend ya configurado por otra ventana, sincronizar a nuestra UI local
+          if (cfg.prohibidos) localStorage.setItem("moset_vig_prohibidos", cfg.prohibidos);
+          if (cfg.peligrosos) localStorage.setItem("moset_vig_peligrosos", cfg.peligrosos);
+          if (cfg.cautelosos) localStorage.setItem("moset_vig_cautelosos", cfg.cautelosos);
+          if (cfg.sandbox_paths) localStorage.setItem("moset_vig_sandbox", cfg.sandbox_paths);
+          window.dispatchEvent(new Event("moset-settings-updated"));
+        }
+      })
+      .catch((e: any) => console.warn("Vigilante get_config failed:", e));
   }, []);
 
   useFileDrop((paths) => {
@@ -527,11 +543,25 @@ export default function App() {
   // Manejar evento de Settings desde otras partes del sistema (e.g. ChatPanel)
   useEffect(() => {
     const handleOpenSettings = () => {
-      setOpenPanels(prev => new Set([...prev, "settings"]));
+      const settingsTabId = "settings-tab";
+      setTabs(prev => {
+        if (!prev.find(t => t.id === settingsTabId)) {
+          return [...prev, {
+            id: settingsTabId,
+            name: "Configuración",
+            fullPath: null,
+            language: "settings",
+            content: "Configuración del Sistema",
+            modified: false,
+          }];
+        }
+        return prev;
+      });
+      setActiveTab(settingsTabId);
     };
     window.addEventListener("open-settings", handleOpenSettings);
     return () => window.removeEventListener("open-settings", handleOpenSettings);
-  }, []);
+  }, [setTabs, setActiveTab]);
 
   // --- Validación en tiempo real (Linter) ---
   useEffect(() => {
@@ -591,7 +621,8 @@ export default function App() {
         });
       }
       
-      const result: string = await invoke("ejecutar", { codigo: codeToRun });
+      const rutaBase = activeFile?.fullPath ? activeFile.fullPath.replace(/\\/g, '/').split('/').slice(0, -1).join('/') : projectRoot;
+      const result: string = await invoke("ejecutar", { codigo: codeToRun, rutaBase });
       const parsed: MosetOutput = JSON.parse(result);
       setMosetOutput(parsed);
     } catch (e: any) {
@@ -625,7 +656,8 @@ export default function App() {
           });
         }
         
-        const result: string = await invoke("ejecutar", { codigo: codeToRun });
+        const rutaBase = detail.fullPath ? detail.fullPath.replace(/\\/g, '/').split('/').slice(0, -1).join('/') : projectRoot;
+        const result: string = await invoke("ejecutar", { codigo: codeToRun, rutaBase });
         const parsed: MosetOutput = JSON.parse(result);
         setMosetOutput(parsed);
       } catch (err: any) {
@@ -715,9 +747,7 @@ export default function App() {
                 </button>
               </div>
             )}
-            {panelId === "settings" && (
-              <SettingsPanel onUpdate={refreshTree} onClose={() => togglePanel("settings")} isFloating={false} onToggleFloating={() => toggleFloatingPanel("settings")} />
-            )}
+
             {panelId === "extensions" && (
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <PanelHeader title="EXTENSIONES" onClose={() => togglePanel('extensions')} isFloating={false} onToggleFloating={() => toggleFloatingPanel('extensions')} />
@@ -812,9 +842,7 @@ export default function App() {
                   <button className="run-btn" onClick={() => runMosetCode()}>&#x25B6;&#xFE0F; MOSET RUN</button>
                 </div>
               )}
-              {panelId === "settings" && (
-                <SettingsPanel onUpdate={refreshTree} onClose={() => togglePanel("settings")} isFloating={true} onToggleFloating={() => toggleFloatingPanel("settings")} />
-              )}
+
               {panelId === "extensions" && (
                 <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                   <PanelHeader title="EXTENSIONES" onClose={() => togglePanel('extensions')} isFloating={true} onToggleFloating={() => toggleFloatingPanel('extensions')} onDragStart={(e) => onFloatDragStart('extensions', e)} />
@@ -1062,6 +1090,10 @@ export default function App() {
               </div>
             ) : activeFile?.language === "gguf" ? (
               <GGUFEditorTab filePath={activeFile.fullPath} />
+            ) : activeFile?.language === "settings" ? (
+              <div style={{ flex: 1, backgroundColor: 'var(--bg-0)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <SettingsPanel onUpdate={refreshTree} onClose={() => closeTab(activeFile.id)} />
+              </div>
             ) : (
               <CodeEditor
                 language={activeFile?.language ?? "moset"}

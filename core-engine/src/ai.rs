@@ -348,16 +348,28 @@ mod engine {
             let mut generated = Vec::new();
             let mut sent_len = 0;
 
-            // Forward del prompt completo
-            let input = Tensor::new(prompt_tokens.as_slice(), &self.device)
-                .map_err(|e| format!("Error tensor: {}", e))?
-                .unsqueeze(0)
-                .map_err(|e| format!("Error unsqueeze: {}", e))?;
+            // Forward del prompt por fragmentos (chunks) para evitar bloqueos largos y permitir cancelación
+            let mut logits_opt = None;
+            let chunk_size = 256;
+            for (i, chunk) in prompt_tokens.chunks(chunk_size).enumerate() {
+                // Check de cancelación enviando un string vacío
+                if !on_partial("".to_string()) {
+                    return Ok(("".to_string(), prompt_len, generated.len()));
+                }
+                let input = Tensor::new(chunk, &self.device)
+                    .map_err(|e| format!("Error tensor: {}", e))?
+                    .unsqueeze(0)
+                    .map_err(|e| format!("Error unsqueeze: {}", e))?;
 
-            let logits = modelo.forward(&input, 0)
-                .map_err(|e| format!("Error forward: {}", e))?;
+                let pos = i * chunk_size;
+                logits_opt = Some(
+                    modelo.forward(&input, pos)
+                        .map_err(|e| format!("Error forward chunk: {}", e))?
+                );
+            }
 
-            let logits = logits.squeeze(0)
+            let logits = logits_opt.ok_or_else(|| "No logits generados".to_string())?
+                .squeeze(0)
                 .map_err(|e| format!("Error squeeze: {}", e))?;
 
             let mut next_token = {
@@ -380,6 +392,10 @@ mod engine {
 
             // Generacion autoregresiva token por token
             for i in 1..max_tokens {
+                if !on_partial("".to_string()) {
+                    break;
+                }
+                
                 if Some(next_token) == self.eos_token_id {
                     break;
                 }

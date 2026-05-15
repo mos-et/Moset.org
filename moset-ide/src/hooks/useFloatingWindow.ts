@@ -58,27 +58,47 @@ export function useFloatingWindow({
   const widthRef = useRef(width);
   useEffect(() => { widthRef.current = width; }, [width]);
 
+  const dragStateRef = useRef({ movementX: 0, movementY: 0, clientX: 0, clientY: 0, hasPending: false });
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (isResizingRef.current) {
-        // Modo acoplado (ahora está a la izquierda del editor, cambia width desde el lado derecho)
-        setWidth((prev) => {
-          let newWidth = prev + e.movementX;
-          if (newWidth < 300) newWidth = 300;
-          if (newWidth > 1200) newWidth = 1200;
-          return newWidth;
-        });
-      } else if (isResizingFloatingRef.current) {
-        // Redimensión libre para ventana flotante desde la esquina inferior derecha
-        setWidth((prev) => Math.max(300, prev + e.movementX));
-        setHeight((prev) => Math.max(300, prev + e.movementY));
-      } else if (isDraggingRef.current) {
-        // Clampar posición dentro del viewport (usa ref para evitar stale closure)
-        const maxX = window.innerWidth - widthRef.current;
-        const maxY = window.innerHeight - 60; // Leave room for title bar
-        setPos({
-          x: Math.max(0, Math.min(e.clientX - dragOffsetRef.current.x, maxX)),
-          y: Math.max(0, Math.min(e.clientY - dragOffsetRef.current.y, maxY)),
+      if (!isResizingRef.current && !isResizingFloatingRef.current && !isDraggingRef.current) return;
+
+      dragStateRef.current.movementX += e.movementX;
+      dragStateRef.current.movementY += e.movementY;
+      dragStateRef.current.clientX = e.clientX;
+      dragStateRef.current.clientY = e.clientY;
+
+      if (!dragStateRef.current.hasPending) {
+        dragStateRef.current.hasPending = true;
+        requestAnimationFrame(() => {
+          const state = dragStateRef.current;
+          
+          if (isResizingRef.current) {
+            // Modo acoplado (ahora está a la izquierda del editor, cambia width desde el lado derecho)
+            setWidth((prev) => {
+              let newWidth = prev + state.movementX;
+              if (newWidth < 300) newWidth = 300;
+              if (newWidth > 1200) newWidth = 1200;
+              return newWidth;
+            });
+          } else if (isResizingFloatingRef.current) {
+            // Redimensión libre para ventana flotante desde la esquina inferior derecha
+            setWidth((prev) => Math.max(300, prev + state.movementX));
+            setHeight((prev) => Math.max(300, prev + state.movementY));
+          } else if (isDraggingRef.current) {
+            // Clampar posición dentro del viewport (usa ref para evitar stale closure)
+            const maxX = window.innerWidth - widthRef.current;
+            const maxY = window.innerHeight - 60; // Leave room for title bar
+            setPos({
+              x: Math.max(0, Math.min(state.clientX - dragOffsetRef.current.x, maxX)),
+              y: Math.max(0, Math.min(state.clientY - dragOffsetRef.current.y, maxY)),
+            });
+          }
+          
+          state.movementX = 0;
+          state.movementY = 0;
+          state.hasPending = false;
         });
       }
     };

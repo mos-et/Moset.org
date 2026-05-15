@@ -10,7 +10,7 @@ fn version() -> String {
 }
 
 #[tauri::command]
-async fn ejecutar(_app: tauri::AppHandle, vig_cfg: tauri::State<'_, std::sync::Mutex<VigilanteConfig>>, codigo: String, idioma: Option<String>) -> Result<String, String> {
+async fn ejecutar(_app: tauri::AppHandle, vig_cfg: tauri::State<'_, std::sync::Mutex<VigilanteConfig>>, codigo: String, idioma: Option<String>, ruta_base: Option<String>) -> Result<String, String> {
     use moset_core::{lexer::Lexer, parser::Parser, compiler::Compilador, vm::VM};
     use std::sync::{Arc, Mutex};
 
@@ -32,6 +32,9 @@ async fn ejecutar(_app: tauri::AppHandle, vig_cfg: tauri::State<'_, std::sync::M
     let vigilante = make_vigilante(&vig_cfg);
     let mut compilador = Compilador::nuevo();
     compilador.vigilante = Some(std::rc::Rc::new(vigilante));
+    if let Some(rb) = ruta_base {
+        compilador.ruta_base = Some(std::path::PathBuf::from(rb));
+    }
     if let Err(e) = compilador.compilar_programa(&programa) {
         return Err(format!("Error de compilación: {}", e));
     }
@@ -49,7 +52,7 @@ async fn ejecutar(_app: tauri::AppHandle, vig_cfg: tauri::State<'_, std::sync::M
     match maquina.ejecutar() {
         Ok(res) => {
             let raw = {
-                let guard = output.lock().unwrap();
+                let guard = output.lock().map_err(|_| "Mutex de output envenenado".to_string())?;
                 if guard.is_empty() {
                     format!("{:?}", res)
                 } else {
@@ -150,8 +153,31 @@ fn search_workspace(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, path: Str
     let vigilante = make_vigilante(&vig_cfg);
     vigilante.autorizar_ruta(&path).map_err(|e| format!("Vigilante: Acceso denegado: {}", e))?;
 
+    if query.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+
     let mut results = Vec::new();
     let q = query.to_lowercase();
+
+    // Extensiones de texto conocidas — evita intentar leer binarios (.exe, .dll, .wasm, .gguf, imágenes, etc.)
+    const TEXT_EXTENSIONS: &[&str] = &[
+        "rs", "toml", "md", "txt", "json", "yaml", "yml", "html", "css", "js", "ts", "tsx", "jsx",
+        "py", "lua", "sh", "bat", "ps1", "cfg", "ini", "xml", "svg", "csv", "log",
+        "moset", "mst", "lock", "gitignore", "env", "editorconfig",
+    ];
+
+    fn is_text_file(path: &std::path::Path) -> bool {
+        // Archivos sin extensión (README, LICENSE, Makefile, etc.) se tratan como texto
+        let ext = match path.extension() {
+            Some(e) => e.to_string_lossy().to_lowercase(),
+            None => return true,
+        };
+        TEXT_EXTENSIONS.contains(&ext.as_str())
+    }
+
+    // Límite de tamaño: 1 MB por archivo para evitar spikes de memoria
+    const MAX_FILE_SIZE: u64 = 1_048_576;
 
     fn search_dir(dir: std::path::PathBuf, q: &str, results: &mut Vec<SearchResult>, vigilante: &moset_core::vigilante::Vigilante) {
         if results.len() >= 500 { return; }
@@ -166,7 +192,11 @@ fn search_workspace(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, path: Str
                     if name != "node_modules" && name != "target" && name != ".git" && name != "dist" {
                         search_dir(p, q, results, vigilante);
                     }
-                } else {
+                } else if is_text_file(&p) {
+                    // Verificar tamaño antes de leer
+                    let file_size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                    if file_size > MAX_FILE_SIZE { continue; }
+
                     if let Ok(content) = std::fs::read_to_string(&p) {
                         for (i, line) in content.lines().enumerate() {
                             if results.len() >= 500 { return; }
@@ -601,120 +631,134 @@ fn extract_words(text: &str) -> Vec<String> {
 }
 
 #[tauri::command]
-fn fetch_full_context(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, paths: Vec<String>, query: Option<String>, max_context_tokens: Option<usize>) -> Result<String, String> {
-    let max_chars = max_context_tokens.unwrap_or(2500) * 4;
-
-    let valid_extensions = ["ce", "et", "rs", "ts", "tsx", "js", "jsx", "md", "json", "toml", "css", "py", "html", "sh"];
-    let ignore_dirs = ["node_modules", ".git", "target", "dist", "build"];
-
-    let mut all_chunks: Vec<ContextChunk> = Vec::new();
-
-    let query_words = query.as_ref().map(|q| extract_words(q)).unwrap_or_default();
-    
-    let explicit_paths: std::collections::HashSet<String> = paths.iter().map(|p| p.replace('\\', "/")).collect();
-
-    fn process_path(
-        path: &std::path::Path,
-        base_path: &std::path::Path,
-        chunks: &mut Vec<ContextChunk>,
-        query_words: &[String],
-        valid_extensions: &[&str],
-        ignore_dirs: &[&str],
-        vigilante: &moset_core::vigilante::Vigilante,
-        explicit_paths: &std::collections::HashSet<String>,
-    ) {
-        let path_str = path.to_string_lossy().replace('\\', "/");
-        if ignore_dirs.iter().any(|d| path_str.contains(&format!("/{}", d)) || path_str.ends_with(d)) {
-            return;
-        }
-
-        if path.is_file() {
-            if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
-                if valid_extensions.contains(&ext.to_lowercase().as_str()) {
-                    // 🛡️ Vigilante: verificar sandbox antes de leer el archivo
-                    if vigilante.autorizar_ruta(&path_str).is_err() {
-                        return;
-                    }
-                    if let Ok(mut content) = std::fs::read_to_string(path) {
-                        let rel_path = path.strip_prefix(base_path).unwrap_or(path).to_string_lossy().to_string();
-
-                        let ext_str = ext.to_lowercase();
-                        if ext_str == "et" {
-                            content = extract_moset_skeleton(&content);
-                        }
-
-                        let mut score = if query_words.is_empty() {
-                            1.0
-                        } else {
-                            let content_words = extract_words(&content);
-                            let mut match_count = 0;
-                            for qw in query_words {
-                                if content_words.contains(qw) {
-                                    match_count += 1;
-                                }
-                            }
-                            match_count as f32
-                        };
-                        
-                        if explicit_paths.contains(&path_str) {
-                            score += 1000.0;
-                        }
-
-                        chunks.push(ContextChunk {
-                            file_path: rel_path,
-                            content,
-                            score,
-                        });
-                    }
-                }
-            }
-        } else if path.is_dir() {
-            if let Ok(entries) = std::fs::read_dir(path) {
-                for entry in entries.filter_map(Result::ok) {
-                    process_path(&entry.path(), base_path, chunks, query_words, valid_extensions, ignore_dirs, vigilante, explicit_paths);
-                }
-            }
-        }
-    }
-
+async fn fetch_full_context(vig_cfg: tauri::State<'_, Mutex<VigilanteConfig>>, paths: Vec<String>, query: Option<String>, max_context_tokens: Option<usize>) -> Result<String, String> {
     let vigilante = make_vigilante(&vig_cfg);
-    for p in paths {
-        let path = std::path::Path::new(&p);
-        let base_path = if path.is_file() { path.parent().unwrap_or(path) } else { path };
-        process_path(path, base_path, &mut all_chunks, &query_words, &valid_extensions, &ignore_dirs, &vigilante, &explicit_paths);
-    }
     
-    // Sort chunks by score (descending)
-    all_chunks.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
-    
-    let mut total_chars = 0;
-    let mut output = String::new();
-    
-    for chunk in all_chunks {
-        if total_chars >= max_chars { break; }
+    // Ejecutar la tarea intensiva en un hilo de background
+    tauri::async_runtime::spawn_blocking(move || {
+        let max_chars = max_context_tokens.unwrap_or(2500) * 4;
+
+        let valid_extensions = ["ce", "et", "rs", "ts", "tsx", "js", "jsx", "md", "json", "toml", "css", "py", "html", "sh"];
+        let ignore_dirs = ["node_modules", ".git", "target", "dist", "build"];
+
+        let mut all_chunks: Vec<ContextChunk> = Vec::new();
+
+        let query_words = query.as_ref().map(|q| extract_words(q)).unwrap_or_default();
         
-        output.push_str(&format!("\n--- Archivo: {} (Relevancia: {}) ---\n", chunk.file_path, chunk.score));
-        
-        let remaining = max_chars.saturating_sub(total_chars);
-        let content_len = chunk.content.chars().count();
-        
-        if content_len > remaining {
-            let truncated: String = chunk.content.chars().take(remaining).collect();
-            output.push_str(&truncated);
-            output.push_str("\n...[Contenido Truncado por RAG]...\n");
-            total_chars += remaining;
-        } else {
-            output.push_str(&chunk.content);
-            output.push_str("\n");
-            total_chars += content_len;
+        let explicit_paths: std::collections::HashSet<String> = paths.iter().map(|p| p.replace('\\', "/")).collect();
+
+        fn process_path(
+            path: &std::path::Path,
+            base_path: &std::path::Path,
+            chunks: &mut Vec<ContextChunk>,
+            query_words: &[String],
+            valid_extensions: &[&str],
+            ignore_dirs: &[&str],
+            vigilante: &moset_core::vigilante::Vigilante,
+            explicit_paths: &std::collections::HashSet<String>,
+        ) {
+            let path_str = path.to_string_lossy().replace('\\', "/");
+            if ignore_dirs.iter().any(|d| path_str.contains(&format!("/{}", d)) || path_str.ends_with(d)) {
+                return;
+            }
+
+            if path.is_file() {
+                if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+                    if valid_extensions.contains(&ext.to_lowercase().as_str()) {
+                        // 🛡️ Vigilante: verificar sandbox antes de leer el archivo
+                        if vigilante.autorizar_ruta(&path_str).is_err() {
+                            return;
+                        }
+                        
+                        // Prevent hanging on huge files (limit to 1MB)
+                        if let Ok(meta) = std::fs::metadata(path) {
+                            if meta.len() > 1_000_000 {
+                                return;
+                            }
+                        }
+
+                        if let Ok(mut content) = std::fs::read_to_string(path) {
+                            let rel_path = path.strip_prefix(base_path).unwrap_or(path).to_string_lossy().to_string();
+
+                            let ext_str = ext.to_lowercase();
+                            if ext_str == "et" {
+                                content = extract_moset_skeleton(&content);
+                            }
+
+                            let mut score = if query_words.is_empty() {
+                                1.0
+                            } else {
+                                let content_lower = content.to_lowercase();
+                                let mut match_count = 0;
+                                for qw in query_words {
+                                    if content_lower.contains(qw) {
+                                        match_count += 1;
+                                    }
+                                }
+                                match_count as f32
+                            };
+                            
+                            if explicit_paths.contains(&path_str) {
+                                score += 1000.0;
+                            }
+
+                            chunks.push(ContextChunk {
+                                file_path: rel_path,
+                                content,
+                                score,
+                            });
+                        }
+                    }
+                }
+            } else if path.is_dir() {
+                if let Ok(entries) = std::fs::read_dir(path) {
+                    for entry in entries.filter_map(Result::ok) {
+                        process_path(&entry.path(), base_path, chunks, query_words, valid_extensions, ignore_dirs, vigilante, explicit_paths);
+                    }
+                }
+            }
         }
-    }
-    
-    if total_chars >= max_chars {
-        output.push_str("\n... [Contexto RAG truncado por límite de seguridad global]");
-    }
-    
-    Ok(output)
+
+        for p in paths {
+            let path = std::path::Path::new(&p);
+            let base_path = if path.is_file() { path.parent().unwrap_or(path) } else { path };
+            process_path(path, base_path, &mut all_chunks, &query_words, &valid_extensions, &ignore_dirs, &vigilante, &explicit_paths);
+        }
+        
+        // Sort chunks by score (descending)
+        all_chunks.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        
+        let mut total_chars = 0;
+        let mut output = String::new();
+        
+        for chunk in all_chunks {
+            if total_chars >= max_chars { break; }
+            
+            output.push_str(&format!("\n--- Archivo: {} (Relevancia: {}) ---\n", chunk.file_path, chunk.score));
+            
+            let remaining = max_chars.saturating_sub(total_chars);
+            let content_len = chunk.content.chars().count();
+            
+            if content_len > remaining {
+                let truncated: String = chunk.content.chars().take(remaining).collect();
+                output.push_str(&truncated);
+                output.push_str("\n...[Contenido Truncado por RAG]...\n");
+                total_chars += remaining;
+            } else {
+                output.push_str(&chunk.content);
+                output.push_str("\n");
+                total_chars += content_len;
+            }
+        }
+        
+        if total_chars >= max_chars {
+            output.push_str("\n... [Contexto RAG truncado por límite de seguridad global]");
+        }
+        
+        Ok(output)
+    })
+    .await
+    .map_err(|e| format!("Error asíncrono en fetch_full_context: {}", e))?
 }
 
 // ─── Agente Autónomo ─────────────────────────────────────────────────────────
@@ -800,6 +844,19 @@ async fn execute_agent_tool(app_handle: tauri::AppHandle, vig_cfg: tauri::State<
         },
         AgentTool::RunCommand => {
             let cmd = call.args.get("command").and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+            // 🛡️ DEBT-002: Sanitización contra shell injection via prompt injection.
+            // Bloquear metacaracteres de encadenamiento que permiten ejecutar comandos ocultos.
+            let shell_injection_patterns = ["; ", " ; ", "&&", "||", "`", "$(", "$env:", "<(", ">("];
+            for pattern in &shell_injection_patterns {
+                if cmd.contains(pattern) {
+                    return Err(format!(
+                        "🛡️ Vigilante: Comando bloqueado por contener metacaracteres de shell injection ('{}').\n\
+                         El agente no puede encadenar múltiples comandos. Ejecuta cada comando por separado.",
+                        pattern.trim()
+                    ));
+                }
+            }
 
             // 🛡️ Vigilante: auditar el comando antes de ejecutarlo con nivel cauteloso (0.80).
             vigilante.autorizar(&cmd, Some(0.80))
@@ -898,7 +955,8 @@ async fn execute_agent_tool(app_handle: tauri::AppHandle, vig_cfg: tauri::State<
         },
         AgentTool::McpListTools => {
             let server = call.args.get("server").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let clients = mcp_state.clients.lock().unwrap();
+            let clients = mcp_state.clients.lock()
+                .map_err(|_| "Mutex de MCP clients envenenado".to_string())?;
             if let Some(client) = clients.get(&server) {
                 let tools = client.list_tools()?;
                 Ok(serde_json::to_string(&tools).unwrap_or_else(|_| "[]".to_string()))
@@ -915,7 +973,8 @@ async fn execute_agent_tool(app_handle: tauri::AppHandle, vig_cfg: tauri::State<
             vigilante.autorizar(&format!("mcp:{}:{}", server, tool), Some(0.80))
                 .map_err(|e| format!("Agente bloqueado por el Vigilante (MCP tool '{}'):\n{}", tool, e))?;
 
-            let clients = mcp_state.clients.lock().unwrap();
+            let clients = mcp_state.clients.lock()
+                .map_err(|_| "Mutex de MCP clients envenenado".to_string())?;
             if let Some(client) = clients.get(&server) {
                 let res = client.call_tool(&tool, args)?;
                 Ok(serde_json::to_string(&res).unwrap_or_else(|_| "{}".to_string()))
@@ -926,7 +985,8 @@ async fn execute_agent_tool(app_handle: tauri::AppHandle, vig_cfg: tauri::State<
         AgentTool::LspDiagnostics => {
             let server = call.args.get("server").and_then(|v| v.as_str()).unwrap_or("").to_string();
             let file_uri = call.args.get("uri").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let clients = lsp_state.clients.lock().unwrap();
+            let clients = lsp_state.clients.lock()
+                .map_err(|_| "Mutex de LSP clients envenenado".to_string())?;
             if let Some(client) = clients.get(&server) {
                 let diags = client.get_diagnostics(&file_uri);
                 Ok(serde_json::to_string(&diags).unwrap_or_else(|_| "[]".to_string()))
@@ -952,14 +1012,30 @@ fn set_clean_cuda_on_exit(state: tauri::State<'_, AiState>, enabled: bool) {
 async fn cargar_modelo(
     state: tauri::State<'_, AiState>,
     modelo_path: String,
-    tokenizer_path: String,
+    tokenizer_path: Option<String>,
 ) -> Result<String, String> {
     eprintln!("[ORQUESTADOR] Iniciando carga de modelo: {}", modelo_path);
-    eprintln!("[ORQUESTADOR] Tokenizer: {}", tokenizer_path);
+    
+    let mut resolved_tokenizer = tokenizer_path;
+    if resolved_tokenizer.is_none() || resolved_tokenizer.as_ref().unwrap().is_empty() {
+        // Intentar buscar tokenizer.json en la misma carpeta que el modelo
+        let model_dir = std::path::Path::new(&modelo_path).parent();
+        if let Some(dir) = model_dir {
+            let possible_tokenizer = dir.join("tokenizer.json");
+            if possible_tokenizer.exists() {
+                resolved_tokenizer = Some(possible_tokenizer.to_string_lossy().into_owned());
+                eprintln!("[ORQUESTADOR] Tokenizer auto-detectado: {:?}", resolved_tokenizer);
+            }
+        }
+    }
+    
+    let tok_path = resolved_tokenizer.ok_or_else(|| "No se proporcionó ruta al tokenizer y no se encontró tokenizer.json en la carpeta del modelo.".to_string())?;
+
+    eprintln!("[ORQUESTADOR] Tokenizer a usar: {}", tok_path);
     let motor_clone = Arc::clone(&state.motor);
     tauri::async_runtime::spawn_blocking(move || {
         let mut motor = motor_clone.lock().map_err(|_| "Deadlock al bloquear MotorNaraka")?;
-        motor.cargar_tokenizer(&tokenizer_path)?;
+        motor.cargar_tokenizer(&tok_path)?;
         let res = motor.cargar_gguf(&modelo_path)?;
         eprintln!("[ORQUESTADOR] Modelo cargado exitosamente en memoria.");
         Ok(res)
@@ -1641,6 +1717,190 @@ for entry in entries:
     }
 }
 
+// ─── Hardware & Downloads ────────────────────────────────────────────────────
+
+#[derive(serde::Serialize)]
+struct HardwareInfo {
+    total_ram_gb: f64,
+    free_ram_gb: f64,
+    estimated_vram_gb: f64,
+    recommended_quantization: String,
+}
+
+#[tauri::command]
+fn get_hardware_info() -> Result<HardwareInfo, String> {
+    use sysinfo::System;
+    let mut sys = System::new_all();
+    sys.refresh_all();
+    
+    let total_ram_gb = sys.total_memory() as f64 / 1_073_741_824.0;
+    let free_ram_gb = sys.free_memory() as f64 / 1_073_741_824.0;
+    
+    // Simple heuristic (later can be upgraded with wgpu/nvml for VRAM)
+    let recommended_quantization = if total_ram_gb >= 32.0 {
+        "Q8_0 o Q6_K".to_string()
+    } else if total_ram_gb >= 16.0 {
+        "Q4_K_M".to_string()
+    } else {
+        "Q3_K_S".to_string()
+    };
+    
+    Ok(HardwareInfo {
+        total_ram_gb,
+        free_ram_gb,
+        estimated_vram_gb: 0.0,
+        recommended_quantization,
+    })
+}
+
+#[derive(serde::Serialize)]
+pub struct CatalogModel {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub repo_id: String,
+    pub filename: String,
+    pub tokenizer_url: Option<String>,
+    pub size_gb: f32,
+    pub architecture: String,
+}
+
+#[tauri::command]
+fn get_model_catalog() -> Vec<CatalogModel> {
+    vec![
+        CatalogModel {
+            id: "qwen2.5-coder-7b".to_string(),
+            name: "Qwen 2.5 Coder 7B Instruct (Q4_K_M)".to_string(),
+            description: "Modelo potente y rápido, optimizado para programación y asistencia general. Ideal para la mayoría de los usuarios de Moset.".to_string(),
+            repo_id: "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF".to_string(),
+            filename: "qwen2.5-coder-7b-instruct-q4_k_m.gguf".to_string(),
+            tokenizer_url: Some("https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct/resolve/main/tokenizer.json".to_string()),
+            size_gb: 4.5,
+            architecture: "qwen2".to_string(),
+        },
+        CatalogModel {
+            id: "phi-3-mini-4k".to_string(),
+            name: "Phi-3 Mini 4K Instruct (Q4_K_M)".to_string(),
+            description: "Modelo pequeño y muy eficiente de Microsoft. Recomendado si tienes poca RAM o hardware limitado.".to_string(),
+            repo_id: "microsoft/Phi-3-mini-4k-instruct-gguf".to_string(),
+            filename: "Phi-3-mini-4k-instruct-q4.gguf".to_string(),
+            tokenizer_url: Some("https://huggingface.co/microsoft/Phi-3-mini-4k-instruct/resolve/main/tokenizer.json".to_string()),
+            size_gb: 2.3,
+            architecture: "phi3".to_string(),
+        },
+        CatalogModel {
+            id: "llama-3-8b-instruct".to_string(),
+            name: "Llama 3 8B Instruct (Q4_K_M)".to_string(),
+            description: "Modelo de propósito general de Meta, con excelente razonamiento para tareas complejas.".to_string(),
+            repo_id: "QuantFactory/Meta-Llama-3-8B-Instruct-GGUF".to_string(),
+            filename: "Meta-Llama-3-8B-Instruct.Q4_K_M.gguf".to_string(),
+            tokenizer_url: Some("https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct/resolve/main/tokenizer.json".to_string()),
+            size_gb: 4.9,
+            architecture: "llama".to_string(),
+        },
+        CatalogModel {
+            id: "deepseek-coder-6.7b".to_string(),
+            name: "DeepSeek Coder 6.7B Instruct (Q4_K_M)".to_string(),
+            description: "Especialista en código fuente, altamente competente en refactorización y resolución de bugs.".to_string(),
+            repo_id: "TheBloke/deepseek-coder-6.7B-instruct-GGUF".to_string(),
+            filename: "deepseek-coder-6.7b-instruct.q4_K_M.gguf".to_string(),
+            tokenizer_url: Some("https://huggingface.co/deepseek-ai/deepseek-coder-6.7b-instruct/resolve/main/tokenizer.json".to_string()),
+            size_gb: 4.1,
+            architecture: "llama".to_string(),
+        }
+    ]
+}
+
+#[derive(Clone, serde::Serialize)]
+struct DownloadProgress {
+    downloaded: u64,
+    total: Option<u64>,
+}
+
+#[tauri::command]
+async fn download_model_turbo(window: tauri::Window, url: String, dest_path: String, num_threads: usize) -> Result<(), String> {
+    use futures_util::future::join_all;
+    use futures_util::StreamExt;
+    use reqwest::header::RANGE;
+    use std::io::Write;
+
+    let client = reqwest::Client::new();
+    let head = client.head(&url).send().await.map_err(|e| e.to_string())?;
+    
+    let total_size = head.content_length().ok_or("El servidor no reportó Content-Length")?;
+    let supports_ranges = head.headers().get("accept-ranges").map(|v| v == "bytes").unwrap_or(false);
+    
+    if !supports_ranges || num_threads <= 1 {
+        let res = client.get(&url).send().await.map_err(|e| e.to_string())?;
+        let mut file = std::fs::File::create(&dest_path).map_err(|e| e.to_string())?;
+        let mut downloaded: u64 = 0;
+        let mut stream = res.bytes_stream();
+        
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| e.to_string())?;
+            file.write_all(&chunk).map_err(|e| e.to_string())?;
+            downloaded += chunk.len() as u64;
+            let _ = window.emit("download-progress", DownloadProgress {
+                downloaded,
+                total: Some(total_size),
+            });
+        }
+        return Ok(());
+    }
+    
+    let chunk_size = total_size / num_threads as u64;
+    let mut tasks = vec![];
+    let shared_downloaded = std::sync::Arc::new(tokio::sync::Mutex::new(0u64));
+    
+    for i in 0..num_threads {
+        let start = i as u64 * chunk_size;
+        let end = if i == num_threads - 1 {
+            total_size - 1
+        } else {
+            start + chunk_size - 1
+        };
+        
+        let client_c = client.clone();
+        let url_c = url.clone();
+        let dest_path_c = format!("{}.part{}", dest_path, i);
+        let window_c = window.clone();
+        let downloaded_c = shared_downloaded.clone();
+        
+        let task = tokio::spawn(async move {
+            let res = client_c.get(&url_c).header(RANGE, format!("bytes={}-{}", start, end)).send().await.map_err(|e| e.to_string())?;
+            let mut file = std::fs::File::create(&dest_path_c).map_err(|e| e.to_string())?;
+            let mut stream = res.bytes_stream();
+            
+            while let Some(chunk) = stream.next().await {
+                let chunk = chunk.map_err(|e| e.to_string())?;
+                file.write_all(&chunk).map_err(|e| e.to_string())?;
+                
+                let mut d = downloaded_c.lock().await;
+                *d += chunk.len() as u64;
+                let _ = window_c.emit("download-progress", DownloadProgress {
+                    downloaded: *d,
+                    total: Some(total_size),
+                });
+            }
+            Ok::<String, String>(dest_path_c)
+        });
+        tasks.push(task);
+    }
+    
+    let results = join_all(tasks).await;
+    
+    // Merge files
+    let mut final_file = std::fs::File::create(&dest_path).map_err(|e| e.to_string())?;
+    for res in results {
+        let part_path = res.map_err(|e| e.to_string())??;
+        let mut part_file = std::fs::File::open(&part_path).map_err(|e| e.to_string())?;
+        std::io::copy(&mut part_file, &mut final_file).map_err(|e| e.to_string())?;
+        let _ = std::fs::remove_file(&part_path);
+    }
+    
+    Ok(())
+}
+
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -1769,6 +2029,7 @@ pub fn run() {
             git_status,
             git_auto_sync,
             configurar_vigilante,
+            get_config_vigilante,
             list_macros,
             read_macro,
             start_mcp_servers,
@@ -1788,8 +2049,11 @@ pub fn run() {
             dematerializar_y_guardar,
             get_et_dict,
             actualizar_traduccion_dict,
-            purgar_et_dict,
             crear_et_dict_por_defecto,
+            purgar_et_dict,
+            get_hardware_info,
+            download_model_turbo,
+            get_model_catalog,
         ])
         .run(tauri::generate_context!())
         .expect("Error iniciando Moset IDE");

@@ -274,8 +274,8 @@ export default function ChatPanel({ projectRoot, contextPaths, setContextPaths, 
     
     try {
       await invoke("cargar_modelo", { 
-        modeloPath: ideConfig.modelPath, 
-        tokenizerPath: ideConfig.tokenizerPath 
+        modelo_path: ideConfig.modelPath, 
+        tokenizer_path: ideConfig.tokenizerPath 
       });
       setIsModelLoaded(true);
       chat.setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "system", content: "✅ Modelo cargado. El sistema está en standby listo para responder.", ts: Date.now() }]);

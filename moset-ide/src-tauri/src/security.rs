@@ -4,6 +4,7 @@ use tauri::State;
 // ─── Vigilante Config Global ───────────────────────────────────────────────────
 // Permite que la configuración de la UI llegue al backend Rust en runtime.
 
+#[derive(serde::Serialize, Clone)]
 pub struct VigilanteConfig {
     pub prohibidos: String,
     pub peligrosos: String,
@@ -49,5 +50,14 @@ pub fn configurar_vigilante(
         cfg.peligrosos = peligrosos;
         cfg.cautelosos = cautelosos;
         cfg.sandbox_paths = sandbox_paths;
+    }
+}
+
+#[tauri::command]
+pub fn get_config_vigilante(state: State<'_, Mutex<VigilanteConfig>>) -> Result<VigilanteConfig, String> {
+    if let Ok(cfg) = state.lock() {
+        Ok(cfg.clone())
+    } else {
+        Err("No se pudo obtener el lock del Mutex de VigilanteConfig".to_string())
     }
 }

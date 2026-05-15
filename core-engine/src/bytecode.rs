@@ -221,7 +221,7 @@ impl Chunk {
     /// Escribe un salto placeholder y retorna el offset para backpatching
     pub fn emitir_salto(&mut self, opcode: OpCode, linea: usize) -> usize {
         self.escribir(opcode as u8, linea);
-        // Placeholder de 2 bytes para el offset (u16 little-endian)
+        // Placeholder de 2 bytes para el offset (u16 big-endian, matches leer_u16)
         self.escribir(0xFF, linea);
         self.escribir(0xFF, linea);
         self.codigo.len() - 2 // offset del primer byte del placeholder
@@ -233,8 +233,8 @@ impl Chunk {
         if salto > u16::MAX as usize {
             return Err("Salto demasiado grande para u16".to_string());
         }
-        self.codigo[offset] = (salto & 0xFF) as u8;
-        self.codigo[offset + 1] = ((salto >> 8) & 0xFF) as u8;
+        self.codigo[offset] = ((salto >> 8) & 0xFF) as u8;
+        self.codigo[offset + 1] = (salto & 0xFF) as u8;
         Ok(())
     }
 
@@ -246,8 +246,8 @@ impl Chunk {
         if offset > u16::MAX as usize {
             return Err("Bucle demasiado grande para u16".to_string());
         }
-        self.escribir((offset & 0xFF) as u8, linea);
         self.escribir(((offset >> 8) & 0xFF) as u8, linea);
+        self.escribir((offset & 0xFF) as u8, linea);
         Ok(())
     }
 }

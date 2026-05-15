@@ -67,8 +67,8 @@ export function ActivityBar({ openPanels, togglePanel, chatOpen, setChatOpen }: 
       ))}
       <div className="activity-bar-spacer" />
       <button
-        className={`activity-btn ${openPanels.has("settings") ? "active" : ""}`}
-        onClick={() => togglePanel("settings")}
+        className="activity-btn"
+        onClick={() => window.dispatchEvent(new CustomEvent("open-settings"))}
         title="Ajustes"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

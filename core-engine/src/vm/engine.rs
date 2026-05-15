@@ -50,6 +50,7 @@ pub struct VM {
     /// Stack de handlers para CatchEnLinea (reservado para implementación completa)
     #[allow(dead_code)]
     handlers_catch: Vec<(usize, usize, usize)>, // (ip_handler, pila_size, frames_len)
+    pub instruction_count: u64, // BUG-046: Persistir conteo de instrucciones
 }
 
 impl VM {
@@ -66,6 +67,7 @@ impl VM {
             este: None,
             base_pila: 0,
             handlers_catch: Vec::new(),
+            instruction_count: 0,
         }
     }
 
@@ -114,11 +116,10 @@ impl VM {
     }
 
     pub fn ejecutar(&mut self) -> Result<EstadoVM, String> {
-        let mut instruction_count: u64 = 0;
         const MAX_INSTRUCTIONS: u64 = 5_000_000;
         loop {
-            instruction_count += 1;
-            if instruction_count > MAX_INSTRUCTIONS {
+            self.instruction_count += 1;
+            if self.instruction_count > MAX_INSTRUCTIONS {
                 return Err("ERR_LIMIT: Límite de ejecución excedido (Seguridad contra bucles infinitos - BUG-022)".to_string());
             }
             if self.ip >= self.chunk.codigo.len() {
@@ -548,7 +549,7 @@ impl VM {
                             if getrandom::fill(&mut buf).is_err() {
                                 println!("GETRANDOM FALLO EN WINDOWS");
                                 // Fallback a LCG si falla la entropía del OS
-                                let seed = instruction_count.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                                let seed = self.instruction_count.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
                                 buf = seed.to_le_bytes();
                             }
                             let rand_u64 = u64::from_le_bytes(buf);
@@ -836,6 +837,21 @@ impl VM {
                 },
                 OpCode::Esperar => {
                     let promesa = self.pop()?;
+                    // BUG-047: Validar que el valor no sea negativo ni nulo
+                    match &promesa {
+                        Valor::Entero(n) if *n < 0 => {
+                            return Err(format!(
+                                "Esperar recibió un valor negativo ({}). Solo se aceptan valores positivos o promesas.",
+                                n
+                            ));
+                        },
+                        Valor::Nulo => {
+                            return Err(
+                                "Esperar recibió un valor nulo. Se esperaba una promesa o valor válido.".into()
+                            );
+                        },
+                        _ => {} // Valor válido para suspender
+                    }
                     return Ok(Some(EstadoVM::Suspendido(promesa)));
                 },
                 OpCode::InvocacionMetodo => {
@@ -982,9 +998,9 @@ impl VM {
 
     #[inline(always)]
     fn leer_u16(&mut self) -> Result<u16, String> {
-        let lo = self.leer_byte()? as u16;
-        let hi = self.leer_byte()? as u16;
-        Ok((hi << 8) | lo)
+        let hi = self.leer_byte()?;
+        let lo = self.leer_byte()?;
+        Ok(u16::from_be_bytes([hi, lo]))
     }
 }
 
@@ -1211,5 +1227,127 @@ mod tests {
         } else {
             panic!("Se esperaba un Entero(11), se obtuvo: {:?}", res);
         }
+    }
+
+    #[test]
+    fn test_catch_en_linea_con_fallback() {
+        // Simular: resultado = (1 / 0) :,[ 42
+        // Debe retornar 42 (el fallback) ya que 1/0 lanza error
+        let programa = Programa {
+            sentencias: vec![
+                Nodo::Asignacion {
+                    nombre: "resultado".to_string(),
+                    valor: Box::new(Nodo::CatchEnLinea {
+                        expresion: Box::new(Nodo::Binario {
+                            izq: Box::new(Nodo::EnteroLit(1)),
+                            op: OpBinario::Dividir,
+                            der: Box::new(Nodo::EnteroLit(0)),
+                        }),
+                        fallback: Box::new(Nodo::EnteroLit(42)),
+                    }),
+                },
+                Nodo::Retornar(Box::new(Nodo::Identificador("resultado".to_string()))),
+            ],
+        };
+
+        let mut compilador = Compilador::nuevo();
+        assert!(compilador.compilar_programa(&programa).is_ok());
+
+        let mut vm = VM::nueva(compilador.chunk);
+        let res = vm.ejecutar();
+
+        assert!(res.is_ok());
+        if let Ok(EstadoVM::Terminado(Valor::Entero(v))) = res {
+            assert_eq!(v, 42);
+        } else {
+            panic!("Se esperaba Entero(42) como fallback del catch, se obtuvo: {:?}", res);
+        }
+    }
+
+    #[test]
+    fn test_instruction_count_persiste_tras_catch() {
+        // Verificar que instruction_count NO se resetea después de un catch
+        let programa = Programa {
+            sentencias: vec![
+                Nodo::Asignacion {
+                    nombre: "x".to_string(),
+                    valor: Box::new(Nodo::CatchEnLinea {
+                        expresion: Box::new(Nodo::Binario {
+                            izq: Box::new(Nodo::EnteroLit(1)),
+                            op: OpBinario::Dividir,
+                            der: Box::new(Nodo::EnteroLit(0)),
+                        }),
+                        fallback: Box::new(Nodo::EnteroLit(0)),
+                    }),
+                },
+            ],
+        };
+
+        let mut compilador = Compilador::nuevo();
+        assert!(compilador.compilar_programa(&programa).is_ok());
+
+        let mut vm = VM::nueva(compilador.chunk);
+        let _ = vm.ejecutar();
+
+        // instruction_count debe ser > 0 después de ejecutar
+        assert!(vm.instruction_count > 0, "instruction_count no debería ser 0 tras la ejecución");
+    }
+
+    #[test]
+    fn test_instruction_count_acumula_a_traves_de_multiples_catch() {
+        // DEBT-001: Verificar que instruction_count se acumula correctamente
+        // a través de múltiples catch cycles y nunca se resetea.
+        // Simulamos N catch-en-linea consecutivos y verificamos que el 
+        // contador final es estrictamente mayor que N.
+        let mut sentencias = Vec::new();
+        for i in 0..50 {
+            sentencias.push(Nodo::Asignacion {
+                nombre: format!("r{}", i),
+                valor: Box::new(Nodo::CatchEnLinea {
+                    expresion: Box::new(Nodo::Binario {
+                        izq: Box::new(Nodo::EnteroLit(1)),
+                        op: OpBinario::Dividir,
+                        der: Box::new(Nodo::EnteroLit(0)),
+                    }),
+                    fallback: Box::new(Nodo::EnteroLit(0)),
+                }),
+            });
+        }
+
+        let programa = Programa { sentencias };
+
+        let mut compilador = Compilador::nuevo();
+        assert!(compilador.compilar_programa(&programa).is_ok());
+
+        let mut vm = VM::nueva(compilador.chunk);
+        let _ = vm.ejecutar();
+
+        // Con 50 catch cycles, instruction_count debe ser significativamente mayor que 50
+        // (cada catch implica múltiples instrucciones: Constante, Constante, Dividir, 
+        //  ConfigurarCatch, LimpiarCatch, Salto, Pop, etc.)
+        assert!(
+            vm.instruction_count > 200,
+            "instruction_count ({}) debería ser > 200 tras 50 catch cycles",
+            vm.instruction_count
+        );
+    }
+
+    #[test]
+    fn test_esperar_valor_negativo_retorna_error() {
+        // BUG-047: Esperar con valor negativo debe retornar error, no suspender silenciosamente
+        let programa = Programa {
+            sentencias: vec![
+                Nodo::Esperar(Box::new(Nodo::EnteroLit(-1))),
+            ],
+        };
+
+        let mut compilador = Compilador::nuevo();
+        assert!(compilador.compilar_programa(&programa).is_ok());
+
+        let mut vm = VM::nueva(compilador.chunk);
+        let resultado = vm.ejecutar();
+        assert!(resultado.is_err(), "Esperar con valor negativo debe retornar error, no Suspendido");
+        let err_msg = resultado.unwrap_err();
+        assert!(err_msg.contains("negativo"), "El error debe mencionar 'negativo', obtuvo: {}", err_msg);
     }
 }

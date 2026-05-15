@@ -68,9 +68,13 @@ impl McpClient {
                 };
                 if let Ok(res) = serde_json::from_str::<JsonRpcResponse>(&l) {
                     let (lock, cvar) = &*response_map_clone;
-                    let mut map = lock.lock().unwrap();
-                    map.insert(res.id, res);
-                    cvar.notify_all();
+                    match lock.lock() {
+                        Ok(mut map) => {
+                            map.insert(res.id, res);
+                            cvar.notify_all();
+                        }
+                        Err(_) => break, // Mutex poisoned, exit reader thread
+                    }
                 }
             }
         });
@@ -95,7 +99,8 @@ impl McpClient {
 
     pub fn send_request(&self, method: &str, params: Option<Value>) -> Result<JsonRpcResponse, String> {
         let id = {
-            let mut guard = self.request_id.lock().unwrap();
+            let mut guard = self.request_id.lock()
+                .map_err(|_| "Mutex de request_id envenenado".to_string())?;
             *guard += 1;
             *guard
         };
@@ -107,11 +112,13 @@ impl McpClient {
             params,
         };
 
-        let msg = serde_json::to_string(&req).unwrap();
+        let msg = serde_json::to_string(&req)
+            .map_err(|e| format!("Error serializando JSON-RPC request: {}", e))?;
         self.stdin_sender.send(msg).map_err(|e| e.to_string())?;
 
         let (lock, cvar) = &*self.response_map;
-        let mut map = lock.lock().unwrap();
+        let mut map = lock.lock()
+            .map_err(|_| "Mutex de response_map envenenado".to_string())?;
         let start = std::time::Instant::now();
         let timeout_duration = std::time::Duration::from_secs(10);
         
@@ -126,7 +133,8 @@ impl McpClient {
             }
             
             let remaining = timeout_duration - elapsed;
-            let result = cvar.wait_timeout(map, remaining).unwrap();
+            let result = cvar.wait_timeout(map, remaining)
+                .map_err(|_| "Mutex de response_map envenenado durante wait".to_string())?;
             map = result.0;
             if result.1.timed_out() {
                 return Err(format!("Timeout waiting for MCP response (method: {})", method));
@@ -140,7 +148,8 @@ impl McpClient {
             method: method.to_string(),
             params,
         };
-        let msg = serde_json::to_string(&notif).unwrap();
+        let msg = serde_json::to_string(&notif)
+            .map_err(|e| format!("Error serializando notificación JSON-RPC: {}", e))?;
         self.stdin_sender.send(msg).map_err(|e| e.to_string())
     }
 

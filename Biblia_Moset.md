@@ -78,7 +78,7 @@ El ecosistema se divide en dos grandes monolitos fuertemente acoplados por IPC (
 │   │   ├── cloud_ai.rs                 ← Motor Cloud (OpenAI/Mistral/Anthropic streaming)
 │   │   ├── valor.rs                    ← Sistema de valores runtime (125 líneas)
 │   │   └── vm/                         ← MÁQUINA VIRTUAL DE BYTECODE
-│   │       ├── engine.rs               ← Motor Fetch-Decode-Execute (1130 líneas) [Refactorizado desde vm.rs]
+│   │       ├── engine.rs               ← Motor Fetch-Decode-Execute (1353 líneas) [Refactorizado desde vm.rs]
 │   │       ├── mod.rs                  ← Exportación
 │   │       └── (bytecode/opcode integrados en engine.rs)
 │
@@ -89,7 +89,7 @@ El ecosistema se divide en dos grandes monolitos fuertemente acoplados por IPC (
 │   │   ├── Cargo.toml                  ← Deps: Tauri v2, moset_core, portable-pty 0.9
 │   │   ├── tauri.conf.json             ← productName: "Moset IDE", id: com.moset.ide
 │   │   ├── src/
-│   │   │   ├── lib.rs                  ← Backend Tauri (1502 líneas): commands, AiState, PTY, lifecycle, MCP, LSP
+│   │   │   ├── lib.rs                  ← Backend Tauri (2047 líneas): commands, AiState, PTY, lifecycle, MCP, LSP
 │   │   │   ├── main.rs                 ← Entry point Tauri (5 líneas)
 │   │   │   └── tauri_bridge.rs         ← PTY spawn PowerShell (136 líneas), read/write PTY
 │   ├── src/
