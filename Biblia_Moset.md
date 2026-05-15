@@ -1,7 +1,7 @@
 #  BIBLIA MOSET — Documento Definitivo del Ecosistema (Motor Soberano)
 
 > **Este archivo define la arquitectura, visión, estado real y auditoría completa de Moset IDE y su ecosistema.**
-> Última consolidación: 2026-04-29 — **v1.0.0 — Release Estable (Localization Lens, 75 Tests, Instalador NSIS)**
+> Última consolidación: 2026-05-15 — **v1.1.0 — Release Estable (Chat Fixes, Version Bump, website sync)**
 > Dueño: Equipo Central de Moset
 
 ---

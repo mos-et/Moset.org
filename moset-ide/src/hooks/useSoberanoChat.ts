@@ -290,6 +290,7 @@ export function useSoberanoChat(ideConfig: IdeConfigState, projectRoot?: string 
           ...recentMessages
         ];
 
+        const compactId = uid();
         setMessages(prev => {
           const sys = prev.filter(m => m.role === "system");
           const firstAsst = prev.find(m => m.role === "assistant");
@@ -302,7 +303,7 @@ export function useSoberanoChat(ideConfig: IdeConfigState, projectRoot?: string 
 
           return [
             ...preserved,
-            { id: uid(), role: "system", content: "⚡ Auto Compact: Se ha activado la Auto-Compresión para evitar errores de contexto. El historial antiguo ha sido descartado.", ts: Date.now() },
+            { id: compactId, role: "system", content: "⚡ Auto Compact: Se ha activado la Auto-Compresión para evitar errores de contexto. El historial antiguo ha sido descartado.", ts: Date.now() },
             ...recent
           ];
         });
@@ -373,17 +374,19 @@ export function useSoberanoChat(ideConfig: IdeConfigState, projectRoot?: string 
       const finalContent = streamBufferRef.current;
       const isTruncated = finalContent.length > MAX_RENDER_CHARS;
 
+      const assistantId = uid();
       flushSync(() => {
         setLoading(false);
         setStreamBuffer("");
-        setMessages(prev => [...prev, { id: uid(), role: "assistant", content: finalContent, ts: Date.now(), truncated: isTruncated }]);
+        setMessages(prev => [...prev, { id: assistantId, role: "assistant", content: finalContent, ts: Date.now(), truncated: isTruncated }]);
       });
     } catch (e: any) {
       console.error(e);
+      const errorId = uid();
       flushSync(() => {
         setLoading(false);
         setStreamBuffer("");
-        setMessages(prev => [...prev, { id: uid(), role: "system", content: `Error en Motor Soberano: ${String(e)}`, ts: Date.now() }]);
+        setMessages(prev => [...prev, { id: errorId, role: "system", content: `Error en Motor Soberano: ${String(e)}`, ts: Date.now() }]);
       });
     }
 

@@ -266,11 +266,13 @@ export default function ChatPanel({ projectRoot, contextPaths, setContextPaths, 
 
   const handleLoadModel = async () => {
     if (!ideConfig.modelPath) {
-      chat.setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "system", content: "❌ Error: No hay ruta de modelo configurada. Ve a Ajustes.", ts: Date.now() }]);
+      const errorId = crypto.randomUUID();
+      chat.setMessages(prev => [...prev, { id: errorId, role: "system", content: "❌ Error: No hay ruta de modelo configurada. Ve a Ajustes.", ts: Date.now() }]);
       return;
     }
     
-    chat.setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "system", content: "🚀 Cargando modelo de Inteligencia Artificial...", ts: Date.now() }]);
+    const loadingId = crypto.randomUUID();
+    chat.setMessages(prev => [...prev, { id: loadingId, role: "system", content: "🚀 Cargando modelo de Inteligencia Artificial...", ts: Date.now() }]);
     
     try {
       await invoke("cargar_modelo", { 
@@ -278,20 +280,25 @@ export default function ChatPanel({ projectRoot, contextPaths, setContextPaths, 
         tokenizer_path: ideConfig.tokenizerPath 
       });
       setIsModelLoaded(true);
-      chat.setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "system", content: "✅ Modelo cargado. El sistema está en standby listo para responder.", ts: Date.now() }]);
+      const successId = crypto.randomUUID();
+      chat.setMessages(prev => [...prev, { id: successId, role: "system", content: "✅ Modelo cargado. El sistema está en standby listo para responder.", ts: Date.now() }]);
     } catch (e) {
-      chat.setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "system", content: `❌ Fallo al cargar motor: ${e}`, ts: Date.now() }]);
+      const failId = crypto.randomUUID();
+      chat.setMessages(prev => [...prev, { id: failId, role: "system", content: `❌ Fallo al cargar motor: ${e}`, ts: Date.now() }]);
     }
   };
 
   const handleUnloadModel = async () => {
-    chat.setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "system", content: "♻️ Descargando modelo de la memoria (Unloading)...", ts: Date.now() }]);
+    const unloadId = crypto.randomUUID();
+    chat.setMessages(prev => [...prev, { id: unloadId, role: "system", content: "♻️ Descargando modelo de la memoria (Unloading)...", ts: Date.now() }]);
     try {
       await invoke("descargar_modelo");
       setIsModelLoaded(false);
-      chat.setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "system", content: "💤 Motor descargado correctamente.", ts: Date.now() }]);
+      const successId = crypto.randomUUID();
+      chat.setMessages(prev => [...prev, { id: successId, role: "system", content: "💤 Motor descargado correctamente.", ts: Date.now() }]);
     } catch (e) {
-      chat.setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "system", content: `❌ Error al descargar: ${e}`, ts: Date.now() }]);
+      const failId = crypto.randomUUID();
+      chat.setMessages(prev => [...prev, { id: failId, role: "system", content: `❌ Error al descargar: ${e}`, ts: Date.now() }]);
     }
   };
 
@@ -315,7 +322,7 @@ export default function ChatPanel({ projectRoot, contextPaths, setContextPaths, 
           {chat.messages.map((m, idx) => {
             const isPendingMsg = pendingGroupApproval?.msgId === m.id;
             return (
-              <div key={idx} className={`chat-msg ${m.role}`} style={{ position: "relative" }}>
+              <div key={m.id} className={`chat-msg ${m.role}`} style={{ position: "relative" }}>
                 <div className="chat-msg-content">{renderContent(m.content, true, projectRoot, isPendingMsg, onOpenArtifact)}</div>
                 {m.role === 'assistant' && (
                   <button
