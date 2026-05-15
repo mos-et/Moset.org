@@ -1136,6 +1136,7 @@ Operas bajo una sandbox estricta ("El Vigilante"). Jamás propongas código que 
                 </div>
               </div>
             )}
+        </div>
       </div>
     </div>
   );
