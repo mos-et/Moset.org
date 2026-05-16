@@ -209,6 +209,27 @@ impl Chunk {
         self.lineas.push(linea);
     }
 
+    /// Escribe un u16 en Big-Endian (BUG-045 Refactor)
+    pub fn escribir_u16(&mut self, valor: u16, linea: usize) {
+        let bytes = valor.to_be_bytes();
+        self.escribir(bytes[0], linea);
+        self.escribir(bytes[1], linea);
+    }
+
+    /// Lee un u16 desde una posición específica (Big-Endian)
+    pub fn leer_u16_en(&self, offset: usize) -> u16 {
+        let hi = self.codigo[offset];
+        let lo = self.codigo[offset + 1];
+        u16::from_be_bytes([hi, lo])
+    }
+
+    /// Escribe un u16 en una posición específica (Big-Endian)
+    pub fn escribir_u16_en(&mut self, offset: usize, valor: u16) {
+        let bytes = valor.to_be_bytes();
+        self.codigo[offset] = bytes[0];
+        self.codigo[offset + 1] = bytes[1];
+    }
+
     /// Añade una constante al pool y devuelve su índice
     pub fn añadir_constante(&mut self, valor: Valor) -> Result<usize, String> {
         if self.constantes.len() >= u16::MAX as usize {
@@ -233,8 +254,7 @@ impl Chunk {
         if salto > u16::MAX as usize {
             return Err("Salto demasiado grande para u16".to_string());
         }
-        self.codigo[offset] = ((salto >> 8) & 0xFF) as u8;
-        self.codigo[offset + 1] = (salto & 0xFF) as u8;
+        self.escribir_u16_en(offset, salto as u16);
         Ok(())
     }
 
@@ -246,8 +266,7 @@ impl Chunk {
         if offset > u16::MAX as usize {
             return Err("Bucle demasiado grande para u16".to_string());
         }
-        self.escribir(((offset >> 8) & 0xFF) as u8, linea);
-        self.escribir((offset & 0xFF) as u8, linea);
+        self.escribir_u16(offset as u16, linea);
         Ok(())
     }
 }

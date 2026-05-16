@@ -837,7 +837,7 @@ impl VM {
                 },
                 OpCode::Esperar => {
                     let promesa = self.pop()?;
-                    // BUG-047: Validar que el valor no sea negativo ni nulo
+                    // BUG-047: Validar que el valor sea de un tipo permitido y positivo
                     match &promesa {
                         Valor::Entero(n) if *n < 0 => {
                             return Err(format!(
@@ -845,12 +845,19 @@ impl VM {
                                 n
                             ));
                         },
-                        Valor::Nulo => {
-                            return Err(
-                                "Esperar recibió un valor nulo. Se esperaba una promesa o valor válido.".into()
-                            );
+                        Valor::Decimal(n) if *n < 0.0 => {
+                            return Err(format!(
+                                "Esperar recibió un tiempo negativo ({:.2}). Solo se aceptan valores positivos.",
+                                n
+                            ));
                         },
-                        _ => {} // Valor válido para suspender
+                        Valor::Nulo | Valor::Texto(_) | Valor::Booleano(_) | Valor::Lista(_) | Valor::Funcion {..} | Valor::Closure {..} => {
+                            return Err(format!(
+                                "Esperar recibió un valor de tipo inválido ({:?}). Se esperaba un número (ms) o una promesa.",
+                                promesa
+                            ));
+                        },
+                        _ => {} // Valor válido (Entero/Decimal positivo, Molde, Superposicion)
                     }
                     return Ok(Some(EstadoVM::Suspendido(promesa)));
                 },
@@ -998,9 +1005,12 @@ impl VM {
 
     #[inline(always)]
     fn leer_u16(&mut self) -> Result<u16, String> {
-        let hi = self.leer_byte()?;
-        let lo = self.leer_byte()?;
-        Ok(u16::from_be_bytes([hi, lo]))
+        if self.ip + 2 > self.chunk.codigo.len() {
+            return Err("Bytecode truncado: se esperaba un u16".into());
+        }
+        let valor = self.chunk.leer_u16_en(self.ip);
+        self.ip += 2;
+        Ok(valor)
     }
 }
 
@@ -1349,5 +1359,57 @@ mod tests {
         assert!(resultado.is_err(), "Esperar con valor negativo debe retornar error, no Suspendido");
         let err_msg = resultado.unwrap_err();
         assert!(err_msg.contains("negativo"), "El error debe mencionar 'negativo', obtuvo: {}", err_msg);
+    }
+
+    #[test]
+    fn test_instruction_count_persiste_en_catch_recursivo() {
+        // BUG-046: Verificar que instruction_count se acumula incluso en 
+        // excepciones relanzadas (catch dentro de catch).
+        // 
+        // Estructura:
+        // catch:
+        //    catch:
+        //       1/0
+        //    fallback:
+        //       1/0 (esto lanza al catch exterior)
+        // fallback:
+        //    0
+        
+        let programa = Programa {
+            sentencias: vec![
+                Nodo::Asignacion {
+                    nombre: "final".to_string(),
+                    valor: Box::new(Nodo::CatchEnLinea {
+                        expresion: Box::new(Nodo::CatchEnLinea {
+                            expresion: Box::new(Nodo::Binario {
+                                izq: Box::new(Nodo::EnteroLit(1)),
+                                op: OpBinario::Dividir,
+                                der: Box::new(Nodo::EnteroLit(0)),
+                            }),
+                            fallback: Box::new(Nodo::Binario {
+                                izq: Box::new(Nodo::EnteroLit(1)),
+                                op: OpBinario::Dividir,
+                                der: Box::new(Nodo::EnteroLit(0)),
+                            }),
+                        }),
+                        fallback: Box::new(Nodo::EnteroLit(999)),
+                    }),
+                },
+            ],
+        };
+
+        let mut compilador = Compilador::nuevo();
+        assert!(compilador.compilar_programa(&programa).is_ok());
+
+        let mut vm = VM::nueva(compilador.chunk);
+        let _ = vm.ejecutar();
+
+        // Debe haber acumulado una cantidad significativa de instrucciones
+        // (dos fallos de división, dos saltos de catch, etc.)
+        assert!(
+            vm.instruction_count > 10,
+            "instruction_count ({}) debería ser > 10 tras catch recursivo",
+            vm.instruction_count
+        );
     }
 }

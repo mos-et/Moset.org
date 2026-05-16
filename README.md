@@ -4,8 +4,8 @@
   # Moset Ecosystem
   **Sovereign Intelligence. Native Development.**
 
-  [![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen.svg)](https://github.com/mos-et/moset.org/releases)
-  [![CI/CD](https://github.com/mos-et/moset.org/actions/workflows/moset-ci.yml/badge.svg)](https://github.com/mos-et/moset.org/actions/workflows/moset-ci.yml)
+  [![Version](https://img.shields.io/badge/Version-1.1.0-brightgreen.svg)](https://github.com/mos-et/Moset.org/releases)
+  [![CI/CD](https://github.com/mos-et/Moset.org/actions/workflows/moset-ci.yml/badge.svg)](https://github.com/mos-et/Moset.org/actions/workflows/moset-ci.yml)
   [![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](https://polyformproject.org/licenses/noncommercial/1.0.0)
 
   <br>
@@ -26,15 +26,11 @@ I built Moset alone, from scratch, across countless sleepless nights — fueled 
 
 Moset started as an obsession: *What if a programming language could speak every human language? What if AI inference could run natively on your machine, sovereign and silent, owing nothing to anyone?* That question consumed me. And this repository is the answer — or at least, the best answer I could give with the time and energy I had.
 
-**Version 1.0.0 is my gift to the community.** It is complete, it compiles on every major OS, it passes every test, and it works. It is not perfect, but it is real.
+**Version 1.1.0 is the latest iteration of this ecosystem.** It is complete, it compiles on every major OS, it passes every test, and it works. It is stable, refined, and ready for production-level native development.
 
-After this release, I'm stepping away for an indefinite period. Not because I've lost faith in the project — quite the opposite. I'm stepping away because I need to recover. Building something this large alone takes a toll that doesn't show up in commit logs.
+After this release, I'm focusing on scaling the ecosystem. If you find value in Moset, use it freely. Fork it. Break it. Rebuild it better. Teach someone to code in their own language. Run an AI model on your own hardware without asking anyone for permission. That was always the point.
 
-If you find value in Moset, use it freely. Fork it. Break it. Rebuild it better. Teach someone to code in their own language. Run an AI model on your own hardware without asking anyone for permission. That was always the point.
-
-*Thank you for reading this far. Now go build something sovereign.*
-
-— **The Creator**, April 2026
+— **The Creator**, May 2026
 
 ---
 
@@ -63,13 +59,13 @@ To fully dive into the philosophy, technical foundations, and the "Lore" behind 
 
 ## 📥 Download
 
-**Latest Release: v1.0.0**
+**Latest Release: v1.1.0**
 
 | Platform | Download |
 |:---------|:---------|
-| Windows x64 | [Moset IDE_1.0.0_x64-setup.exe](https://github.com/mos-et/moset.org/releases/latest) |
-| macOS x64 | [Moset IDE_1.0.0_x64.dmg](https://github.com/mos-et/moset.org/releases/latest) |
-| Linux amd64 | [Moset IDE_1.0.0_amd64.AppImage](https://github.com/mos-et/moset.org/releases/latest) |
+| Windows x64 | [Moset.IDE_1.1.0_x64-setup.exe](https://github.com/mos-et/Moset.org/releases/latest/download/Moset.IDE_1.1.0_x64-setup.exe) |
+| macOS x64 | [Moset.IDE_1.1.0_aarch64.dmg](https://github.com/mos-et/Moset.org/releases/latest/download/Moset.IDE_1.1.0_aarch64.dmg) |
+| Linux amd64 | [Moset.IDE_1.1.0_amd64.AppImage](https://github.com/mos-et/Moset.org/releases/latest/download/Moset.IDE_1.1.0_amd64.AppImage) |
 
 > **Note:** The Windows installer includes the full IDE, core engine, and CLI tools.
 
@@ -147,16 +143,17 @@ cargo test
 
 **75 tests** (67 unit + 8 E2E) — 100% pass rate. Covers: lexer, parser, evaluator, VM, vigilante, closures, sandbox, quantum operations, and overflow protection.
 
-## 📋 Changelog Highlights (v1.0.0)
+## 📋 Changelog Highlights (v1.1.0)
 
-- ✅ **Localization Lens** — Real-time inline translation in the code editor
-- ✅ **Bytecode VM** — 49+ opcodes, closures, catch handlers, quantum ops
-- ✅ **Omniglot Lexer** — 8 human languages (ES, EN, IT, PT, FR, ZH, JA, DE)
-- ✅ **Cloud AI Bridge** — OpenAI, Anthropic, Mistral integration with Vigilante
-- ✅ **MCP Agent** — 12-tool autonomous agent with security middleware
-- ✅ **GGUF Surgery** — Native metadata editor for local AI models
-- ✅ **75 Tests** — Full backend test coverage with 0 failures
-- ✅ **NSIS Installer** — One-click Windows installation
+- ✅ **Stability & Performance** — General engine optimizations and bug fixes.
+- ✅ **Localization Lens** — Real-time inline translation in the code editor.
+- ✅ **Bytecode VM** — 49+ opcodes, closures, catch handlers, quantum ops.
+- ✅ **Omniglot Lexer** — 8 human languages (ES, EN, IT, PT, FR, ZH, JA, DE).
+- ✅ **Cloud AI Bridge** — OpenAI, Anthropic, Mistral integration with Vigilante.
+- ✅ **MCP Agent** — 12-tool autonomous agent with security middleware.
+- ✅ **GGUF Surgery** — Native metadata editor for local AI models.
+- ✅ **75 Tests** — Full backend test coverage with 0 failures.
+- ✅ **NSIS Installer** — One-click Windows installation.
 
 ---
 <div align="center">

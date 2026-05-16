@@ -42,6 +42,7 @@ mod engine {
         Qwen2,
         Qwen3,
         Llama,
+        Starcoder,
     }
 
     pub enum ModeloUnificado {
@@ -49,6 +50,7 @@ mod engine {
         Qwen2(candle_transformers::models::quantized_qwen2::ModelWeights),
         Qwen3(candle_transformers::models::quantized_qwen3::ModelWeights),
         Llama(candle_transformers::models::quantized_llama::ModelWeights),
+        Starcoder(()),
     }
 
     impl ModeloUnificado {
@@ -58,6 +60,7 @@ mod engine {
                 ModeloUnificado::Qwen2(m) => m.forward(input, pos),
                 ModeloUnificado::Qwen3(m) => m.forward(input, pos),
                 ModeloUnificado::Llama(m) => m.forward(input, pos),
+                ModeloUnificado::Starcoder(_) => candle_core::bail!("Starcoder GGUF inferencing is not natively supported by candle 0.10.2"),
             }
         }
     }
@@ -152,10 +155,10 @@ mod engine {
         }
 
         pub fn cargar_gguf(&mut self, ruta: &str) -> Result<String, String> {
-            // IMPORTANTE: Limpiamos explícitamente el modelo anterior de la RAM/VRAM
-            // antes de cargar uno nuevo para evitar picos de memoria (OOM).
-            self.modelo = None;
-            self.arquitectura = None;
+            if self.tokenizer.is_none() {
+                #[cfg(debug_assertions)]
+                eprintln!("[naraka] WARN: Cargando modelo sin tokenizer presente. Se recomienda cargar_tokenizer() primero.");
+            }
 
             let path = PathBuf::from(ruta);
             if !path.exists() {
@@ -168,7 +171,7 @@ mod engine {
             let content = gguf_file::Content::read(&mut file)
                 .map_err(|e| format!("Error leyendo GGUF: {}", e))?;
 
-            let arch = Self::detectar_arquitectura(&content);
+            let arch = Self::detectar_arquitectura(&content)?;
             let arch_str = format!("{:?}", arch);
 
             let modelo = match &arch {
@@ -196,6 +199,9 @@ mod engine {
                     ).map_err(|e| format!("Error Llama: {}", e))?;
                     ModeloUnificado::Llama(w)
                 }
+                ArquitecturaModelo::Starcoder => {
+                    return Err("Starcoder (GPT-2) GGUF load not supported natively by candle 0.10.2".to_string());
+                }
             };
 
             self.modelo = Some(modelo);
@@ -213,7 +219,7 @@ mod engine {
             ))
         }
 
-        fn detectar_arquitectura(content: &gguf_file::Content) -> ArquitecturaModelo {
+        fn detectar_arquitectura(content: &gguf_file::Content) -> Result<ArquitecturaModelo, String> {
             // Log all metadata keys for debugging
             #[cfg(debug_assertions)]
             eprintln!("[naraka] Metadata keys: {:?}", content.metadata.keys().collect::<Vec<_>>());
@@ -225,44 +231,44 @@ mod engine {
 
                 // Phi-3 family
                 if s.contains("phi3") || s.contains("phi-3") || s.contains("phi") {
-                    return ArquitecturaModelo::Phi3;
+                    return Ok(ArquitecturaModelo::Phi3);
                 }
                 // Qwen3 (must check before qwen2)
                 if s.contains("qwen3") {
                     if content.metadata.contains_key("qwen3.attention.head_count") {
-                        return ArquitecturaModelo::Qwen3;
+                        return Ok(ArquitecturaModelo::Qwen3);
                     } else {
-                        #[cfg(debug_assertions)]
-                        eprintln!("[naraka] WARN: Architecture '{}' detected but qwen3.attention.head_count missing, trying Qwen2 fallback", s);
-                        return ArquitecturaModelo::Qwen2;
+                        return Err(format!("Arquitectura '{}' detectada pero faltan metadatos críticos (qwen3.attention.head_count)", s));
                     }
                 }
                 // Qwen2 / Qwen
                 if s.contains("qwen2") || s.contains("qwen") {
-                    return ArquitecturaModelo::Qwen2;
+                    return Ok(ArquitecturaModelo::Qwen2);
                 }
                 // Explicit llama-family check: verify required metadata exists
                 if s.contains("llama") || s.contains("mistral") || s.contains("deepseek")
-                   || s.contains("gemma") || s.contains("starcoder") || s.contains("codellama") {
+                   || s.contains("gemma") || s.contains("codellama") {
                     // Validate that llama-specific keys exist before committing
                     if content.metadata.contains_key("llama.attention.head_count") {
-                        return ArquitecturaModelo::Llama;
+                        return Ok(ArquitecturaModelo::Llama);
                     } else {
-                        #[cfg(debug_assertions)]
-                        eprintln!("[naraka] WARN: Architecture '{}' detected but llama.attention.head_count missing, trying Qwen2 fallback", s);
-                        // Some models report as "llama" but use a Qwen-compatible layout
-                        // Try Qwen2 as it has more lenient metadata requirements
-                        return ArquitecturaModelo::Qwen2;
+                        return Err(format!("Arquitectura '{}' detectada pero faltan metadatos críticos (llama.attention.head_count)", s));
                     }
                 }
+                // GPT-2 / StarCoder family
+                if s.contains("gpt2") || s.contains("starcoder") {
+                    return Ok(ArquitecturaModelo::Starcoder);
+                }
+                
+                return Err(format!("Arquitectura no soportada o desconocida: {}", s));
             }
-            // Ultimate fallback: try Llama if head_count exists, else Qwen2
+            // Ultimate fallback
             if content.metadata.contains_key("llama.attention.head_count") {
-                ArquitecturaModelo::Llama
+                Ok(ArquitecturaModelo::Llama)
+            } else if content.metadata.contains_key("qwen2.attention.head_count") {
+                Ok(ArquitecturaModelo::Qwen2)
             } else {
-                #[cfg(debug_assertions)]
-                eprintln!("[naraka] WARN: No architecture detected and no llama metadata, defaulting to Qwen2");
-                ArquitecturaModelo::Qwen2
+                Err("No se pudo inferir la arquitectura del modelo desde los metadatos".to_string())
             }
         }
 

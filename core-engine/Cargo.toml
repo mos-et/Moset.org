@@ -21,6 +21,7 @@ cloud = ["reqwest"]
 ai = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "cloud"]
 cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
 metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]
+candle-transformers = ["dep:candle-transformers"]
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false

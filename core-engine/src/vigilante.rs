@@ -142,15 +142,30 @@ impl Vigilante {
         let palabras: Vec<&str> = cmd_lower.split_whitespace().collect();
         let cmd_normalized = palabras.join(" ");
 
-        // ⛔ Verificar lista negra absoluta PRIMERO
+        // ⛔ Verificar lista negra absoluta PRIMERO (con normalización agresiva)
+        let sin_comillas = cmd_normalized.replace("\"", "").replace("'", "");
+        let sin_comillas_norm = sin_comillas.split_whitespace().collect::<Vec<&str>>().join(" ");
+
         for prohibido in &self.prohibidos {
             let prohibido_norm = prohibido.to_lowercase().split_whitespace().collect::<Vec<&str>>().join(" ");
-            if cmd_normalized.contains(&prohibido_norm) {
+            if sin_comillas_norm.contains(&prohibido_norm) {
                 return Veredicto::Prohibido {
                     razon: format!(
                         "Comando '{}' está en la lista negra del Vigilante. NUNCA se ejecuta.",
                         comando
                     ),
+                };
+            }
+        }
+
+        // 🛡️ Detección de Inyección de Comandos (DEBT-002)
+        // Detectar encadenamiento de comandos o redirecciones sospechosas
+        let inyectores = [";", "&&", "||", "|", "`", "$(", "\n", "\r"];
+        for inyector in &inyectores {
+            if comando.contains(inyector) {
+                return Veredicto::RequiereConfianza {
+                    nivel_minimo: 0.95,
+                    categoria: format!("🛡️ Inyección detectada ('{}')", inyector),
                 };
             }
         }
@@ -219,18 +234,26 @@ impl Vigilante {
     pub fn autorizar_ruta(&self, ruta: &str) -> Result<(), String> {
         let ruta_normal = ruta.replace('\\', "/");
 
-        // ⛔ Bloquear intentos de Directory Traversal
-        // W-004 Fix: Cubrir backslash Windows y URL encoding
+        // ⛔ Bloquear intentos de Directory Traversal (W-004 Fix)
+        // Cubrir backslash Windows y URL encoding de forma exhaustiva
         let ruta_decoded = ruta_normal
             .replace("%2e", ".")
             .replace("%2E", ".")
             .replace("%2f", "/")
             .replace("%2F", "/")
-            .replace("%5c", "\\")
-            .replace("%5C", "\\");
-        if ruta_decoded.contains("../") || ruta_decoded.contains("..\\")
+            .replace("%5c", "/")
+            .replace("%5C", "/")
+            .replace('\\', "/");
+        
+        // Bloquear si contiene ".." como componente de ruta
+        let componentes: Vec<&str> = ruta_decoded.split('/').collect();
+        if componentes.contains(&"..") {
+            return Err("🛑 Vigilante: PATH TRAVERSAL DETECTADO (Uso de '..'). Acceso denegado.".into());
+        }
+
+        if ruta_decoded.contains("../") || ruta_decoded.contains("/..") || ruta_decoded.ends_with("/..") || ruta_decoded == ".."
         {
-            return Err("🛑 Vigilante: PATH TRAVERSAL DETECTADO (Uso de '../'). Acceso denegado.".into());
+            return Err("🛑 Vigilante: PATH TRAVERSAL DETECTADO. Acceso denegado.".into());
         }
 
         // Si la ruta existe, usar su forma canónica para evitar escapes por symlinks
@@ -490,5 +513,24 @@ mod tests {
         assert!(v.autorizar_url("ftp://example.com").is_err());
         assert!(v.autorizar_url("file:///etc/passwd").is_err());
         assert!(v.autorizar_url("gopher://server").is_err());
+    }
+
+    #[test]
+    fn test_deteccion_inyeccion_comando() {
+        let v = Vigilante::nuevo();
+        // Encadenamiento con punto y coma
+        match v.auditar("echo hola; whoami") {
+            Veredicto::RequiereConfianza { nivel_minimo, .. } => {
+                assert!(nivel_minimo >= 0.95);
+            }
+            other => panic!("Se esperaba detección de inyección (;), encontré {:?}", other),
+        }
+        // Pipe
+        match v.auditar("ls | grep rs") {
+            Veredicto::RequiereConfianza { nivel_minimo, .. } => {
+                assert!(nivel_minimo >= 0.95);
+            }
+            other => panic!("Se esperaba detección de inyección (|), encontré {:?}", other),
+        }
     }
 }
